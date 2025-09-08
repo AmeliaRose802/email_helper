@@ -5,9 +5,13 @@
   - ✅ Verified both categories now work properly without KeyError exceptions
   - ✅ Confirmed GUI integration uses get_available_categories() which includes new categories
 
-- Delete unused files. Clean up unused code.
+- ✅ **FIXED**: Missing Outlook folders for 'fyi' and 'newsletter' categories causing categorization failures
+  - ✅ Added folder mappings for 'fyi' → 'FYI' and 'newsletter' → 'Newsletters' in outlook_manager.py
+  - ✅ Added 'work_relevant' → 'Work Relevant' mapping as well for completeness
+  - ✅ All categories from AIProcessor.get_available_categories() now have corresponding Outlook folders
+  - ✅ Folders will be automatically created when first email is moved to each category
 
-- 
+- Delete unused files. Clean up unused code.
 
 - In the review mode, include the AI generated summery too for faster review
 
@@ -29,7 +33,7 @@
 
 - In the GUI, list emails by category for faster review
 
-- For newsletters the paragraph summery should cover all newsletters not one paragraph per newsletter
+- For newsletters the paragraph summery should cover all newsletters not one paragraph per newsletter. The summaries of newsletters in the summery output is getting cut off. This may be related.
 
 - ✅ **COMPLETED**: When an email shows up, check all emails in inbox for thread matches and include them. Thread emails may be in older emails that are not part of the emails currently being reviewed. If possible, use outlook APIs and metadata to determine threads rather then just subject
   - ✅ Replaced subject-based thread grouping with Outlook's native ConversationID API

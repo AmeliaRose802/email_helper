@@ -56,6 +56,9 @@ class OutlookManager:
                 'optional_action': 'Optional Actions',
                 'job_listing': 'Job Listings',  # Use existing Job Listings folder
                 'optional_event': 'Optional Events',
+                'work_relevant': 'Work Relevant',
+                'fyi': 'FYI',
+                'newsletter': 'Newsletters',
                 'spam_to_delete': 'ai_deleted',  # Use existing ai_deleted folder
                 'general_information': 'Summarized'  # Use existing Summarized folder
             }
