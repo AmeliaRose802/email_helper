@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""
+Main Email Manager - Orchestrates the entire email management system
+"""
+
+import sys
+import os
+
+# Add the scripts directory to the Python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from outlook_manager import OutlookManager
+from ai_processor import AIProcessor
+from email_analyzer import EmailAnalyzer
+from summary_generator import SummaryGenerator
+from user_interface import UserInterface
+from email_processor import EmailProcessor
+
+
+class EmailManagementSystem:
+    """Main application class that orchestrates all components"""
+    
+    def __init__(self):
+        # Initialize all components
+        self.outlook_manager = OutlookManager()
+        self.ai_processor = AIProcessor()
+        self.email_analyzer = EmailAnalyzer(self.ai_processor)
+        self.summary_generator = SummaryGenerator()
+        self.user_interface = UserInterface(self.ai_processor, self.outlook_manager, self.summary_generator)
+        self.email_processor = EmailProcessor(
+            self.outlook_manager, 
+            self.ai_processor, 
+            self.email_analyzer, 
+            self.summary_generator
+        )
+    
+    def run(self):
+        """Main application entry point"""
+        print("🤖 AI-POWERED EMAIL MANAGEMENT SYSTEM")
+        print("Based on Amelia's ADHD-Friendly Summary Requirements")
+        print("=" * 60)
+        
+        try:
+            # Connect to Outlook
+            print("🔗 Connecting to Outlook...")
+            self.outlook_manager.connect_to_outlook()
+            
+            # Get user preferences
+            max_emails = self.user_interface.get_max_emails_from_user()
+            
+            print(f"\n📋 Generating summary with AI suggestions for up to {max_emails} emails...")
+            
+            # Process emails
+            email_suggestions = self.email_processor.process_emails(max_emails)
+            
+            if not email_suggestions:
+                print("❌ No email suggestions generated. Cannot create summary.")
+                return
+            
+            print(f"\n📋 Using collected data from {len(email_suggestions)} processed emails for summary generation...")
+            
+            # Generate summary
+            summary_sections = self.email_processor.generate_summary()
+            
+            # Set data for user interface
+            self.user_interface.set_email_suggestions(email_suggestions)
+            self.user_interface.set_action_items_data(self.email_processor.get_action_items_data())
+            
+            # Offer editing options
+            self.user_interface.offer_editing_options()
+            
+            print("\n✅ Email management session completed successfully!")
+            
+        except Exception as e:
+            print(f"\n❌ An error occurred during email processing:")
+            print(f"   Error: {str(e)}")
+            print(f"   Type: {type(e).__name__}")
+            
+            # Check for common issues
+            if "Outlook" in str(e):
+                print("\n💡 Troubleshooting tips:")
+                print("   • Make sure Microsoft Outlook is installed and running")
+                print("   • Check that Outlook is properly configured with your email account")
+                print("   • Try restarting Outlook and running this script again")
+            elif "prompty" in str(e).lower() or "ai" in str(e).lower():
+                print("\n💡 Troubleshooting tips:")
+                print("   • Make sure the prompty library is installed: pip install prompty")
+                print("   • Check that Azure OpenAI credentials are configured")
+                print("   • Verify that prompt files exist in the prompts directory")
+            else:
+                print("\n💡 General troubleshooting:")
+                print("   • Make sure all required Python packages are installed")
+                print("   • Check that all files in the prompts directory exist")
+                print("   • Verify your Python environment is set up correctly")
+            
+            return False
+        
+        except KeyboardInterrupt:
+            print("\n\n🛑 Program interrupted by user. Exiting...")
+            return False
+
+
+def main():
+    """Main function - entry point for the application"""
+    system = EmailManagementSystem()
+    system.run()
+
+
+if __name__ == "__main__":
+    main()

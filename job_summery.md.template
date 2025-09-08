@@ -1,0 +1,29 @@
+# Job Summary Template
+
+**Copy this file to `user_specific_data/job_summery.md` and customize it with your information**
+
+## Your Job Context
+
+Describe your role, responsibilities, and work focus areas. This helps the AI classify emails more accurately based on your specific job requirements.
+
+Example:
+```
+I am a Software Engineer working on Azure Compute Node Services, specifically:
+
+- Instance Metadata Service (IMDS) development and maintenance
+- WireServer endpoint implementation and optimization  
+- Azure Host Gateway (AHG) partner integrations
+- Security Champion responsibilities for the team
+- R2D/SafeFly release processes and approvals
+- ICM incident investigation and resolution
+
+Key technologies: Azure, C#, Python, REST APIs, microservices
+Team focus: High-scale distributed systems, reliability, performance
+```
+
+## Instructions
+
+1. Create the `user_specific_data` directory in your project root
+2. Copy this template to `user_specific_data/job_summery.md`
+3. Replace the example content with your actual job context
+4. Keep this file private - it's already ignored by git

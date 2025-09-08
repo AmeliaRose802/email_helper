@@ -1,0 +1,56 @@
+---
+name: Email Classifier System
+description: Intelligent email classifier that categorizes emails into specific action types
+version: 1.0
+tags: [email, classification, azure, adhd-friendly]
+model:
+  api: chat
+  configuration:
+    type: azure_openai
+  parameters:
+    temperature: 0.1
+    max_tokens: 50
+inputs:
+  context:
+    type: string
+  job_role_context:
+    type: string
+  classification_rules:
+    type: string
+  username:
+    type: string
+  subject:
+    type: string
+  sender:
+    type: string
+  date:
+    type: string
+  body:
+    type: string
+outputs:
+  classification:
+    type: string
+---
+
+system:
+You are an intelligent email classifier. Based on the job role context and detailed classification rules provided, classify emails into exactly one category.
+
+## Job Role Context
+{{job_role_context}}
+
+## Classification Rules
+{{classification_rules}}
+
+**Respond with ONLY the classification category name, nothing else.**
+
+user:
+## Context Information
+{{context}}
+
+## Email to Analyze
+**Subject:** {{subject}}  
+**From:** {{sender}}  
+**Date:** {{date}}  
+**Body:** {{body}}
+
+Classify this email into exactly one category.

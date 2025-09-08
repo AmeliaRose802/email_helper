@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Summary - Focused & Actionable</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #007acc;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #007acc;
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .overview {
+            background: #e8f4fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .overview h2 {
+            color: #005a8b;
+            margin: 0 0 10px 0;
+        }
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007acc;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .required-actions { background: #ffe6e6; border-left: 5px solid #dc3545; }
+        .team-actions { background: #fff3cd; border-left: 5px solid #ffc107; }
+        .optional-actions { background: #e7f3ff; border-left: 5px solid #17a2b8; }
+        .job-listings { background: #e8f5e8; border-left: 5px solid #28a745; }
+        .optional-events { background: #f8e8ff; border-left: 5px solid #6f42c1; }
+        
+        .section-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin: 0;
+            color: #333;
+        }
+        .item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .item-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .item-meta {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+        .item-content {
+            margin-bottom: 15px;
+        }
+        .item-content div {
+            margin-bottom: 8px;
+        }
+        .label {
+            font-weight: bold;
+            color: #555;
+            display: inline-block;
+            min-width: 80px;
+        }
+        .links {
+            margin-top: 10px;
+        }
+        .links a {
+            display: inline-block;
+            background: #007acc;
+            color: white;
+            padding: 8px 15px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-right: 10px;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        .links a:hover {
+            background: #005a8b;
+        }
+        .empty-section {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Email Summary</h1>
+            <p>Focused & Actionable</p>
+            <p><strong>Generated:</strong> {{timestamp}}</p>
+        </div>
+
+        <div class="overview">
+            <h2>📊 Summary Overview</h2>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">{{total_items}}</div>
+                    <div>Total Items</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">{{high_priority}}</div>
+                    <div>High Priority</div>
+                </div>
+            </div>
+            <p style="margin-top: 15px; font-weight: bold; color: #005a8b;">Stay focused - relevant items only!</p>
+        </div>
+
+        <!-- Required Actions Section -->
+        <div class="section">
+            <div class="section-header required-actions">
+                <span style="font-size: 1.2em;">🔴</span>
+                <h3 class="section-title">REQUIRED ACTION ITEMS (ME) ({{required_actions|length}})</h3>
+            </div>
+            {% if required_actions %}
+                {% for item in required_actions %}
+                <div class="item">
+                    <div class="item-title">{{loop.index}}. {{item.subject}}</div>
+                    <div class="item-meta">From: {{item.sender}}</div>
+                    <div class="item-content">
+                        <div><span class="label">Due:</span> {{item.due_date}}</div>
+                        <div><span class="label">Action:</span> {{item.action_required}}</div>
+                        <div><span class="label">Why:</span> {{item.explanation}}</div>
+                    </div>
+                    {% if item.links %}
+                    <div class="links">
+                        {% for link in item.links[:2] %}
+                        <a href="{{link}}" target="_blank">Link</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-section">No required actions found</div>
+            {% endif %}
+        </div>
+
+        <!-- Team Actions Section -->
+        <div class="section">
+            <div class="section-header team-actions">
+                <span style="font-size: 1.2em;">👥</span>
+                <h3 class="section-title">TEAM ACTION ITEMS ({{team_actions|length}})</h3>
+            </div>
+            {% if team_actions %}
+                {% for item in team_actions %}
+                <div class="item">
+                    <div class="item-title">{{loop.index}}. {{item.subject}}</div>
+                    <div class="item-meta">From: {{item.sender}}</div>
+                    <div class="item-content">
+                        <div><span class="label">Due:</span> {{item.due_date}}</div>
+                        <div><span class="label">Action:</span> {{item.action_required}}</div>
+                        <div><span class="label">Why:</span> {{item.explanation}}</div>
+                    </div>
+                    {% if item.links %}
+                    <div class="links">
+                        {% for link in item.links[:2] %}
+                        <a href="{{link}}" target="_blank">Link</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-section">No team actions found</div>
+            {% endif %}
+        </div>
+
+        <!-- Optional Actions Section -->
+        <div class="section">
+            <div class="section-header optional-actions">
+                <span style="font-size: 1.2em;">📝</span>
+                <h3 class="section-title">OPTIONAL ACTION ITEMS ({{optional_actions|length}})</h3>
+            </div>
+            {% if optional_actions %}
+                {% for item in optional_actions %}
+                <div class="item">
+                    <div class="item-title">{{loop.index}}. {{item.subject}}</div>
+                    <div class="item-meta">From: {{item.sender}}</div>
+                    <div class="item-content">
+                        <div><span class="label">What:</span> {{item.action_required}}</div>
+                        <div><span class="label">Relevant:</span> {{item.why_relevant}}</div>
+                        <div><span class="label">Context:</span> {{item.explanation}}</div>
+                    </div>
+                    {% if item.links %}
+                    <div class="links">
+                        {% for link in item.links[:2] %}
+                        <a href="{{link}}" target="_blank">Link</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-section">No optional actions found</div>
+            {% endif %}
+        </div>
+
+        <!-- Job Listings Section -->
+        <div class="section">
+            <div class="section-header job-listings">
+                <span style="font-size: 1.2em;">💼</span>
+                <h3 class="section-title">JOB LISTINGS ({{job_listings|length}})</h3>
+            </div>
+            {% if job_listings %}
+                {% for item in job_listings %}
+                <div class="item">
+                    <div class="item-title">{{loop.index}}. {{item.subject}}</div>
+                    <div class="item-meta">From: {{item.sender}}</div>
+                    <div class="item-content">
+                        <div><span class="label">Match:</span> {{item.qualification_match}}</div>
+                        <div><span class="label">Due:</span> {{item.due_date}}</div>
+                    </div>
+                    {% if item.links %}
+                    <div class="links">
+                        {% for link in item.links[:2] %}
+                        <a href="{{link}}" target="_blank">Apply</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-section">No job listings found</div>
+            {% endif %}
+        </div>
+
+        <!-- Optional Events Section -->
+        <div class="section">
+            <div class="section-header optional-events">
+                <span style="font-size: 1.2em;">🎪</span>
+                <h3 class="section-title">OPTIONAL EVENTS ({{optional_events|length}})</h3>
+            </div>
+            {% if optional_events %}
+                {% for item in optional_events %}
+                <div class="item">
+                    <div class="item-title">{{loop.index}}. {{item.subject}}</div>
+                    <div class="item-meta">From: {{item.sender}}</div>
+                    <div class="item-content">
+                        <div><span class="label">Date:</span> {{item.date}}</div>
+                        <div><span class="label">Relevant:</span> {{item.relevance}}</div>
+                    </div>
+                    {% if item.links %}
+                    <div class="links">
+                        {% for link in item.links[:2] %}
+                        <a href="{{link}}" target="_blank">Register</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-section">No optional events found</div>
+            {% endif %}
+        </div>
+
+        <div class="footer">
+            <p>Email Summary generated automatically - Stay focused on what matters most!</p>
+        </div>
+    </div>
+</body>
+</html>

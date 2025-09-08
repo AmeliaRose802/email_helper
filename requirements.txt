@@ -1,0 +1,22 @@
+# Interactive Email Learning System - Azure OpenAI Integration
+# Python package requirements
+
+# Core dependencies
+pandas>=2.0.0
+pywin32>=306                    # For Outlook COM integration
+jinja2>=3.0.0                   # Template engine for HTML generation
+
+# Azure OpenAI integration  
+openai>=1.3.0                   # Azure OpenAI client library
+prompty>=1.0.0                  # Microsoft Prompty for AI prompt management
+promptflow>=1.0.0               # PromptFlow core for better prompty integration
+azure-identity>=1.15.0          # Azure authentication using DefaultAzureCredential
+python-dotenv>=1.0.0            # Environment variable management
+
+# Optional: For advanced text processing
+nltk>=3.8                       # Natural language processing
+scikit-learn>=1.3.0             # Machine learning for classification enhancement
+
+# Development dependencies
+pytest>=7.0.0                   # Testing framework
+black>=23.0.0                   # Code formatting

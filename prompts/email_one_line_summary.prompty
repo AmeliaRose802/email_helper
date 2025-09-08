@@ -1,0 +1,61 @@
+---
+name: Email One-Line Summary Generator
+description: Generate a single concise line summary of an email for quick scanning
+version: 1.0
+tags: [email, summary, one-line, adhd-friendly]
+model:
+  api: chat
+  configuration:
+    type: azure_openai
+  parameters:
+    temperature: 0.2
+    max_tokens: 100
+inputs:
+  context:
+    type: string
+  username:
+    type: string
+  subject:
+    type: string
+  sender:
+    type: string
+  date:
+    type: string
+  body:
+    type: string
+outputs:
+  summary:
+    type: string
+---
+
+system:
+Generate a single, concise line that captures the essence of this email for quick scanning. Focus on the key action, request, or information. Keep it under 120 characters for easy reading.
+
+user:
+## Context Information
+{{context}}
+
+## Email to Summarize
+**Subject:** {{subject}}  
+**From:** {{sender}}  
+**Date:** {{date}}  
+**Body:** {{body}}
+
+Generate a one-line summary for this email.
+
+- Return ONLY one line (no headers, bullets, or formatting)
+- Maximum 120 characters
+- Focus on actionable content or key information
+- Use active voice when possible
+- Be specific about what the email is asking for or providing
+
+## Examples
+
+Good summaries:
+- "Manager requesting quarterly budget review by Friday"
+- "Azure service outage notification affecting production systems"
+- "Training session invitation for new security protocols"
+- "Job application deadline extended to September 15th"
+- "Survey feedback requested for team development program"
+
+Return only the summary line, nothing else.

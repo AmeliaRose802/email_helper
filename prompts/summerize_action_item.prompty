@@ -1,0 +1,75 @@
+---
+name: Email action item summarizer
+description: Extracts key info from an email which represents an item that the user needs to complete
+version: 1.0
+tags: [email, analysis, extraction, azure, adhd-friendly]
+model:
+  api: chat
+  configuration:
+    type: azure_openai
+  parameters:
+    temperature: 0.2
+    max_tokens: 500
+inputs:
+  context:
+    type: string
+  username:
+    type: string
+  subject:
+    type: string
+  sender:
+    type: string
+  date:
+    type: string
+  body:
+    type: string
+outputs:
+  action_details:
+    type: object
+---
+
+system:
+You are an intelligent task email analyzer that extracts key information from emails to create follow up items. Return your response as a JSON object with the following structure:
+
+{
+  "due_date": "string - when this needs to be done",
+  "action_required": "string - what specific action is needed",
+  "explanation": "string - why this is relevant",
+  "relevance": "string - how this relates to work",
+  "links": ["array of relevant links from the email"]
+}
+
+user:
+## Context Information
+{{context}}
+
+## Email to Analyze
+**Subject:** {{subject}}  
+**From:** {{sender}}  
+**Date:** {{date}}  
+**Body:** {{body}}
+
+Extract action item details from this email and return as JSON.
+
+**Subject:** {{subject}}  
+**From:** {{sender}}  
+**Date:** {{date}}  
+**Body:** {{body}}
+
+## Output Format
+
+Return your analysis as a JSON object with these fields:
+
+- **due_date**: Extract any deadline or due date (if none found, return "No specific deadline")
+- **action_required**: What specific action is needed (if unclear, return "Review email content")
+- **explanation**: Why this action is needed (brief explanation)
+- **relevance**: Why this is relevant to the user based on their job context
+- **links**: Array of important URLs from the email (up to 3 most relevant)
+
+## Instructions
+
+- Focus on actionable information
+- Be concise and clear for ADHD-friendly processing
+- Extract only the most relevant links
+- Consider the user's role based on their job context
+- Return ONLY the JSON object, no other text

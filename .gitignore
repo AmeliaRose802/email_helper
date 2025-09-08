@@ -1,3 +1,26 @@
+# User-specific data - DO NOT COMMIT (contains personal information)
+user_specific_data/
+*.personal
+*.private
+
+# Runtime data - generated files and AI summaries
+runtime_data/
+
+# Environment files - DO NOT COMMIT
+.env
+.env.local
+.env.production
+.env.staging
+
+# Azure credentials and secrets - SECURITY SENSITIVE
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+azure_credentials.json
+azure_config.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -143,6 +166,15 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Azure credentials and secrets - SECURITY SENSITIVE
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+azure_credentials.json
+azure_config.json
 
 # Spyder project settings
 .spyderproject

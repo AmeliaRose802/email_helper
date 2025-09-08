@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+"""
+Summary Generator - Handles summary creation, display, and file output
+"""
+
+from datetime import datetime
+import os
+import webbrowser
+from jinja2 import Environment, FileSystemLoader
+
+
+class SummaryGenerator:
+    def __init__(self):
+        pass
+    
+    def build_summary_sections(self, action_items_data):
+        """Build summary sections using collected AI analysis data"""
+        summary_sections = {
+            'required_actions': [],
+            'team_actions': [],
+            'optional_actions': [],
+            'job_listings': [],
+            'optional_events': []
+        }
+        
+        # Required personal actions - use collected action details
+        if 'required_personal_action' in action_items_data:
+            for item_data in action_items_data['required_personal_action']:
+                email = item_data['email_object']
+                action_details = item_data['action_details']
+                
+                summary_sections['required_actions'].append({
+                    'subject': email.Subject,
+                    'sender': email.SenderName,
+                    'due_date': action_details.get('due_date', 'No specific deadline'),
+                    'explanation': action_details.get('explanation', 'Details in email'),
+                    'action_required': action_details.get('action_required', 'Review email'),
+                    'links': action_details.get('links', []),
+                    'priority': 1
+                })
+        
+        # Team actions - use collected action details
+        if 'team_action' in action_items_data:
+            for item_data in action_items_data['team_action']:
+                email = item_data['email_object']
+                action_details = item_data['action_details']
+                
+                summary_sections['team_actions'].append({
+                    'subject': email.Subject,
+                    'sender': email.SenderName,
+                    'due_date': action_details.get('due_date', 'No specific deadline'),
+                    'explanation': action_details.get('explanation', 'Details in email'),
+                    'action_required': action_details.get('action_required', 'Review email'),
+                    'links': action_details.get('links', []),
+                    'priority': 2
+                })
+        
+        # Optional actions - use collected action details
+        if 'optional_action' in action_items_data:
+            for item_data in action_items_data['optional_action']:
+                email = item_data['email_object']
+                action_details = item_data['action_details']
+                
+                summary_sections['optional_actions'].append({
+                    'subject': email.Subject,
+                    'sender': email.SenderName,
+                    'explanation': action_details.get('explanation', 'Details in email'),
+                    'action_required': action_details.get('action_required', 'Review email'),
+                    'links': action_details.get('links', []),
+                    'why_relevant': action_details.get('relevance', 'General professional interest')
+                })
+        
+        # Job listings - use collected job data
+        if 'job_listing' in action_items_data:
+            for job_data in action_items_data['job_listing']:
+                email = job_data['email_object']
+                
+                summary_sections['job_listings'].append({
+                    'subject': email.Subject,
+                    'sender': email.SenderName,
+                    'qualification_match': job_data['qualification_match'],
+                    'links': job_data['links'],
+                    'due_date': job_data['due_date']
+                })
+        
+        # Optional events - use collected event data
+        if 'optional_event' in action_items_data:
+            for event_data in action_items_data['optional_event']:
+                email = event_data['email_object']
+                
+                summary_sections['optional_events'].append({
+                    'subject': email.Subject,
+                    'sender': email.SenderName,
+                    'date': event_data['date'],
+                    'relevance': event_data['relevance'],
+                    'links': event_data['links']
+                })
+        
+        return summary_sections
+    
+    def display_focused_summary(self, summary_sections):
+        """Display AI-enhanced ADHD-friendly focused summary"""
+        
+        # Calculate total counts for overview
+        total_items = sum(len(items) for items in summary_sections.values())
+        high_priority = len(summary_sections.get('required_actions', []))
+        
+        print(f"📊 SUMMARY OVERVIEW")
+        print(f"Total actionable items: {total_items}")
+        print(f"High priority (required actions): {high_priority}")
+        print("=" * 50)
+        print()
+        
+        sections = [
+            ('🔴 REQUIRED ACTION ITEMS (ME)', 'required_actions', lambda x: x['due_date'] == "No specific deadline"),
+            ('👥 TEAM ACTION ITEMS', 'team_actions', None),
+            ('📝 OPTIONAL ACTION ITEMS', 'optional_actions', None),
+            ('💼 JOB LISTINGS', 'job_listings', None),
+            ('🎪 OPTIONAL EVENTS', 'optional_events', None)
+        ]
+        
+        for title, section_key, sort_key in sections:
+            items = summary_sections.get(section_key, [])
+            if not items:
+                continue
+                
+            # Include count in the title
+            count = len(items)
+            title_with_count = f"{title} ({count})"
+            print(f"{title_with_count}\n{'-' * len(title_with_count)}")
+            
+            if sort_key:
+                items = sorted(items, key=sort_key)
+            
+            for i, item in enumerate(items, 1):
+                self._display_item(i, item, section_key)
+                print()
+    
+    def _display_item(self, index, item, section_type):
+        """Display individual item based on section type"""
+        print(f"{index}. **{item['subject']}**")
+        print(f"   From: {item['sender']}")
+        
+        if section_type in ['required_actions', 'team_actions']:
+            print(f"   Due: {item['due_date']}")
+            print(f"   Action: {item.get('action_required', 'Review email')}")
+            print(f"   Why: {item['explanation']}")
+        elif section_type == 'optional_actions':
+            print(f"   What: {item.get('action_required', 'Provide feedback')}")
+            print(f"   Why relevant: {item['why_relevant']}")
+            print(f"   Context: {item['explanation']}")
+        elif section_type == 'job_listings':
+            print(f"   Match: {item['qualification_match']}")
+            print(f"   Due: {item['due_date']}")
+        elif section_type == 'optional_events':
+            print(f"   Date: {item['date']}")
+            print(f"   Why relevant: {item['relevance']}")
+        
+        # Display links
+        if item.get('links'):
+            link_type = 'Apply' if section_type == 'job_listings' else 'Register' if section_type == 'optional_events' else 'Link'
+            for link in item['links'][:2]:
+                print(f"   {link_type}: {link}")
+    
+    def save_focused_summary(self, summary_sections, timestamp):
+        """Save focused summary to HTML file and open in browser"""
+        # Create runtime_data/ai_summaries directory if it doesn't exist
+        # Get the project root directory (parent of scripts directory)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        runtime_dir = os.path.join(project_root, 'runtime_data', 'ai_summaries')
+        os.makedirs(runtime_dir, exist_ok=True)
+        
+        filename = f'focused_summary_{timestamp.replace(":", "").replace("-", "").replace(" ", "_")}.html'
+        filepath = os.path.join(runtime_dir, filename)
+        
+        # Set up Jinja2 environment
+        template_dir = os.path.join(os.path.dirname(__file__), 'templates')
+        env = Environment(loader=FileSystemLoader(template_dir))
+        template = env.get_template('summary_base.html')
+        
+        # Calculate total counts
+        total_items = sum(len(items) for items in summary_sections.values())
+        high_priority = len(summary_sections.get('required_actions', []))
+        
+        # Render HTML with template
+        html_content = template.render(
+            timestamp=timestamp,
+            total_items=total_items,
+            high_priority=high_priority,
+            required_actions=summary_sections.get('required_actions', []),
+            team_actions=summary_sections.get('team_actions', []),
+            optional_actions=summary_sections.get('optional_actions', []),
+            job_listings=summary_sections.get('job_listings', []),
+            optional_events=summary_sections.get('optional_events', [])
+        )
+        
+        # Write HTML file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        # Open in default browser
+        file_path = os.path.abspath(filepath)
+        webbrowser.open(f'file://{file_path}')
+        
+        print(f"💾 HTML summary saved to: {filepath}")
+        print(f"🌐 Opened in browser automatically")
+        return filepath
+    
+    def display_suggestions_for_editing(self, email_suggestions):
+        """Display all AI suggestions with numbers for editing"""
+        if not email_suggestions:
+            print("❌ No email suggestions available. Please generate summary first.")
+            return False
+            
+        print("\n📝 EMAIL SUGGESTIONS")
+        print("=" * 60)
+        
+        for i, suggestion_data in enumerate(email_suggestions, 1):
+            email = suggestion_data['email_object']
+            suggestion = suggestion_data['ai_suggestion']
+            
+            print(f"{i:2d}. {email.Subject}")
+            print(f"    From: {email.SenderName}")
+            print(f"    Current: {suggestion.replace('_', ' ').title()}")
+            print(f"    Date: {email.ReceivedTime.strftime('%Y-%m-%d %H:%M')}")
+            print()
+        
+        return True
+    
+    def show_categorization_preview(self, categories):
+        """Show preview of email categorization counts"""
+        print(f"\n✅ Email categorization preview:")
+        for category, emails in categories.items():
+            if category != 'spam_to_delete':
+                print(f"  • {category.replace('_', ' ').title()}: {len(emails)} conversations")
+        
+        # Show spam/deleted count separately if any
+        if 'spam_to_delete' in categories:
+            spam_count = len(categories['spam_to_delete'])
+            print(f"  • 🗑️ Spam/Delete: {spam_count} conversations")

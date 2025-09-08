@@ -1,0 +1,52 @@
+---
+name: Event Relevance Assessment
+description: Assess why an event or optional action is relevant to the user based on their job context and skills
+authors:
+  - System Generated
+model:
+  api: chat
+  configuration:
+    type: azure_openai
+  parameters:
+    max_tokens: 200
+    temperature: 0.3
+inputs:
+  context:
+    type: string
+  username:
+    type: string
+  subject:
+    type: string
+  sender:
+    type: string
+  body:
+    type: string
+outputs:
+  relevance_assessment:
+    type: string
+---
+
+system:
+You are an AI assistant that assesses the relevance of events, training opportunities, or optional actions for a professional.
+
+Given the user's job context and skills profile, analyze why this email might be relevant to them. Be specific and professional.
+
+Focus on:
+- Career development opportunities
+- Skill building alignment
+- Professional networking value
+- Industry knowledge advancement
+- Direct job relevance
+
+Provide a concise, actionable explanation in 1-2 sentences.
+
+user:
+**User Profile:**
+{{context}}
+
+**Email Details:**
+Subject: {{subject}}
+Sender: {{sender}}
+Content Preview: {{body}}
+
+Assess why this email/event is relevant to this user. Provide a brief, specific explanation.
