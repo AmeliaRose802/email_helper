@@ -103,10 +103,19 @@ class SummaryGenerator:
             for fyi_data in action_items_data['fyi']:
                 email = fyi_data['email_object']
                 
+                # Safe date handling for both COM objects and safe wrappers
+                try:
+                    if hasattr(email.ReceivedTime, 'strftime'):
+                        date_str = email.ReceivedTime.strftime('%Y-%m-%d')
+                    else:
+                        date_str = str(email.ReceivedTime)[:10] if str(email.ReceivedTime) != 'Unknown' else 'Unknown'
+                except AttributeError:
+                    date_str = 'Unknown'
+                
                 summary_sections['fyi_notices'].append({
                     'subject': email.Subject,
                     'sender': email.SenderName,
-                    'date': email.ReceivedTime.strftime('%Y-%m-%d'),
+                    'date': date_str,
                     'summary': fyi_data['summary']
                 })
         
@@ -115,10 +124,19 @@ class SummaryGenerator:
             for newsletter_data in action_items_data['newsletter']:
                 email = newsletter_data['email_object']
                 
+                # Safe date handling for both COM objects and safe wrappers
+                try:
+                    if hasattr(email.ReceivedTime, 'strftime'):
+                        date_str = email.ReceivedTime.strftime('%Y-%m-%d')
+                    else:
+                        date_str = str(email.ReceivedTime)[:10] if str(email.ReceivedTime) != 'Unknown' else 'Unknown'
+                except AttributeError:
+                    date_str = 'Unknown'
+                
                 summary_sections['newsletters'].append({
                     'subject': email.Subject,
                     'sender': email.SenderName,
-                    'date': email.ReceivedTime.strftime('%Y-%m-%d'),
+                    'date': date_str,
                     'summary': newsletter_data['summary']
                 })
         
@@ -279,7 +297,17 @@ class SummaryGenerator:
             print(f"{i:2d}. {email.Subject}")
             print(f"    From: {email.SenderName}")
             print(f"    Current: {suggestion.replace('_', ' ').title()}")
-            print(f"    Date: {email.ReceivedTime.strftime('%Y-%m-%d %H:%M')}")
+            
+            # Safe date handling for both COM objects and safe wrappers
+            try:
+                if hasattr(email.ReceivedTime, 'strftime'):
+                    date_str = email.ReceivedTime.strftime('%Y-%m-%d %H:%M')
+                else:
+                    date_str = str(email.ReceivedTime) if str(email.ReceivedTime) != 'Unknown' else 'Unknown'
+            except AttributeError:
+                date_str = 'Unknown'
+            
+            print(f"    Date: {date_str}")
             print()
         
         return True
