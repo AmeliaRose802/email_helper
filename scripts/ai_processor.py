@@ -18,6 +18,7 @@ class AIProcessor:
         project_root = os.path.dirname(script_dir)
         self.prompts_dir = os.path.join(project_root, 'prompts')
         self.user_data_dir = os.path.join(project_root, 'user_specific_data')
+        self.runtime_data_dir = os.path.join(project_root, 'runtime_data', 'user_feedback')
         
         # File references (now in user_specific_data)
         self.job_summary_file = os.path.join(self.user_data_dir, 'job_summery.md')
@@ -26,9 +27,10 @@ class AIProcessor:
         self.classification_rules_file = os.path.join(self.user_data_dir, 'classification_rules.md')
         self.email_classifier_system_file = 'email_classifier_system.prompty'
         
-        # Learning files
-        self.learning_file = 'ai_learning_feedback.csv'
-        self.modification_file = 'suggestion_modifications.csv'
+        # Learning files (now in runtime_data)
+        os.makedirs(self.runtime_data_dir, exist_ok=True)
+        self.learning_file = os.path.join(self.runtime_data_dir, 'ai_learning_feedback.csv')
+        self.modification_file = os.path.join(self.runtime_data_dir, 'suggestion_modifications.csv')
     
     def get_username(self):
         """Load username from user_specific_data/username.txt"""
