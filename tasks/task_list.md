@@ -1,5 +1,10 @@
 # TODO
 
+
+
+- classification_rules.md does not appear to contain any internal info. It should go back into the promptly file email_classifier_system.prompty.
+
+
 - ✅ **COMPLETED**: Create the summaries under a new folder created at runtime called runtime_data/ai_summaries. Add this entire folder to the git ignore.
   - ✅ Updated `summary_generator.py` to save HTML summaries to `runtime_data/ai_summaries/`
   - ✅ Added `runtime_data/` to `.gitignore` to exclude all runtime generated files
@@ -23,8 +28,6 @@
 
 - ✅ **COMPLETED**: Move info that is specific to the user out of the email_classifer_system.promply. Instead move this data into a separate markdown file and inject it so that it can be kept confidential. Update the readme to reflect the need for this.
 
-
-
 - ✅ **COMPLETED**: Remove direct references to the users alias from prompt files. Instead pass this in as an argument to the prompts so it can be kept private and can support multiple users. It can be read from a persistent file stored locally
   - ✅ Created `username.txt` in user_specific_data directory
   - ✅ Updated `ai_processor.py` to load username and inject it into all prompts
@@ -33,8 +36,6 @@
   - ✅ Updated setup script to configure username during installation
   - ✅ Added username.txt.template for new users
 
-- Show accuracy rate based on how many user reclassifies. Store the accuracy rate for each run so we can persistently across runs so we can monitor it over time. We want to be able to track how changes to the meta prompts impact accuracy rate.
+- Show accuracy rate based on how many emails user reclassifies. Store the accuracy rate in runtime_data for each run so we can persistently across runs so we can monitor it over time. We want to be able to track how changes impact accuracy rate.
 
 - Make a GUI for viewing and modifying suggestions. Suggestions should be visble. The user should be able to change the classification using a drop down menu.
-
-

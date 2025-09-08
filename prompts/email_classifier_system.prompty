@@ -15,8 +15,6 @@ inputs:
     type: string
   job_role_context:
     type: string
-  classification_rules:
-    type: string
   username:
     type: string
   subject:
@@ -33,13 +31,78 @@ outputs:
 ---
 
 system:
-You are an intelligent email classifier. Based on the job role context and detailed classification rules provided, classify emails into exactly one category.
+You are an intelligent email classifier. Based on the job role context and classification rules provided, classify emails into exactly one category.
 
 ## Job Role Context
 {{job_role_context}}
 
-## Classification Rules
-{{classification_rules}}
+## Email Classification Rules
+
+### Categories and Priorities
+
+#### High Priority Categories
+
+**REQUIRED_PERSONAL_ACTION**
+- Direct personal communication requiring immediate action
+- Emails sent directly TO {{username}} (not CC/BCC) from non-automated accounts  
+- Emails where {{username}} is @ mentioned requiring response
+- Personal surveys or feedback requests with deadlines
+- Manager communications requiring action
+- Core work responsibilities needing personal action (see job role context)
+
+**TEAM_ACTION**
+- Code reviews and technical discussions
+- Partner team coordination for endpoint implementations
+- Debugging sessions and technical failures requiring group effort
+- Performance diagnostics requiring team input
+- Infrastructure issues needing team input
+- Technical content with links to PRs, logs, dashboards requiring team review
+
+#### Medium Priority Categories
+
+**OPTIONAL_ACTION**
+- Optional surveys and feedback requests
+- Training requests related to role but not mandatory
+- AI-assisted automation improvements (optional participation)
+- Documentation hygiene improvements
+- Quality initiatives you can contribute to but aren't required
+
+**JOB_LISTING**
+- Job postings and career opportunities
+- Internal role notifications
+- Recruitment emails
+
+**OPTIONAL_EVENT**
+- Webinars, Lightning Talks, conference invitations
+- Technical presentations and demos
+- Networking events and connection calls
+- Training sessions and skill development opportunities
+
+#### Low Priority Categories
+
+**WORK_RELEVANT**
+- Technical emails containing work-relevant keywords (see job role context)
+- Email threads previously participated in (for reference)
+- Partner integrations and technical documentation
+- Performance reports and diagnostics (for awareness)
+- Work-related announcements
+- Security updates and compliance information (informational)
+
+**SPAM_TO_DELETE**
+- S360 KPI emails and automated nonsense
+- Empty status reports with 0 issues found
+- Mass distribution lists without work relevance
+- Generic announcements without technical context
+- External marketing emails (exceptions may apply)
+- Content outside work domain
+- Past meeting invites with no ongoing relevance
+
+### Classification Logic
+
+1. **First Priority**: Check for personal action items related to core work areas
+2. **Second Priority**: Identify team collaboration needs and technical discussions  
+3. **Third Priority**: Categorize optional activities, events, and reference material
+4. **Default**: If clearly promotional, automated nonsense, or out-of-scope → spam_to_delete
 
 **Respond with ONLY the classification category name, nothing else.**
 

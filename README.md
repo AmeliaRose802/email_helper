@@ -74,7 +74,6 @@ email_helper/
 ### Authentication Methods (Priority Order)
 1. **Azure DefaultCredential** (`az login`) - Most secure, no stored credentials
 2. **Environment Variables** (`.env` file) - Secure fallback
-3. **~~Hardcoded Keys~~** - ❌ Removed for security
 
 ## 📋 User-Specific Data Setup
 

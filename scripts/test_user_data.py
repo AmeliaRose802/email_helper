@@ -29,13 +29,6 @@ def test_user_data_loading():
         else:
             print(f"❌ Job Role Context: {job_role_context}")
         
-        # Test classification rules loading
-        classification_rules = ai.get_classification_rules()
-        if classification_rules and "unavailable" not in classification_rules.lower():
-            print(f"✅ Classification Rules: Loaded ({len(classification_rules)} characters)")
-        else:
-            print(f"❌ Classification Rules: {classification_rules}")
-        
         # Test job context loading (existing method)
         job_context = ai.get_job_context()
         if job_context and "unavailable" not in job_context.lower():

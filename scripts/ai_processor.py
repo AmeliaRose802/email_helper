@@ -24,7 +24,6 @@ class AIProcessor:
         self.job_summary_file = os.path.join(self.user_data_dir, 'job_summery.md')
         self.job_skills_file = os.path.join(self.user_data_dir, 'job_skill_summery.md')
         self.job_role_context_file = os.path.join(self.user_data_dir, 'job_role_context.md')
-        self.classification_rules_file = os.path.join(self.user_data_dir, 'classification_rules.md')
         self.email_classifier_system_file = 'email_classifier_system.prompty'
         
         # Learning files (now in runtime_data)
@@ -188,26 +187,11 @@ class AIProcessor:
             print(f"⚠️  Could not load job role context: {e}")
             return "Job role context unavailable"
     
-    def get_classification_rules(self):
-        """Get classification rules from file"""
-        try:
-            if os.path.exists(self.classification_rules_file):
-                with open(self.classification_rules_file, 'r', encoding='utf-8') as f:
-                    return f.read().strip()
-            else:
-                print(f"⚠️  Classification rules file not found: {self.classification_rules_file}")
-                print("   Please create user_specific_data/classification_rules.md with your classification rules")
-                return "Classification rules unavailable - please create user_specific_data/classification_rules.md"
-        except Exception as e:
-            print(f"⚠️  Could not load classification rules: {e}")
-            return "Classification rules unavailable"
-    
     def _create_email_inputs(self, email_content, context):
         """Create input dictionary for prompty execution"""
         return {
             'context': context,
             'job_role_context': self.get_job_role_context(),
-            'classification_rules': self.get_classification_rules(),
             'username': self.get_username(),
             'subject': email_content.get('subject', ''),
             'sender': email_content.get('sender', ''),
