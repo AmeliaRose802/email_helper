@@ -397,7 +397,7 @@ class UnifiedEmailGUI:
             self.progress_text.config(state=tk.DISABLED)
             
             self.update_progress(0, f"Starting email processing for {max_emails} emails...")
-            self.update_progress(20, "Retrieving conversations using Outlook APIs...")
+            self.update_progress(5, "Retrieving conversations using Outlook APIs...")
             
             # CRITICAL FIX: Get Outlook data on main thread (COM apartment thread)
             try:
@@ -405,7 +405,7 @@ class UnifiedEmailGUI:
                     days_back=7, max_emails=max_emails)
                 
                 # ALSO EXTRACT EMAIL BODIES ON MAIN THREAD
-                self.update_progress(25, "Extracting email content...")
+                self.update_progress(10, "Extracting email content...")
                 enriched_conversation_data = []
                 
                 for conversation_id, conv_info in conversation_data:
@@ -458,7 +458,7 @@ class UnifiedEmailGUI:
                 self.reset_processing_ui()
                 return
             
-            self.update_progress(30, f"Found {len(conversation_data)} conversations. Starting AI analysis...")
+            self.update_progress(15, f"Found {len(conversation_data)} conversations. Starting AI analysis...")
             
             # Now start background thread with the retrieved data
             processing_thread = threading.Thread(target=self.process_emails_background, 
@@ -476,14 +476,14 @@ class UnifiedEmailGUI:
             # Reset email processor data
             self.email_processor._reset_data_storage()
             
-            self.update_progress(35, "Loading AI learning data...")
+            self.update_progress(20, "Loading AI learning data...")
             learning_data = self.ai_processor.load_learning_data()
             
             if self.processing_cancelled:
                 return
             
             total_conversations = len(conversation_data)
-            self.update_progress(40, f"Analyzing {total_conversations} unique conversations...")
+            self.update_progress(25, f"Analyzing {total_conversations} unique conversations...")
             
             # Initialize accuracy tracking
             self.ai_processor.start_accuracy_session(total_conversations)
@@ -495,9 +495,9 @@ class UnifiedEmailGUI:
                     self.update_progress(0, "❌ Processing cancelled by user")
                     return
                 
-                # Calculate progress (40% to 90% for processing)
+                # Calculate progress (25% to 95% for processing - 70% range)
                 # i is 1-based, so subtract 1 to make it 0-based for calculation
-                start_progress = 40 + (50 * (i - 1) / total_conversations)
+                start_progress = 25 + (70 * (i - 1) / total_conversations)
                 self.update_progress(start_progress, f"Processing conversation {i}/{total_conversations}...")
                 
                 # Process single conversation
@@ -506,7 +506,7 @@ class UnifiedEmailGUI:
                     processed_count += 1
                     
                     # Update progress after completing this conversation
-                    end_progress = 40 + (50 * i / total_conversations)
+                    end_progress = 25 + (70 * i / total_conversations)
                     self.update_progress(end_progress, f"Completed conversation {i}/{total_conversations}")
                     
                 except Exception as conv_error:
@@ -519,7 +519,7 @@ class UnifiedEmailGUI:
             if self.processing_cancelled:
                 return
             
-            self.update_progress(95, "Finalizing processing...")
+            self.update_progress(97, "Finalizing processing...")
             
             # Store results
             self.email_suggestions = self.email_processor.get_email_suggestions()

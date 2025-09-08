@@ -5,6 +5,13 @@
   - ✅ Verified both categories now work properly without KeyError exceptions
   - ✅ Confirmed GUI integration uses get_available_categories() which includes new categories
 
+- ✅ **FIXED**: Summary generation failing with 'date' field errors
+  - ✅ Fixed ReceivedTime access in summary_generator.py to handle both COM objects and safe wrappers
+  - ✅ Added robust date handling with strftime() availability checking and fallbacks
+  - ✅ Fixed debug print statements to safely handle different date object types
+  - ✅ Summary generation now works with enriched data structure without COM errors
+  - ✅ All email categories (FYI, newsletters) can now be included in summaries successfully
+
 - ✅ **FIXED**: KeyError 'date' when editing email suggestions in GUI
   - ✅ Fixed email_info structure in unified_gui.py to include 'date' field using 'received_time'
   - ✅ Made record_suggestion_modification method robust with .get() methods and fallbacks

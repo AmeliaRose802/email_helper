@@ -28,12 +28,15 @@ class SummaryGenerator:
         # Required personal actions - use collected action details
         if 'required_personal_action' in action_items_data:
             for item_data in action_items_data['required_personal_action']:
-                email = item_data['email_object']
                 action_details = item_data['action_details']
                 
+                # Use enriched email data instead of COM object properties
+                subject = item_data.get('email_subject', 'Unknown Subject')
+                sender = item_data.get('email_sender', 'Unknown Sender')
+                
                 summary_sections['required_actions'].append({
-                    'subject': email.Subject,
-                    'sender': email.SenderName,
+                    'subject': subject,
+                    'sender': sender,
                     'due_date': action_details.get('due_date', 'No specific deadline'),
                     'explanation': action_details.get('explanation', 'Details in email'),
                     'action_required': action_details.get('action_required', 'Review email'),
@@ -44,12 +47,15 @@ class SummaryGenerator:
         # Team actions - use collected action details
         if 'team_action' in action_items_data:
             for item_data in action_items_data['team_action']:
-                email = item_data['email_object']
                 action_details = item_data['action_details']
                 
+                # Use enriched email data instead of COM object properties
+                subject = item_data.get('email_subject', 'Unknown Subject')
+                sender = item_data.get('email_sender', 'Unknown Sender')
+                
                 summary_sections['team_actions'].append({
-                    'subject': email.Subject,
-                    'sender': email.SenderName,
+                    'subject': subject,
+                    'sender': sender,
                     'due_date': action_details.get('due_date', 'No specific deadline'),
                     'explanation': action_details.get('explanation', 'Details in email'),
                     'action_required': action_details.get('action_required', 'Review email'),
@@ -60,12 +66,15 @@ class SummaryGenerator:
         # Optional actions - use collected action details
         if 'optional_action' in action_items_data:
             for item_data in action_items_data['optional_action']:
-                email = item_data['email_object']
                 action_details = item_data['action_details']
                 
+                # Use enriched email data instead of COM object properties
+                subject = item_data.get('email_subject', 'Unknown Subject')
+                sender = item_data.get('email_sender', 'Unknown Sender')
+                
                 summary_sections['optional_actions'].append({
-                    'subject': email.Subject,
-                    'sender': email.SenderName,
+                    'subject': subject,
+                    'sender': sender,
                     'explanation': action_details.get('explanation', 'Details in email'),
                     'action_required': action_details.get('action_required', 'Review email'),
                     'links': action_details.get('links', []),
@@ -75,11 +84,13 @@ class SummaryGenerator:
         # Job listings - use collected job data
         if 'job_listing' in action_items_data:
             for job_data in action_items_data['job_listing']:
-                email = job_data['email_object']
+                # Use enriched email data instead of COM object properties
+                subject = job_data.get('email_subject', 'Unknown Subject')
+                sender = job_data.get('email_sender', 'Unknown Sender')
                 
                 summary_sections['job_listings'].append({
-                    'subject': email.Subject,
-                    'sender': email.SenderName,
+                    'subject': subject,
+                    'sender': sender,
                     'qualification_match': job_data['qualification_match'],
                     'links': job_data['links'],
                     'due_date': job_data['due_date']
@@ -88,12 +99,14 @@ class SummaryGenerator:
         # Optional events - use collected event data
         if 'optional_event' in action_items_data:
             for event_data in action_items_data['optional_event']:
-                email = event_data['email_object']
+                # Use enriched email data instead of COM object properties
+                subject = event_data.get('email_subject', 'Unknown Subject')
+                sender = event_data.get('email_sender', 'Unknown Sender')
                 
                 summary_sections['optional_events'].append({
-                    'subject': email.Subject,
-                    'sender': email.SenderName,
-                    'date': event_data['date'],
+                    'subject': subject,
+                    'sender': sender,
+                    'date': event_data.get('date', event_data.get('event_date', 'Unknown')),
                     'relevance': event_data['relevance'],
                     'links': event_data['links']
                 })
