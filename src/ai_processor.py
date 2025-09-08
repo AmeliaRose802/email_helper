@@ -9,6 +9,7 @@ import re
 import pandas as pd
 from datetime import datetime
 from azure_config import get_azure_config
+from accuracy_tracker import AccuracyTracker
 
 
 class AIProcessor:
@@ -30,6 +31,15 @@ class AIProcessor:
         os.makedirs(self.runtime_data_dir, exist_ok=True)
         self.learning_file = os.path.join(self.runtime_data_dir, 'ai_learning_feedback.csv')
         self.modification_file = os.path.join(self.runtime_data_dir, 'suggestion_modifications.csv')
+        
+        # Initialize accuracy tracker
+        runtime_base_dir = os.path.join(project_root, 'runtime_data')
+        self.accuracy_tracker = AccuracyTracker(runtime_base_dir)
+        
+        # Session tracking
+        self.session_start_time = datetime.now()
+        self.session_total_emails = 0
+        self.session_modifications = []
     
     def get_username(self):
         """Load username from user_specific_data/username.txt"""
@@ -330,7 +340,7 @@ Learning History: {len(learning_data)} previous decisions"""
         print(f"💾 Modification recorded to {self.modification_file}")
     
     def record_batch_processing(self, success_count, error_count, categories_used):
-        """Record batch processing results for learning"""
+        """Record batch processing results for learning AND finalize accuracy tracking"""
         batch_entry = {
             'timestamp': datetime.now().isoformat(),
             'action': 'batch_categorization',
@@ -353,6 +363,103 @@ Learning History: {len(learning_data)} previous decisions"""
             
         except Exception as e:
             print(f"⚠️  Could not record batch processing: {e}")
+        
+        # Finalize accuracy tracking for this session
+        self.finalize_accuracy_session(success_count, error_count, categories_used)
+    
+    def start_accuracy_session(self, total_emails):
+        """Initialize accuracy tracking for a new session"""
+        self.session_start_time = datetime.now()
+        self.session_total_emails = total_emails
+        self.session_modifications = []
+        print(f"📊 Started accuracy tracking for {total_emails} emails")
+    
+    def record_suggestion_modification(self, email_data, old_category, new_category, user_explanation):
+        """Record the suggestion modification to CSV for learning AND track for accuracy"""
+        modification_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'subject': email_data['subject'],
+            'sender': email_data['sender'],
+            'email_date': email_data['date'],
+            'old_suggestion': old_category,
+            'new_suggestion': new_category,
+            'user_explanation': user_explanation,
+            'body_preview': email_data.get('body', '')[:200]
+        }
+        
+        # Save to CSV
+        new_df = pd.DataFrame([modification_entry])
+        
+        if os.path.exists(self.modification_file):
+            existing_df = pd.read_csv(self.modification_file)
+            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+        else:
+            combined_df = new_df
+            
+        combined_df.to_csv(self.modification_file, index=False)
+        print(f"💾 Modification recorded to {self.modification_file}")
+        
+        # Track for session accuracy
+        self.session_modifications.append({
+            'old_category': old_category,
+            'new_category': new_category,
+            'timestamp': datetime.now()
+        })
+    
+    def finalize_accuracy_session(self, success_count=None, error_count=None, categories_used=None):
+        """Calculate and record accuracy metrics for the completed session"""
+        if self.session_total_emails == 0:
+            print("⚠️  No emails processed in this session")
+            return
+            
+        # Calculate session metrics
+        session_duration = (datetime.now() - self.session_start_time).total_seconds() / 60
+        modifications_count = len(self.session_modifications)
+        accuracy_rate = self.accuracy_tracker.calculate_accuracy_for_session(
+            self.session_total_emails, self.session_modifications
+        )
+        
+        # Analyze modifications by category
+        category_modifications = {}
+        for mod in self.session_modifications:
+            old_cat = mod['old_category']
+            category_modifications[old_cat] = category_modifications.get(old_cat, 0) + 1
+        
+        # Prepare session data
+        session_data = {
+            'run_id': datetime.now().strftime("%Y%m%d_%H%M%S"),
+            'total_emails': self.session_total_emails,
+            'modifications_count': modifications_count,
+            'accuracy_rate': accuracy_rate,
+            'categories_used': categories_used or 0,
+            'errors': error_count or 0,
+            'duration_minutes': round(session_duration, 2),
+            'category_modifications': category_modifications
+        }
+        
+        # Record accuracy data
+        self.accuracy_tracker.record_session_accuracy(session_data)
+        self.accuracy_tracker.save_accuracy_summary(session_data)
+        
+        # Display quick summary
+        print(f"\n{'='*50}")
+        print("📊 SESSION ACCURACY SUMMARY")
+        print(f"{'='*50}")
+        print(f"📧 Emails processed: {self.session_total_emails}")
+        print(f"✏️  User corrections: {modifications_count}")
+        print(f"🎯 Accuracy rate: {accuracy_rate:.1f}%")
+        print(f"⏱️  Session duration: {session_duration:.1f} minutes")
+        
+        if category_modifications:
+            print(f"\n🔍 Most corrected categories:")
+            for category, count in sorted(category_modifications.items(), key=lambda x: x[1], reverse=True)[:3]:
+                print(f"   • {category.replace('_', ' ').title()}: {count} corrections")
+        
+        print(f"\n💡 Use 'python show_accuracy_report.py' to see detailed trends")
+    
+    def show_accuracy_report(self, days_back=30):
+        """Display comprehensive accuracy report"""
+        self.accuracy_tracker.display_accuracy_report(days_back)
     
     @staticmethod
     def get_available_categories():

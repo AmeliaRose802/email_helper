@@ -140,7 +140,6 @@ class AzureConfig:
                     azure_endpoint=self.endpoint,
                     api_key=self.get_api_key()
                 )
-                print("⚠️  Using PromptFlow with API key")
             
             return config
             

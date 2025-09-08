@@ -111,7 +111,7 @@ Write-Host ""
 Write-Host "🚀 Next Steps:" -ForegroundColor Cyan
 Write-Host "1. Install the OpenAI Python package: pip install openai" -ForegroundColor White
 Write-Host "2. Restart PowerShell/VS Code" -ForegroundColor White  
-Write-Host "3. Run your email classification system: python interactive_learning_system.py" -ForegroundColor White
+Write-Host "3. Run your email classification system: python email_manager.py" -ForegroundColor White
 Write-Host ""
 Write-Host "🧪 Test Connection:" -ForegroundColor Cyan
 $testChoice = Read-Host "Would you like to test the connection now? (y/n)"
