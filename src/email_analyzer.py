@@ -45,23 +45,96 @@ class EmailAnalyzer:
         return "No specific deadline"
     
     def extract_links_intelligent(self, text):
-        """Intelligent link extraction with context"""
+        """Intelligent link extraction with context and image filtering"""
         urls = re.findall(r'http[s]?://[^\s<>"]+', text)
         
         categorized_links = []
-        for url in urls[:5]:  # Limit to 5 most relevant
-            if 'forms.' in url or 'survey' in url:
-                categorized_links.append(f"Survey: {url}")
-            elif 'github.com' in url or 'visualstudio.com' in url:
-                categorized_links.append(f"Code: {url}")
-            elif 'docs.microsoft.com' in url or 'aka.ms' in url:
-                categorized_links.append(f"Docs: {url}")
-            elif 'teams.microsoft.com' in url or 'outlook.com' in url:
-                categorized_links.append(f"Meeting: {url}")
-            else:
-                categorized_links.append(url)
+        for url in urls[:10]:  # Check more URLs before limiting
+            # Filter out image links and other non-actionable URLs
+            if self._is_actionable_link(url):
+                # Clean tracking parameters from the URL
+                clean_url = self._clean_tracking_parameters(url)
+                
+                if 'forms.' in clean_url or 'survey' in clean_url:
+                    categorized_links.append(f"Survey: {clean_url}")
+                elif 'github.com' in clean_url or 'visualstudio.com' in clean_url:
+                    categorized_links.append(f"Code: {clean_url}")
+                elif 'docs.microsoft.com' in clean_url or 'aka.ms' in clean_url:
+                    categorized_links.append(f"Docs: {clean_url}")
+                elif 'teams.microsoft.com' in clean_url or 'outlook.com' in clean_url:
+                    categorized_links.append(f"Meeting: {clean_url}")
+                else:
+                    categorized_links.append(clean_url)
+            
+            # Limit to 5 actionable links
+            if len(categorized_links) >= 5:
+                break
         
         return categorized_links
+    
+    def _clean_tracking_parameters(self, url):
+        """Remove tracking parameters from URLs"""
+        import urllib.parse as urlparse
+        
+        try:
+            parsed = urlparse.urlparse(url)
+            
+            # Common tracking parameters to remove
+            tracking_params = [
+                'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+                'fbclid', 'gclid', '_hsenc', '_hsmi', 'mc_cid', 'mc_eid',
+                'ref', 'source', 'campaign_id'
+            ]
+            
+            # Parse query parameters
+            query_params = urlparse.parse_qs(parsed.query)
+            
+            # Remove tracking parameters
+            cleaned_params = {k: v for k, v in query_params.items() 
+                            if k not in tracking_params}
+            
+            # Rebuild the URL
+            new_query = urlparse.urlencode(cleaned_params, doseq=True)
+            cleaned_url = urlparse.urlunparse((
+                parsed.scheme, parsed.netloc, parsed.path,
+                parsed.params, new_query, parsed.fragment
+            ))
+            
+            return cleaned_url
+        except Exception:
+            # If URL parsing fails, return original URL
+            return url
+    
+    def _is_actionable_link(self, url):
+        """Filter out image links, tracking pixels, and other non-actionable URLs"""
+        # Convert to lowercase for case-insensitive matching
+        url_lower = url.lower()
+        
+        # Exclude specific protocols
+        if url_lower.startswith(('cid:', 'data:', 'mailto:', 'tel:')):
+            return False
+        
+        # Exclude image file extensions
+        image_extensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico', '.bmp', '.tif', '.tiff']
+        if any(url_lower.endswith(ext) for ext in image_extensions):
+            return False
+        
+        # Exclude common image/asset paths
+        asset_paths = ['/images/', '/img/', '/icons/', '/logo/', '/assets/', '/static/']
+        if any(path in url_lower for path in asset_paths):
+            return False
+        
+        # Exclude tracking and analytics URLs
+        tracking_domains = ['google-analytics.com', 'googletagmanager.com', 'doubleclick.net', 
+                          'facebook.com/tr', 'linkedin.com/px', 'twitter.com/i/adsct']
+        if any(domain in url_lower for domain in tracking_domains):
+            return False
+        
+        # Exclude very short URLs that are likely not actionable
+        if len(url) < 10:
+            return False
+        
+        return True
     
     def extract_email_metadata(self, subject, body):
         """Extract both due date and links in one call to reduce duplication"""

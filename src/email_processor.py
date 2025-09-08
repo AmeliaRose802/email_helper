@@ -88,6 +88,26 @@ class EmailProcessor:
             
             # Classify the email
             suggestion = self.ai_processor.classify_email(email_content, learning_data)
+            
+            # CRASH HARD if AI classification failed
+            if suggestion in ["AI processing unavailable", "AI processing failed", "general_information"]:
+                print("\n" + "="*80)
+                print("🚨 AI CLASSIFICATION FAILURE - CRASHING WITH DEBUG INFO")
+                print("="*80)
+                print(f"Subject: {email_content['subject']}")
+                print(f"Sender: {email_content['sender']}")
+                print(f"Date: {email_content['date']}")
+                print(f"Body Length: {len(email_content['body'])} chars")
+                print(f"Learning Data Rows: {len(learning_data)}")
+                print("\n--- EMAIL BODY ---")
+                print(email_content['body'][:1000])
+                if len(email_content['body']) > 1000:
+                    print(f"... (truncated, full length: {len(email_content['body'])} chars)")
+                print(f"\n--- AI CLASSIFICATION RESULT ---")
+                print(f"Suggestion: '{suggestion}'")
+                print("="*80)
+                raise RuntimeError(f"AI classification failed for email: {email_content['subject']}")
+            
             print(f"🤖 AI Classification: {suggestion.replace('_', ' ').title()}")
             
             # Store email suggestion with full conversation context
@@ -189,6 +209,29 @@ class EmailProcessor:
             
             context = self.ai_processor.get_standard_context()
             action_details = self.ai_processor.extract_action_item_details(email_content, context)
+            
+            # CRASH HARD if AI parsing failed - dump debug info
+            if action_details.get('explanation') in ['AI could not analyze this email', 'AI parsing failed']:
+                print("\n" + "="*80)
+                print("🚨 AI PARSING FAILURE - CRASHING WITH DEBUG INFO")
+                print("="*80)
+                print(f"Subject: {email_content['subject']}")
+                print(f"Sender: {email_content['sender']}")
+                print(f"Date: {email_content['date']}")
+                print(f"Body Length: {len(email_content['body'])} chars")
+                print(f"Context Length: {len(context)} chars")
+                print("\n--- EMAIL BODY ---")
+                print(email_content['body'][:1000])
+                if len(email_content['body']) > 1000:
+                    print(f"... (truncated, full length: {len(email_content['body'])} chars)")
+                print("\n--- CONTEXT ---")
+                print(context[:500])
+                if len(context) > 500:
+                    print(f"... (truncated, full length: {len(context)} chars)")
+                print("\n--- AI RESPONSE ---")
+                print(f"Action Details Returned: {action_details}")
+                print("="*80)
+                raise RuntimeError(f"AI parsing failed for action item: {email_content['subject']}")
             
             print(f"   • Due Date: {action_details.get('due_date', 'No specific deadline')}")
             print(f"   • Action: {action_details.get('action_required', 'Review email')}")

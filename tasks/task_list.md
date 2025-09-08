@@ -1,19 +1,20 @@
 # TODO
 
-- Aggressively clean up this code to reduce the lines and logical complexity.
+BUGS:
 
-First take a minute to understand the logical structure of the file so you know what is important and what isn't.
+- Render emails correctly in review pane so that they are easier to read. We don't need to have complete formatting or show images but links should at least be linked so they don't make it hard to read the email.
 
-- Eliminate excessive error handling: 
-Since this is non prod code, we don't want an intense level of error handling. Crashing is almost always preferable to continuing in a bad state. 
+- When review pane first opens, automatically load in first email
 
-- Remove excess print statements when they record success.
+- The links included in tasks are often to images. We should not return broken links or links to images. 
 
-- Don't keep multiple backup methods. Figure out what actually works and remove the others.
+- However we should also include links to open the emails themselves in either outlook or the web version? Let me know the complexity of doing this. Store the entry ID and use it to create a link to the relevant email.
+
+Improvements:
+
+- Record all human accepted suggestions, not just the changed ones in the review view. This will allow us to have better data for fine tuning.
 
 - In the review mode, include the AI generated summery too for faster review
-
-- After the user applies suggestions in outlook, give them the option to load in another batch of suggestions, hiding the already reviewed emails. Include all emails reviewed during entire session in the summery
 
 - Should be able to select a column to sort by
 
@@ -25,6 +26,6 @@ Since this is non prod code, we don't want an intense level of error handling. C
 
 - Improve the colors and UI so the GUI looks less like accounting software from 2001
 
-- The links included in tasks are nonsense/broken. Instead, can we include links to open the emails themselves in either outlook or the web version? Let me know the complexity of doing this
-
 - If there are no items in a section, don't include it in the summery
+
+- SUmmery should be opened in app rather then directing us to the browser

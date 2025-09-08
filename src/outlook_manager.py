@@ -174,7 +174,12 @@ class OutlookManager:
             raise Exception("Not connected to Outlook. Call connect_to_outlook() first.")
             
         from datetime import timedelta
-        cutoff_date = datetime.now() - timedelta(days=days_back)
+        
+        # If days_back is None, don't apply any date filter
+        if days_back is not None:
+            cutoff_date = datetime.now() - timedelta(days=days_back)
+        else:
+            cutoff_date = None
         
         try:
             # Get recent emails as starting point - use simpler approach
@@ -198,13 +203,18 @@ class OutlookManager:
                     # Check recent emails
                     if hasattr(email, 'ReceivedTime'):
                         email_date = email.ReceivedTime.replace(tzinfo=None)
-                        if email_date >= cutoff_date:
+                        
+                        # Apply date filter only if cutoff_date is set
+                        if cutoff_date is None or email_date >= cutoff_date:
                             recent_emails.append(email)
                         
-                        # Also collect for extended search (30 days)
-                        extended_cutoff = datetime.now() - timedelta(days=30)
-                        if email_date >= extended_cutoff:
+                        # Also collect for extended search (30 days or all if no cutoff)
+                        if cutoff_date is None:
                             all_relevant_emails.append(email)
+                        else:
+                            extended_cutoff = datetime.now() - timedelta(days=30)
+                            if email_date >= extended_cutoff:
+                                all_relevant_emails.append(email)
                     
                     # Limit to prevent excessive processing
                     if len(recent_emails) >= max_emails * 2:

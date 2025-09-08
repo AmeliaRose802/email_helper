@@ -254,7 +254,7 @@ class UnifiedEmailGUI:
         self.update_progress(5, "Retrieving conversations...")
         
         conversation_data = self.outlook_manager.get_emails_with_full_conversations(
-            days_back=7, max_emails=max_emails)
+            days_back=None, max_emails=max_emails)
         
         
         enriched_conversation_data = []
@@ -521,11 +521,19 @@ class UnifiedEmailGUI:
         suggestion_data = self.email_suggestions[index]
         email_data = suggestion_data.get('email_data', {})
         suggestion = suggestion_data['ai_suggestion']
+        ai_summary = suggestion_data.get('ai_summary', 'No summary available')
         
-        # Update preview with email body
+        # Update preview with AI summary first, then email body
         self.preview_text.config(state=tk.NORMAL)
         self.preview_text.delete(1.0, tk.END)
         
+        # Add AI Summary section at the top for faster review
+        self.preview_text.insert(tk.END, "🤖 AI SUMMARY:\n")
+        self.preview_text.insert(tk.END, f"{ai_summary}\n\n")
+        self.preview_text.insert(tk.END, "=" * 50 + "\n")
+        self.preview_text.insert(tk.END, "📧 EMAIL CONTENT:\n\n")
+        
+        # Add email body (truncated for performance)
         body = email_data.get('body', 'No content available')
         self.preview_text.insert(tk.END, body[:1000])
         if len(body) > 1000:
@@ -579,6 +587,9 @@ class UnifiedEmailGUI:
         # Update the suggestion
         suggestion_data['ai_suggestion'] = new_category
         
+        # Update the action_items_data to reflect the reclassification
+        self._update_action_items_for_reclassification(suggestion_data, old_category, new_category)
+        
         # Record the change for accuracy tracking
         email_data = suggestion_data.get('email_data', {})
         email_info = {
@@ -588,6 +599,105 @@ class UnifiedEmailGUI:
             'body': email_data.get('body', '')[:500]
         }
         self.ai_processor.record_suggestion_modification(email_info, old_category, new_category, user_explanation)
+    
+    def _update_action_items_for_reclassification(self, suggestion_data, old_category, new_category):
+        """Update action_items_data when an email is reclassified"""
+        email_data = suggestion_data.get('email_data', {})
+        thread_data = suggestion_data.get('thread_data', {})
+        
+        # Remove from old category if it exists in action_items_data
+        if old_category in self.action_items_data:
+            # Find and remove the item with matching email data
+            items_to_remove = []
+            for i, item in enumerate(self.action_items_data[old_category]):
+                if (item.get('email_subject') == email_data.get('subject') and 
+                    item.get('email_sender') == email_data.get('sender_name')):
+                    items_to_remove.append(i)
+            
+            # Remove items in reverse order to maintain indices
+            for i in reversed(items_to_remove):
+                self.action_items_data[old_category].pop(i)
+        
+        # Add to new category
+        if new_category not in self.action_items_data:
+            self.action_items_data[new_category] = []
+        
+        # Create appropriate data structure based on new category
+        if new_category == 'fyi':
+            # Generate FYI summary for reclassified item
+            email_content = {
+                'subject': email_data.get('subject', 'Unknown'),
+                'sender': email_data.get('sender_name', 'Unknown'),
+                'body': email_data.get('body', ''),
+                'received_time': email_data.get('received_time')
+            }
+            context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+            fyi_summary = self.ai_processor.generate_fyi_summary(email_content, context)
+            
+            fyi_item = {
+                'summary': fyi_summary,
+                'thread_data': thread_data,
+                'email_subject': email_data.get('subject'),
+                'email_sender': email_data.get('sender_name'),
+                'email_date': email_data.get('received_time')
+            }
+            self.action_items_data[new_category].append(fyi_item)
+            
+        elif new_category == 'newsletter':
+            # Generate newsletter summary for reclassified item
+            email_content = {
+                'subject': email_data.get('subject', 'Unknown'),
+                'sender': email_data.get('sender_name', 'Unknown'),
+                'body': email_data.get('body', ''),
+                'received_time': email_data.get('received_time')
+            }
+            context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+            newsletter_summary = self.ai_processor.generate_newsletter_summary(email_content, context)
+            
+            newsletter_item = {
+                'summary': newsletter_summary,
+                'thread_data': thread_data,
+                'email_subject': email_data.get('subject'),
+                'email_sender': email_data.get('sender_name'),
+                'email_date': email_data.get('received_time')
+            }
+            self.action_items_data[new_category].append(newsletter_item)
+            
+        elif new_category in ['required_personal_action', 'optional_action', 'team_action']:
+            # Generate action item details for reclassified item
+            email_content = {
+                'subject': email_data.get('subject', 'Unknown'),
+                'sender': email_data.get('sender_name', 'Unknown'),
+                'body': email_data.get('body', ''),
+                'received_time': email_data.get('received_time')
+            }
+            context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+            action_details = self.ai_processor.extract_action_item_details(email_content, context)
+            
+            action_item = {
+                'action': action_details.get('action_required', 'Review email'),
+                'thread_data': thread_data,
+                'email_subject': email_data.get('subject'),
+                'email_sender': email_data.get('sender_name'),
+                'email_date': email_data.get('received_time'),
+                'action_details': action_details
+            }
+            self.action_items_data[new_category].append(action_item)
+            
+        elif new_category == 'optional_event':
+            # Generate event relevance for reclassified item
+            relevance = self.ai_processor.assess_event_relevance(
+                email_data.get('subject', ''), email_data.get('body', ''), 
+                self.ai_processor.get_job_context())
+            
+            event_item = {
+                'relevance': relevance,
+                'thread_data': thread_data,
+                'email_subject': email_data.get('subject'),
+                'email_sender': email_data.get('sender_name'),
+                'email_date': email_data.get('received_time')
+            }
+            self.action_items_data[new_category].append(event_item)
     
     def apply_to_outlook(self):
         if not self.email_suggestions:
@@ -685,12 +795,19 @@ class UnifiedEmailGUI:
             self.summary_text.delete(1.0, tk.END)
             self.summary_text.config(state=tk.DISABLED)
             
+            # Re-enable the start processing button and disable cancel button
+            self.start_processing_btn.config(state=tk.NORMAL)
+            self.cancel_processing_btn.config(state=tk.DISABLED)
+            
             # Disable tabs 2 and 3
             self.notebook.tab(1, state="disabled")
             self.notebook.tab(2, state="disabled")
             
             # Switch to processing tab
             self.notebook.select(0)
+            
+            # Reset status
+            self.status_var.set("Ready")
     
     def run(self):
         self.root.mainloop()
