@@ -57,9 +57,15 @@ class AIProcessor:
     
     def load_learning_data(self):
         """Load previous learning feedback"""
-        if os.path.exists(self.learning_file):
-            return pd.read_csv(self.learning_file)
-        return pd.DataFrame()
+        try:
+            if os.path.exists(self.learning_file):
+                # Load CSV and ensure no datetime parsing issues
+                df = pd.read_csv(self.learning_file, dtype=str)  # Load all columns as strings
+                return df
+            return pd.DataFrame()
+        except Exception as e:
+            print(f"⚠️  Error loading learning data: {e}")
+            return pd.DataFrame()
     
     def parse_prompty_file(self, file_path):
         """Parse prompty file content"""
@@ -131,8 +137,6 @@ class AIProcessor:
                         if "api_key" in p.model.configuration:
                             del p.model.configuration["api_key"]
                             
-                        print("✅ Using Azure DefaultCredential authentication")
-                        
                     except ImportError as ie2:
                         print(f"⚠️  Azure identity not available: {ie2}")
                         print("   Falling back to API key authentication")
@@ -197,6 +201,10 @@ class AIProcessor:
             print(f"⚠️  Could not load job role context: {e}")
             return "Job role context unavailable"
     
+    def get_standard_context(self) -> str:
+        """Get standard job context string used across the application"""
+        return f"Job Context: {self.get_job_context()}\nSkills Profile: {self.get_job_skills()}"
+    
     def _create_email_inputs(self, email_content, context):
         """Create input dictionary for prompty execution"""
         return {
@@ -206,13 +214,12 @@ class AIProcessor:
             'subject': email_content.get('subject', ''),
             'sender': email_content.get('sender', ''),
             'date': email_content.get('date', ''),
-            'body': email_content.get('body', '')[:2000]
+            'body': email_content.get('body', '')[:3000]  # Increased for better context
         }
     
     def classify_email(self, email_content, learning_data):
         """AI-powered email classification using prompty"""
-        context = f"""Job Context: {self.get_job_context()}
-Skills Profile: {self.get_job_skills()}
+        context = f"""{self.get_standard_context()}
 Learning History: {len(learning_data)} previous decisions"""
         
         inputs = self._create_email_inputs(email_content, context)
@@ -222,7 +229,7 @@ Learning History: {len(learning_data)} previous decisions"""
     def generate_email_summary(self, email_content):
         """Generate a concise AI summary of an email"""
         try:
-            context = f"Job Context: {self.get_job_context()}\nSkills Profile: {self.get_job_skills()}"
+            context = self.get_standard_context()
             inputs = self._create_email_inputs(email_content, context)
             
             # Use the dedicated one-line summary prompt
@@ -307,15 +314,35 @@ Learning History: {len(learning_data)} previous decisions"""
     
     def save_learning_feedback(self, feedback_entries):
         """Save learning feedback to CSV"""
-        new_df = pd.DataFrame(feedback_entries)
+        # Ensure all datetime objects are converted to strings
+        processed_entries = []
+        for entry in feedback_entries:
+            processed_entry = entry.copy()
+            for key, value in processed_entry.items():
+                if hasattr(value, 'strftime'):
+                    processed_entry[key] = value.strftime('%Y-%m-%d %H:%M:%S')
+                elif not isinstance(value, (str, int, float, bool)) and value is not None:
+                    processed_entry[key] = str(value)
+            processed_entries.append(processed_entry)
+            
+        new_df = pd.DataFrame(processed_entries)
         
-        if os.path.exists(self.learning_file):
-            existing_df = pd.read_csv(self.learning_file)
-            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-        else:
-            combined_df = new_df
-        
-        combined_df.to_csv(self.learning_file, index=False)
+        try:
+            if os.path.exists(self.learning_file):
+                existing_df = pd.read_csv(self.learning_file)
+                # Ensure consistent data types
+                for col in new_df.columns:
+                    if col in existing_df.columns:
+                        existing_df[col] = existing_df[col].astype(str)
+                    new_df[col] = new_df[col].astype(str)
+                combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+            else:
+                combined_df = new_df
+            
+            combined_df.to_csv(self.learning_file, index=False)
+        except Exception as e:
+            print(f"⚠️  Error saving learning feedback: {e}")
+            print("   Continuing without saving to file...")
     
     def generate_fyi_summary(self, email_content, context):
         """Generate a bullet point summary for FYI notices"""
@@ -365,7 +392,7 @@ Learning History: {len(learning_data)} previous decisions"""
     def record_batch_processing(self, success_count, error_count, categories_used):
         """Record batch processing results for learning AND finalize accuracy tracking"""
         batch_entry = {
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # Use string format
             'action': 'batch_categorization',
             'emails_processed': success_count + error_count,
             'successful': success_count,
@@ -375,16 +402,23 @@ Learning History: {len(learning_data)} previous decisions"""
         
         # Save to existing learning file
         try:
+            batch_df = pd.DataFrame([batch_entry])
+            
             if os.path.exists(self.learning_file):
                 existing_df = pd.read_csv(self.learning_file)
+                # Ensure consistent string types for timestamp columns
+                if 'timestamp' in existing_df.columns:
+                    existing_df['timestamp'] = existing_df['timestamp'].astype(str)
+                batch_df['timestamp'] = batch_df['timestamp'].astype(str)
+                combined_df = pd.concat([existing_df, batch_df], ignore_index=True)
             else:
-                existing_df = pd.DataFrame()
+                combined_df = batch_df
                 
-            batch_df = pd.DataFrame([batch_entry])
-            combined_df = pd.concat([existing_df, batch_df], ignore_index=True)
             combined_df.to_csv(self.learning_file, index=False)
             
         except Exception as e:
+            print(f"⚠️  Error saving batch processing record: {e}")
+            print("   Continuing without saving to file...")
             print(f"⚠️  Could not record batch processing: {e}")
         
         # Finalize accuracy tracking for this session
@@ -395,34 +429,55 @@ Learning History: {len(learning_data)} previous decisions"""
         self.session_start_time = datetime.now()
         self.session_total_emails = total_emails
         self.session_modifications = []
-        print(f"📊 Started accuracy tracking for {total_emails} emails")
     
     def record_suggestion_modification(self, email_data, old_category, new_category, user_explanation):
         """Record the suggestion modification to CSV for learning AND track for accuracy"""
+        # Ensure datetime is properly formatted as string to avoid pandas timezone issues
+        email_date = email_data.get('date', email_data.get('received_time', 'Unknown'))
+        if hasattr(email_date, 'strftime'):
+            email_date = email_date.strftime('%Y-%m-%d %H:%M:%S')
+        elif not isinstance(email_date, str):
+            email_date = str(email_date)
+            
         modification_entry = {
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # Use string format
             'subject': email_data.get('subject', 'Unknown'),
             'sender': email_data.get('sender', 'Unknown'),
-            'email_date': email_data.get('date', email_data.get('received_time', 'Unknown')),
+            'email_date': email_date,  # Now guaranteed to be string
             'old_suggestion': old_category,
             'new_suggestion': new_category,
             'user_explanation': user_explanation,
             'body_preview': email_data.get('body', '')[:200]
         }
         
-        # Save to CSV
-        new_df = pd.DataFrame([modification_entry])
-        
-        if os.path.exists(self.modification_file):
-            existing_df = pd.read_csv(self.modification_file)
-            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-        else:
-            combined_df = new_df
+        try:
+            # Save to CSV with better error handling
+            new_df = pd.DataFrame([modification_entry])
             
-        combined_df.to_csv(self.modification_file, index=False)
-        print(f"💾 Modification recorded to {self.modification_file}")
+            if os.path.exists(self.modification_file):
+                try:
+                    existing_df = pd.read_csv(self.modification_file)
+                    # Ensure consistent data types before concatenation
+                    for col in ['timestamp', 'email_date']:
+                        if col in existing_df.columns:
+                            existing_df[col] = existing_df[col].astype(str)
+                        new_df[col] = new_df[col].astype(str)
+                    
+                    combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+                except Exception as read_error:
+                    print(f"⚠️  Error reading existing file, creating new: {read_error}")
+                    combined_df = new_df
+            else:
+                combined_df = new_df
+                
+            combined_df.to_csv(self.modification_file, index=False)
+            print(f"💾 Modification recorded to {self.modification_file}")
+            
+        except Exception as e:
+            print(f"⚠️  Error saving modification record: {e}")
+            print("   Continuing without saving to file...")
         
-        # Track for session accuracy
+        # Track for session accuracy (this should always work)
         self.session_modifications.append({
             'old_category': old_category,
             'new_category': new_category,
@@ -465,18 +520,11 @@ Learning History: {len(learning_data)} previous decisions"""
         self.accuracy_tracker.save_accuracy_summary(session_data)
         
         # Display quick summary
-        print(f"\n{'='*50}")
-        print("📊 SESSION ACCURACY SUMMARY")
-        print(f"{'='*50}")
-        print(f"📧 Emails processed: {self.session_total_emails}")
-        print(f"✏️  User corrections: {modifications_count}")
-        print(f"🎯 Accuracy rate: {accuracy_rate:.1f}%")
-        print(f"⏱️  Session duration: {session_duration:.1f} minutes")
+        print(f"Session summary - Processed: {self.session_total_emails}, Corrections: {modifications_count}, Accuracy: {accuracy_rate:.1f}%")
         
         if category_modifications:
-            print(f"\n🔍 Most corrected categories:")
             for category, count in sorted(category_modifications.items(), key=lambda x: x[1], reverse=True)[:3]:
-                print(f"   • {category.replace('_', ' ').title()}: {count} corrections")
+                print(f"   Most corrected: {category.replace('_', ' ').title()}: {count}")
         
         print(f"\n💡 Use 'python show_accuracy_report.py' to see detailed trends")
     

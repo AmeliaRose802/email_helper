@@ -72,7 +72,7 @@ class EmailProcessor:
                 print(f"   Date Range: {min(e.ReceivedTime for e in emails).strftime('%Y-%m-%d')} to {latest_date.strftime('%Y-%m-%d %H:%M')}")
             
             # Use the most recent/relevant email for AI processing
-            representative_email = self._choose_representative_email(emails)
+            representative_email = self.email_analyzer.choose_best_representative_email(emails, "general")
             
             # Generate AI summary using representative email but with full thread context
             email_content = self._create_email_content_dict(representative_email)
@@ -115,37 +115,6 @@ class EmailProcessor:
         self.summary_generator.show_categorization_preview(categories)
         
         return self.email_suggestions
-    
-    def _choose_representative_email(self, emails):
-        """Choose the best email to represent a conversation thread"""
-        if len(emails) == 1:
-            return emails[0]
-            
-        # Sort by date (newest first)
-        sorted_emails = sorted(emails, key=lambda x: x.ReceivedTime, reverse=True)
-        
-        # Strategy: Prefer the latest email that's not just "Thanks" or "Got it"
-        for email in sorted_emails:
-            try:
-                body = email.Body[:1000] if hasattr(email, 'Body') and email.Body else ""
-                body_lower = body.lower()
-                subject = email.Subject.lower()
-                
-                # Skip very short responses
-                if len(body) < 50 and any(phrase in body_lower for phrase in ['thanks', 'got it', 'received', 'ok']):
-                    continue
-                    
-                # Skip auto-replies
-                if 'auto' in subject or 'out of office' in body_lower:
-                    continue
-                    
-                return email
-            except:
-                # If there's any error accessing properties, just use this email
-                return email
-        
-        # Fallback: return the latest email
-        return sorted_emails[0]
     
     def _build_thread_context(self, emails, representative_email):
         """Build context summary from conversation thread"""
@@ -206,8 +175,8 @@ class EmailProcessor:
             print("🔍 Extracting action item details...")
             
             # For thread processing, analyze the most relevant email in the thread
-            analysis_email = self.email_analyzer.get_most_actionable_email(
-                email_data.get('thread_emails', [email])
+            analysis_email = self.email_analyzer.choose_best_representative_email(
+                email_data.get('all_emails', [email]), "actionable"
             )
             
             email_content = self._create_email_content_dict(analysis_email)
@@ -218,7 +187,7 @@ class EmailProcessor:
                 thread_context = f"\nThread context: {thread_count} emails in conversation with {', '.join(email_data['participants'])}"
                 email_content['body'] += thread_context
             
-            context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+            context = self.ai_processor.get_standard_context()
             action_details = self.ai_processor.extract_action_item_details(email_content, context)
             
             print(f"   • Due Date: {action_details.get('due_date', 'No specific deadline')}")
@@ -236,19 +205,18 @@ class EmailProcessor:
         elif suggestion == 'job_listing':
             print("🔍 Analyzing job qualification match...")
             qualification_match = self.email_analyzer.assess_job_qualification(email.Subject, self.outlook_manager.get_email_body(email))
-            due_date = self.email_analyzer.extract_due_date_intelligent(f"{email.Subject} {self.outlook_manager.get_email_body(email)}")
-            links = self.email_analyzer.extract_links_intelligent(self.outlook_manager.get_email_body(email))
+            metadata = self.email_analyzer.extract_email_metadata(email.Subject, self.outlook_manager.get_email_body(email))
             
             print(f"   • Match Assessment: {qualification_match}")
-            print(f"   • Application Due: {due_date}")
-            if links:
-                print(f"   • Application Links: {len(links)} found")
+            print(f"   • Application Due: {metadata['due_date']}")
+            if metadata['links']:
+                print(f"   • Application Links: {len(metadata['links'])} found")
             
             job_data = {
                 'email_object': email,
                 'qualification_match': qualification_match,
-                'due_date': due_date,
-                'links': links,
+                'due_date': metadata['due_date'],
+                'links': metadata['links'],
                 'thread_data': email_data
             }
             self.action_items_data['job_listing'].append(job_data)
@@ -256,20 +224,19 @@ class EmailProcessor:
         # Process optional events with detailed output
         elif suggestion == 'optional_event':
             print("🔍 Analyzing event details and relevance...")
-            event_date = self.email_analyzer.extract_due_date_intelligent(f"{email.Subject} {self.outlook_manager.get_email_body(email)}")
+            metadata = self.email_analyzer.extract_email_metadata(email.Subject, self.outlook_manager.get_email_body(email))
             relevance = self.ai_processor.assess_event_relevance(email.Subject, self.outlook_manager.get_email_body(email), self.ai_processor.get_job_context())
-            links = self.email_analyzer.extract_links_intelligent(self.outlook_manager.get_email_body(email))
             
-            print(f"   • Event Date: {event_date}")
+            print(f"   • Event Date: {metadata['due_date']}")
             print(f"   • Relevance: {relevance[:100]}..." if len(relevance) > 100 else f"   • Relevance: {relevance}")
-            if links:
-                print(f"   • Registration Links: {len(links)} found")
+            if metadata['links']:
+                print(f"   • Registration Links: {len(metadata['links'])} found")
             
             event_data = {
                 'email_object': email,
-                'date': event_date,
+                'date': metadata['due_date'],
                 'relevance': relevance,
-                'links': links,
+                'links': metadata['links'],
                 'thread_data': email_data
             }
             self.action_items_data['optional_event'].append(event_data)
@@ -290,7 +257,7 @@ class EmailProcessor:
                 print("📋 Processing FYI notice...")
                 # Generate FYI summary
                 email_content = self._create_email_content_dict(email)
-                context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+                context = self.ai_processor.get_standard_context()
                 fyi_summary = self.ai_processor.generate_fyi_summary(email_content, context)
                 
                 print(f"   • Summary: {fyi_summary}")
@@ -306,7 +273,7 @@ class EmailProcessor:
                 print("📰 Processing newsletter...")
                 # Generate newsletter summary
                 email_content = self._create_email_content_dict(email)
-                context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+                context = self.ai_processor.get_standard_context()
                 newsletter_summary = self.ai_processor.generate_newsletter_summary(email_content, context)
                 
                 print(f"   • Newsletter: {email.Subject}")

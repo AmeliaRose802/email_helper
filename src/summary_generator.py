@@ -114,20 +114,17 @@ class SummaryGenerator:
         # FYI notices - use collected FYI data
         if 'fyi' in action_items_data:
             for fyi_data in action_items_data['fyi']:
-                email = fyi_data['email_object']
-                
-                # Safe date handling for both COM objects and safe wrappers
-                try:
-                    if hasattr(email.ReceivedTime, 'strftime'):
-                        date_str = email.ReceivedTime.strftime('%Y-%m-%d')
+                date_str = 'Unknown'
+                if 'email_date' in fyi_data and fyi_data['email_date']:
+                    date = fyi_data['email_date']
+                    if hasattr(date, 'strftime'):
+                        date_str = date.strftime('%Y-%m-%d')
                     else:
-                        date_str = str(email.ReceivedTime)[:10] if str(email.ReceivedTime) != 'Unknown' else 'Unknown'
-                except AttributeError:
-                    date_str = 'Unknown'
+                        date_str = str(date)[:10]
                 
                 summary_sections['fyi_notices'].append({
-                    'subject': email.Subject,
-                    'sender': email.SenderName,
+                    'subject': fyi_data.get('email_subject', 'Unknown Subject'),
+                    'sender': fyi_data.get('email_sender', 'Unknown Sender'),
                     'date': date_str,
                     'summary': fyi_data['summary']
                 })
@@ -135,20 +132,17 @@ class SummaryGenerator:
         # Newsletters - use collected newsletter data
         if 'newsletter' in action_items_data:
             for newsletter_data in action_items_data['newsletter']:
-                email = newsletter_data['email_object']
-                
-                # Safe date handling for both COM objects and safe wrappers
-                try:
-                    if hasattr(email.ReceivedTime, 'strftime'):
-                        date_str = email.ReceivedTime.strftime('%Y-%m-%d')
+                date_str = 'Unknown'
+                if 'email_date' in newsletter_data and newsletter_data['email_date']:
+                    date = newsletter_data['email_date']
+                    if hasattr(date, 'strftime'):
+                        date_str = date.strftime('%Y-%m-%d')
                     else:
-                        date_str = str(email.ReceivedTime)[:10] if str(email.ReceivedTime) != 'Unknown' else 'Unknown'
-                except AttributeError:
-                    date_str = 'Unknown'
+                        date_str = str(date)[:10]
                 
                 summary_sections['newsletters'].append({
-                    'subject': email.Subject,
-                    'sender': email.SenderName,
+                    'subject': newsletter_data.get('email_subject', 'Unknown Subject'),
+                    'sender': newsletter_data.get('email_sender', 'Unknown Sender'),
                     'date': date_str,
                     'summary': newsletter_data['summary']
                 })

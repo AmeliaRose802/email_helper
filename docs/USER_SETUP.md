@@ -81,7 +81,7 @@ Once configured, run the system normally:
 
 ```powershell
 cd scripts
-python email_manager.py
+python email_manager_main.py
 ```
 
 The system will automatically load your user-specific data and use it for AI processing.

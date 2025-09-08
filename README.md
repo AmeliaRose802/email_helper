@@ -38,16 +38,16 @@ cp job_skill_summery.md.template user_specific_data/job_skill_summery.md
 
 ### 4. Run the Application
 ```bash
-cd scripts
-python email_manager.py
+python email_manager_main.py
 ```
 
 ## 📁 Project Structure
 
 ```
 email_helper/
-├── scripts/              # Main application code
-│   ├── email_manager.py  # Main entry point
+├── email_manager_main.py # Main entry point (GUI)
+├── src/                  # Application code
+│   ├── unified_gui.py    # Unified GUI interface  
 │   ├── ai_processor.py   # AI/prompty integration
 │   ├── azure_config.py   # Secure Azure authentication
 │   └── ...

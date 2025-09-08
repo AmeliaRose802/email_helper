@@ -63,6 +63,14 @@ class EmailAnalyzer:
         
         return categorized_links
     
+    def extract_email_metadata(self, subject, body):
+        """Extract both due date and links in one call to reduce duplication"""
+        text_combined = f"{subject} {body}"
+        return {
+            'due_date': self.extract_due_date_intelligent(text_combined),
+            'links': self.extract_links_intelligent(body)
+        }
+    
     def assess_job_qualification(self, email_subject, email_body):
         """AI-powered job qualification assessment"""
         if not self.ai_processor:
@@ -298,39 +306,57 @@ class EmailAnalyzer:
         
         return representatives
     
-    def choose_best_representative(self, thread_emails):
-        """Choose the best email to represent a thread"""
-        # Sort emails by date (newest first)
-        sorted_emails = sorted(thread_emails, key=lambda x: x.ReceivedTime, reverse=True)
+    def choose_best_representative_email(self, thread_emails, purpose="general"):
+        """Unified method to choose the best email from a thread for different purposes
         
-        # Strategy 1: Prefer the latest email that's not just "Thanks" or "Got it"
-        for email in sorted_emails:
-            body = email.Body[:1000] if email.Body else ""
-            body_lower = body.lower()
-            subject = email.Subject.lower()
-            
-            # Skip very short responses
-            if len(body) < 50 and any(phrase in body_lower for phrase in ['thanks', 'got it', 'received', 'ok']):
-                continue
-                
-            # Skip auto-replies
-            if 'auto' in subject or 'out of office' in body_lower:
-                continue
-                
-            return email
-        
-        # Strategy 2: If all are short responses, return the latest one
-        return sorted_emails[0]
-    
-    def get_most_actionable_email(self, thread_emails):
-        """Find the email in a thread that contains the most actionable content"""
+        Args:
+            thread_emails: List of emails in the thread
+            purpose: 'general', 'actionable', or 'latest' to optimize selection
+        """
         if len(thread_emails) == 1:
             return thread_emails[0]
         
+        # Sort emails by date (newest first)
+        sorted_emails = sorted(thread_emails, key=lambda x: x.ReceivedTime, reverse=True)
+        
+        if purpose == "actionable":
+            return self._get_most_actionable_from_sorted(sorted_emails)
+        elif purpose == "latest":
+            return sorted_emails[0]
+        else:  # general purpose
+            return self._get_best_representative_from_sorted(sorted_emails)
+    
+    def _get_best_representative_from_sorted(self, sorted_emails):
+        """Helper method for general representative selection"""
+        # Strategy: Prefer the latest email that's not just "Thanks" or "Got it"
+        for email in sorted_emails:
+            try:
+                body = email.Body[:1000] if hasattr(email, 'Body') and email.Body else ""
+                body_lower = body.lower()
+                subject = email.Subject.lower()
+                
+                # Skip very short responses
+                if len(body) < 50 and any(phrase in body_lower for phrase in ['thanks', 'got it', 'received', 'ok']):
+                    continue
+                    
+                # Skip auto-replies
+                if 'auto' in subject or 'out of office' in body_lower:
+                    continue
+                    
+                return email
+            except:
+                # If there's any error accessing properties, just use this email
+                return email
+        
+        # Fallback: return the latest email
+        return sorted_emails[0]
+    
+    def _get_most_actionable_from_sorted(self, sorted_emails):
+        """Helper method for actionable email selection"""
         # Score emails based on actionable content indicators
         scored_emails = []
         
-        for email in thread_emails:
+        for email in sorted_emails:
             body = email.Body[:1000] if email.Body else ""
             body_lower = body.lower()
             subject = email.Subject.lower()
@@ -344,13 +370,13 @@ class EmailAnalyzer:
             date_patterns = [r'\d{1,2}[/-]\d{1,2}', r'(monday|tuesday|wednesday|thursday|friday)', r'(january|february|march|april|may|june|july|august|september|october|november|december)']
             for pattern in date_patterns:
                 if re.search(pattern, body_lower):
-                    score += 3
+                    score += 1
             
             # Higher score for longer content (more context)
             if len(body) > 200:
                 score += 1
             if len(body) > 500:
-                score += 1
+                score += 2
                 
             # Lower score for auto-replies and acknowledgments
             if any(phrase in body_lower for phrase in ['thanks', 'received', 'got it', 'auto-reply']):
@@ -364,5 +390,4 @@ class EmailAnalyzer:
             scored_emails.append((email, score))
         
         # Return email with highest score
-        best_email = max(scored_emails, key=lambda x: x[1])[0]
-        return best_email
+        return max(scored_emails, key=lambda x: x[1])[0]

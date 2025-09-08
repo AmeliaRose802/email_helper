@@ -17,19 +17,16 @@ class OutlookManager:
         
     def connect_to_outlook(self):
         """Connect to Outlook application"""
-        print("🔗 Connecting to Outlook...")
         try:
             self.outlook = win32com.client.Dispatch("Outlook.Application")
             self.namespace = self.outlook.GetNamespace("MAPI")
             
             # Test accessing the default folder before storing it
-            print("🔍 Testing Outlook inbox access...")
             inbox = self.namespace.GetDefaultFolder(6)  # 6 = olFolderInbox
             
             # Try to access the Items property to verify it works
             try:
                 _ = inbox.Items.Count  # This will trigger the error if there is one
-                print(f"✅ Inbox contains {inbox.Items.Count} items")
             except Exception as items_error:
                 raise Exception(f"Cannot access inbox items: {str(items_error)}")
             
@@ -37,7 +34,6 @@ class OutlookManager:
             
             # Set up folder structure for email organization
             self._setup_outlook_folders()
-            print("✅ Connected to Outlook successfully")
             
         except Exception as e:
             print(f"❌ Failed to connect to Outlook: {str(e)}")
@@ -68,8 +64,6 @@ class OutlookManager:
                 folder = self._create_folder_if_not_exists(inbox_folder, folder_name)
                 self.folders[category] = folder
                 
-            print("✅ Outlook folder structure ready under Inbox")
-            
         except Exception as e:
             print(f"⚠️  Warning: Could not set up Outlook folders: {e}")
             print("   Emails will be categorized but not moved to folders")
@@ -80,12 +74,10 @@ class OutlookManager:
             # Try to find existing folder
             for folder in parent_folder.Folders:
                 if folder.Name == folder_name:
-                    print(f"📁 Found existing folder: {folder_name}")
                     return folder
             
             # Create if not found
             new_folder = parent_folder.Folders.Add(folder_name)
-            print(f"📁 Created new folder: {folder_name}")
             return new_folder
                     
         except Exception as e:
@@ -102,7 +94,6 @@ class OutlookManager:
         try:
             target_folder = self.folders[category]
             email.Move(target_folder)
-            print(f"📧 Moved '{email.Subject[:50]}...' to {category.replace('_', ' ').title()}")
             return True
             
         except Exception as e:
@@ -187,7 +178,6 @@ class OutlookManager:
         
         try:
             # Get recent emails as starting point - use simpler approach
-            print("🔍 Accessing Outlook inbox items...")
             
             recent_emails = []
             all_relevant_emails = []
@@ -237,9 +227,6 @@ class OutlookManager:
         # Group by conversation using all available emails
         conversation_groups = {}
         processed_conversations = set()
-        
-        print(f"🔍 Analyzing {len(recent_emails)} recent emails for conversation threads...")
-        print(f"📧 Searching {len(all_relevant_emails)} total emails for full threads...")
         
         for email in recent_emails:
             try:
@@ -299,8 +286,6 @@ class OutlookManager:
                     'recent_trigger': email
                 }
         
-        print(f"📊 Found {len(conversation_groups)} conversation threads")
-        
         # Sort conversations by latest activity
         sorted_conversations = sorted(
             conversation_groups.items(),
@@ -320,9 +305,6 @@ class OutlookManager:
             print("❌ No email suggestions to process.")
             return 0, 0
             
-        print(f"\n📧 APPLYING CATEGORIZATION TO {len(email_suggestions)} EMAILS")
-        print("=" * 60)
-        
         # Ask for confirmation if callback provided
         if confirmation_callback and not confirmation_callback(len(email_suggestions)):
             print("❌ Categorization cancelled.")
@@ -342,10 +324,6 @@ class OutlookManager:
             thread_count = thread_data.get('thread_count', 1)
             
             if thread_count > 1:
-                print(f"\n📧 Processing THREAD {i}/{len(email_suggestions)}: {email.Subject[:50]}...")
-                print(f"   Category: {category.replace('_', ' ').title()}")
-                print(f"   Thread size: {thread_count} emails")
-                
                 # Move all emails in the thread
                 thread_success = 0
                 for thread_email in all_emails:
@@ -360,11 +338,9 @@ class OutlookManager:
                 
                 if thread_success == len(all_emails):
                     success_count += 1
-                    print(f"✅ Moved entire thread ({len(all_emails)} emails)")
                 else:
-                    print(f"⚠️  Partially moved thread ({thread_success}/{len(all_emails)} emails)")
+                    pass  # Partially moved thread
             else:
-                print(f"\n📧 Processing {i}/{len(email_suggestions)}: {email.Subject[:50]}...")
                 print(f"   Category: {category.replace('_', ' ').title()}")
                 
                 try:
@@ -377,10 +353,8 @@ class OutlookManager:
                     print(f"❌ Error processing email: {e}")
                     error_count += 1
         
-        print(f"\n✅ CATEGORIZATION COMPLETE")
-        print(f"   Successfully processed: {success_count} emails")
+        print(f"\n✅ CATEGORIZATION COMPLETE - Successfully processed: {success_count} emails")
         if error_count > 0:
             print(f"   Errors encountered: {error_count} emails")
-        print(f"   Check your Inbox subfolders for organized emails!")
         
         return success_count, error_count

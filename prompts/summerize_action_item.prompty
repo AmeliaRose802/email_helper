@@ -9,7 +9,7 @@ model:
     type: azure_openai
   parameters:
     temperature: 0.2
-    max_tokens: 500
+    max_tokens: 800
 inputs:
   context:
     type: string
@@ -61,15 +61,16 @@ Extract action item details from this email and return as JSON.
 Return your analysis as a JSON object with these fields:
 
 - **due_date**: Extract any deadline or due date (if none found, return "No specific deadline")
-- **action_required**: What specific action is needed (if unclear, return "Review email content")
-- **explanation**: Why this action is needed (brief explanation)
-- **relevance**: Why this is relevant to the user based on their job context
+- **action_required**: What specific action is needed (be specific but concise)
+- **explanation**: Complete explanation of why this action is needed (ensure full context)
+- **relevance**: Why this is relevant to the user based on their job context (complete reasoning)
 - **links**: Array of important URLs from the email (up to 3 most relevant)
 
 ## Instructions
 
 - Focus on actionable information
-- Be concise and clear for ADHD-friendly processing
+- Be concise but complete - don't truncate important context
 - Extract only the most relevant links
 - Consider the user's role based on their job context
+- Provide complete explanations (don't cut off mid-sentence)
 - Return ONLY the JSON object, no other text
