@@ -7,6 +7,10 @@
 
 - Delete unused files. Clean up unused code.
 
+- 
+
+- In the review mode, include the AI generated summery too for faster review
+
 - ✅ **COMPLETED**: Allow the user to complete the entire flow within the UI:
   - ✅ Created unified GUI with tabbed workflow (Process → Edit → Summary)
   - ✅ Added email count selection with predefined options (25, 50, 100, 200) plus custom input
@@ -19,24 +23,9 @@
   - ✅ Full conversation thread support with participant tracking
   - ✅ Session management with ability to start new processing batches
 
-- ✅ **COMPLETED**: Add a new FIY category for items that are notices. The summery of these items should be included in the summery in a new section.
-  - ✅ Added FYI category to email classifier system
-  - ✅ Created `fyi_summary.prompty` for generating concise bullet point summaries
-  - ✅ Updated email processor to handle FYI emails and generate summaries
-  - ✅ Added FYI notices section to summary generator (displays as bullet points)
-  - ✅ Updated HTML template to include FYI notices section
-  - ✅ FYI notices are included in the summary with sender attribution
-
-- ✅ **COMPLETED**: Add a new category called newsletters. A 1 paragraph summery of the newsletters I got should be included in the email summery.
-  - ✅ Added NEWSLETTER category to email classifier system  
-  - ✅ Created `newsletter_summary.prompty` for generating paragraph summaries
-  - ✅ Updated email processor to handle newsletter emails and generate summaries
-  - ✅ Added newsletters section to summary generator (paragraph format)
-  - ✅ Updated HTML template to include newsletters summary section
-  - ✅ Multiple newsletters are combined into comprehensive highlights
-  - ✅ Single newsletters display with full context and formatting
-
 - After the user applies suggestions in outlook, give them the option to load in another batch of suggestions, hiding the already reviewed emails. Include all emails reviewed during entire session in the summery
+
+- Use some heruistic to retreve labeled examples similar to the current email from the modification suggestions. Then inject these examples into the prompt for few shot prompting.
 
 - In the GUI, list emails by category for faster review
 
@@ -51,13 +40,6 @@
   - ✅ Fixed single email handling to ensure emails without threads are still processed
   - ✅ Updated categorization batch processing to handle new thread data structure
   - ✅ Threads now properly include all related emails regardless of when they were received
-
-- ✅ **COMPLETED**: Include classification in the GUI view as a column
-  - ✅ GUI displays "AI Category" as the third column in the email list
-  - ✅ Shows human-readable category names (e.g., "Team Action", "Required Personal Action")
-  - ✅ Category column is properly populated for both single emails and conversation threads
-  - ✅ Category column is editable through the details panel dropdown
-  - ✅ Category updates are reflected in the GUI immediately after changes
 
 - Improve the colors and UI so the GUI looks less like accounting software from 2001
 

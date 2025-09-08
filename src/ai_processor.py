@@ -288,15 +288,18 @@ Learning History: {len(learning_data)} previous decisions"""
     
     def assess_event_relevance(self, subject, body, context):
         """Assess why an event is relevant to the user using AI"""
-        email_inputs = {
-            'context': context,
+        # Create proper email content structure
+        email_content = {
             'subject': subject,
             'sender': 'Unknown',
-            'body': body[:500]
+            'body': body[:500],
+            'date': ''  # Not critical for relevance assessment
         }
         
         try:
-            result = self.execute_prompty('event_relevance_assessment.prompty', email_inputs)
+            # Use the standard input creation method that includes username
+            inputs = self._create_email_inputs(email_content, context)
+            result = self.execute_prompty('event_relevance_assessment.prompty', inputs)
             return result.strip() if result else "Professional development or networking opportunity"
         except Exception as e:
             print(f"⚠️  AI relevance assessment failed: {e}")

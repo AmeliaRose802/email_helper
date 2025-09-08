@@ -416,7 +416,8 @@ class UnifiedEmailGUI:
                             # Get body safely on main thread
                             body = self.outlook_manager.get_email_body(email)
                             emails_with_body.append({
-                                # DO NOT include 'email_object' - it's a COM object
+                                # Store COM object reference for categorization (will only be used on main thread)
+                                'email_object': email,  # Keep this for categorization step
                                 'body': body,
                                 'subject': email.Subject,
                                 'sender_name': email.SenderName,
@@ -495,13 +496,19 @@ class UnifiedEmailGUI:
                     return
                 
                 # Calculate progress (40% to 90% for processing)
-                progress = 40 + (50 * i / total_conversations)
-                self.update_progress(progress, f"Processing conversation {i}/{total_conversations}...")
+                # i is 1-based, so subtract 1 to make it 0-based for calculation
+                start_progress = 40 + (50 * (i - 1) / total_conversations)
+                self.update_progress(start_progress, f"Processing conversation {i}/{total_conversations}...")
                 
                 # Process single conversation
                 try:
                     self.process_single_conversation(conversation_id, conv_info, i, total_conversations, learning_data)
                     processed_count += 1
+                    
+                    # Update progress after completing this conversation
+                    end_progress = 40 + (50 * i / total_conversations)
+                    self.update_progress(end_progress, f"Completed conversation {i}/{total_conversations}")
+                    
                 except Exception as conv_error:
                     self.update_progress_text(f"❌ Error processing conversation: {str(conv_error)}")
                     continue
@@ -591,14 +598,16 @@ class UnifiedEmailGUI:
         suggestion = self.ai_processor.classify_email(email_content, learning_data)
         self.update_progress_text(f"🤖 AI Classification: {suggestion.replace('_', ' ').title()}")
         
-        # Store email suggestion using enriched data only (NO COM objects)
+        # Store email suggestion with COM object for categorization (main thread only)
         email_suggestion = {
-            'email_data': representative_email_data,  # Use enriched data instead of COM object
+            'email_data': representative_email_data,  # Enriched data for display
+            'email_object': representative_email_data['email_object'],  # COM object for categorization
             'ai_suggestion': suggestion,
             'thread_data': {
                 'conversation_id': conversation_id,
                 'thread_count': thread_count,
-                'all_emails_data': emails_with_body,  # Use enriched data instead of COM objects
+                'all_emails_data': emails_with_body,  # Enriched data for display
+                'all_emails': [email_data['email_object'] for email_data in emails_with_body],  # COM objects for categorization
                 'participants': list(set(email_data['sender_name'] for email_data in emails_with_body)),
                 'latest_date': latest_date,
                 'topic': topic
@@ -654,6 +663,13 @@ class UnifiedEmailGUI:
             context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
             action_details = self.ai_processor.extract_action_item_details(email_content, context)
             
+            # Create a safe email object wrapper that doesn't access COM properties
+            safe_email_object = type('SafeEmailObject', (), {
+                'Subject': subject,
+                'SenderName': sender_name,
+                'ReceivedTime': received_time
+            })()
+            
             action_item = {
                 'action': action_details.get('action_required', 'Review email'),
                 'qualification_match': qualification_match,
@@ -663,7 +679,9 @@ class UnifiedEmailGUI:
                 'email_subject': subject,
                 'email_sender': sender_name,
                 'email_date': received_time,
-                'action_details': action_details
+                'action_details': action_details,
+                # Use safe wrapper instead of COM object
+                'email_object': safe_email_object
             }
             
             # Add to email_processor data directly (avoid method calls that might access COM)
@@ -682,6 +700,13 @@ class UnifiedEmailGUI:
             context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
             action_details = self.ai_processor.extract_action_item_details(email_content, context)
             
+            # Create a safe email object wrapper that doesn't access COM properties
+            safe_email_object = type('SafeEmailObject', (), {
+                'Subject': subject,
+                'SenderName': sender_name,
+                'ReceivedTime': received_time
+            })()
+            
             event_item = {
                 'event': action_details.get('action_required', f'Event: {subject}'),
                 'event_date': event_date,
@@ -690,7 +715,9 @@ class UnifiedEmailGUI:
                 'thread_data': thread_data,
                 'email_subject': subject,
                 'email_sender': sender_name,
-                'email_date': received_time
+                'email_date': received_time,
+                # Use safe wrapper instead of COM object
+                'email_object': safe_email_object
             }
             
             # Add to email_processor data directly
@@ -705,12 +732,21 @@ class UnifiedEmailGUI:
             context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
             fyi_summary = self.ai_processor.generate_fyi_summary(email_content, context)
             
+            # Create a safe email object wrapper that doesn't access COM properties
+            safe_email_object = type('SafeEmailObject', (), {
+                'Subject': subject,
+                'SenderName': sender_name,
+                'ReceivedTime': received_time
+            })()
+            
             fyi_item = {
                 'summary': fyi_summary,
                 'thread_data': thread_data,
                 'email_subject': subject,
                 'email_sender': sender_name,
-                'email_date': received_time
+                'email_date': received_time,
+                # Use safe wrapper instead of COM object
+                'email_object': safe_email_object
             }
             
             if not hasattr(self.email_processor, 'action_items_data'):
@@ -724,12 +760,21 @@ class UnifiedEmailGUI:
             context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
             newsletter_summary = self.ai_processor.generate_newsletter_summary(email_content, context)
             
+            # Create a safe email object wrapper that doesn't access COM properties
+            safe_email_object = type('SafeEmailObject', (), {
+                'Subject': subject,
+                'SenderName': sender_name,
+                'ReceivedTime': received_time
+            })()
+            
             newsletter_item = {
                 'summary': newsletter_summary,
                 'thread_data': thread_data,
                 'email_subject': subject,
                 'email_sender': sender_name,
-                'email_date': received_time
+                'email_date': received_time,
+                # Use safe wrapper instead of COM object
+                'email_object': safe_email_object
             }
             
             if not hasattr(self.email_processor, 'action_items_data'):
@@ -977,7 +1022,13 @@ class UnifiedEmailGUI:
         suggestion_data['ai_suggestion'] = new_category
         
         # Record the change for accuracy tracking
-        self.ai_processor.record_user_correction(old_category, new_category, user_explanation)
+        email_data = suggestion_data.get('email_data', {})
+        email_info = {
+            'subject': email_data.get('subject', 'Unknown'),
+            'sender': email_data.get('sender_name', 'Unknown'),
+            'body': email_data.get('body', '')[:500]  # Truncate for storage
+        }
+        self.ai_processor.record_suggestion_modification(email_info, old_category, new_category, user_explanation)
         
         # Remove from old action data category
         self._remove_from_action_data(email, old_category)
