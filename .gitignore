@@ -3,6 +3,11 @@ user_specific_data/
 *.personal
 *.private
 
+# Azure configuration files - SECURITY SENSITIVE  
+azure_info.md
+azure_credentials.json
+azure_config.json
+
 # Runtime data - generated files and AI summaries
 runtime_data/
 
