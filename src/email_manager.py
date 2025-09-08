@@ -60,7 +60,6 @@ class EmailManagementSystem:
     def run(self):
         """Main application entry point"""
         print("🤖 AI-POWERED EMAIL MANAGEMENT SYSTEM")
-        print("Based on Amelia's ADHD-Friendly Summary Requirements")
         print("=" * 60)
         
         try:
@@ -102,30 +101,6 @@ class EmailManagementSystem:
             interface.offer_editing_options()
             
             print("\n✅ Email management session completed successfully!")
-            
-        except Exception as e:
-            print(f"\n❌ An error occurred during email processing:")
-            print(f"   Error: {str(e)}")
-            print(f"   Type: {type(e).__name__}")
-            
-            # Check for common issues
-            if "Outlook" in str(e):
-                print("\n💡 Troubleshooting tips:")
-                print("   • Make sure Microsoft Outlook is installed and running")
-                print("   • Check that Outlook is properly configured with your email account")
-                print("   • Try restarting Outlook and running this script again")
-            elif "prompty" in str(e).lower() or "ai" in str(e).lower():
-                print("\n💡 Troubleshooting tips:")
-                print("   • Make sure the prompty library is installed: pip install prompty")
-                print("   • Check that Azure OpenAI credentials are configured")
-                print("   • Verify that prompt files exist in the prompts directory")
-            else:
-                print("\n💡 General troubleshooting:")
-                print("   • Make sure all required Python packages are installed")
-                print("   • Check that all files in the prompts directory exist")
-                print("   • Verify your Python environment is set up correctly")
-            
-            return False
         
         except KeyboardInterrupt:
             print("\n\n🛑 Program interrupted by user. Exiting...")

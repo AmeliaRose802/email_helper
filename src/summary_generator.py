@@ -20,7 +20,9 @@ class SummaryGenerator:
             'team_actions': [],
             'optional_actions': [],
             'job_listings': [],
-            'optional_events': []
+            'optional_events': [],
+            'fyi_notices': [],
+            'newsletters': []
         }
         
         # Required personal actions - use collected action details
@@ -96,6 +98,30 @@ class SummaryGenerator:
                     'links': event_data['links']
                 })
         
+        # FYI notices - use collected FYI data
+        if 'fyi' in action_items_data:
+            for fyi_data in action_items_data['fyi']:
+                email = fyi_data['email_object']
+                
+                summary_sections['fyi_notices'].append({
+                    'subject': email.Subject,
+                    'sender': email.SenderName,
+                    'date': email.ReceivedTime.strftime('%Y-%m-%d'),
+                    'summary': fyi_data['summary']
+                })
+        
+        # Newsletters - use collected newsletter data
+        if 'newsletter' in action_items_data:
+            for newsletter_data in action_items_data['newsletter']:
+                email = newsletter_data['email_object']
+                
+                summary_sections['newsletters'].append({
+                    'subject': email.Subject,
+                    'sender': email.SenderName,
+                    'date': email.ReceivedTime.strftime('%Y-%m-%d'),
+                    'summary': newsletter_data['summary']
+                })
+        
         return summary_sections
     
     def display_focused_summary(self, summary_sections):
@@ -116,7 +142,9 @@ class SummaryGenerator:
             ('👥 TEAM ACTION ITEMS', 'team_actions', None),
             ('📝 OPTIONAL ACTION ITEMS', 'optional_actions', None),
             ('💼 JOB LISTINGS', 'job_listings', None),
-            ('🎪 OPTIONAL EVENTS', 'optional_events', None)
+            ('🎪 OPTIONAL EVENTS', 'optional_events', None),
+            ('📋 FYI NOTICES', 'fyi_notices', None),
+            ('📰 NEWSLETTERS SUMMARY', 'newsletters', None)
         ]
         
         for title, section_key, sort_key in sections:
@@ -132,35 +160,62 @@ class SummaryGenerator:
             if sort_key:
                 items = sorted(items, key=sort_key)
             
-            for i, item in enumerate(items, 1):
-                self._display_item(i, item, section_key)
-                print()
+            # Special handling for FYI and Newsletter sections
+            if section_key == 'fyi_notices':
+                # FYI notices display as simple bullet points
+                for item in items:
+                    self._display_item(None, item, section_key)
+            elif section_key == 'newsletters':
+                # Newsletter section displays as paragraph summaries
+                if len(items) > 1:
+                    # Combine multiple newsletters into a comprehensive summary
+                    print("Combined newsletter highlights:")
+                    for i, item in enumerate(items, 1):
+                        print(f"{i}. {item['summary']}")
+                else:
+                    # Single newsletter
+                    for item in items:
+                        self._display_item(None, item, section_key)
+            else:
+                # Regular sections with numbered items
+                for i, item in enumerate(items, 1):
+                    self._display_item(i, item, section_key)
+                    print()
     
     def _display_item(self, index, item, section_type):
         """Display individual item based on section type"""
-        print(f"{index}. **{item['subject']}**")
-        print(f"   From: {item['sender']}")
-        
-        if section_type in ['required_actions', 'team_actions']:
-            print(f"   Due: {item['due_date']}")
-            print(f"   Action: {item.get('action_required', 'Review email')}")
-            print(f"   Why: {item['explanation']}")
-        elif section_type == 'optional_actions':
-            print(f"   What: {item.get('action_required', 'Provide feedback')}")
-            print(f"   Why relevant: {item['why_relevant']}")
-            print(f"   Context: {item['explanation']}")
-        elif section_type == 'job_listings':
-            print(f"   Match: {item['qualification_match']}")
-            print(f"   Due: {item['due_date']}")
-        elif section_type == 'optional_events':
-            print(f"   Date: {item['date']}")
-            print(f"   Why relevant: {item['relevance']}")
-        
-        # Display links
-        if item.get('links'):
-            link_type = 'Apply' if section_type == 'job_listings' else 'Register' if section_type == 'optional_events' else 'Link'
-            for link in item['links'][:2]:
-                print(f"   {link_type}: {link}")
+        if section_type == 'fyi_notices':
+            # FYI notices show as bullet points only
+            print(f"{item['summary']} ({item['sender']})")
+        elif section_type == 'newsletters':
+            # Newsletters show as paragraph summaries
+            print(f"**{item['subject']}** ({item['sender']}, {item['date']})")
+            print(f"{item['summary']}")
+        else:
+            # Regular items display as before
+            print(f"{index}. **{item['subject']}**")
+            print(f"   From: {item['sender']}")
+            
+            if section_type in ['required_actions', 'team_actions']:
+                print(f"   Due: {item['due_date']}")
+                print(f"   Action: {item.get('action_required', 'Review email')}")
+                print(f"   Why: {item['explanation']}")
+            elif section_type == 'optional_actions':
+                print(f"   What: {item.get('action_required', 'Provide feedback')}")
+                print(f"   Why relevant: {item['why_relevant']}")
+                print(f"   Context: {item['explanation']}")
+            elif section_type == 'job_listings':
+                print(f"   Match: {item['qualification_match']}")
+                print(f"   Due: {item['due_date']}")
+            elif section_type == 'optional_events':
+                print(f"   Date: {item['date']}")
+                print(f"   Why relevant: {item['relevance']}")
+            
+            # Display links
+            if item.get('links'):
+                link_type = 'Apply' if section_type == 'job_listings' else 'Register' if section_type == 'optional_events' else 'Link'
+                for link in item['links'][:2]:
+                    print(f"   {link_type}: {link}")
     
     def save_focused_summary(self, summary_sections, timestamp):
         """Save focused summary to HTML file and open in browser"""
@@ -191,7 +246,9 @@ class SummaryGenerator:
             team_actions=summary_sections.get('team_actions', []),
             optional_actions=summary_sections.get('optional_actions', []),
             job_listings=summary_sections.get('job_listings', []),
-            optional_events=summary_sections.get('optional_events', [])
+            optional_events=summary_sections.get('optional_events', []),
+            fyi_notices=summary_sections.get('fyi_notices', []),
+            newsletters=summary_sections.get('newsletters', [])
         )
         
         # Write HTML file

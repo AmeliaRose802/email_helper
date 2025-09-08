@@ -255,14 +255,11 @@ class EmailAnalyzer:
         subject = email.Subject.lower()
         subject = re.sub(r'^(re:|fw:|fwd:|forward:)\s*', '', subject).strip()
         subject = re.sub(r'\[.*?\]', '', subject).strip()  # Remove tags like [EXTERNAL]
+        subject = re.sub(r'\s+', ' ', subject).strip()  # Normalize whitespace
         
-        # Get sender domain for grouping
-        sender = email.SenderName.lower()
-        
-        # Create thread key combining subject and sender characteristics
-        thread_key = f"{subject}_{sender[:20]}"  # Limit sender to avoid too much variation
-        
-        return thread_key
+        # Use only the normalized subject as the thread key
+        # This allows proper grouping of conversation threads regardless of sender
+        return subject
     
     def select_thread_representatives(self, thread_groups, max_emails):
         """Select the most representative email from each thread"""

@@ -18,13 +18,30 @@ class OutlookManager:
     def connect_to_outlook(self):
         """Connect to Outlook application"""
         print("🔗 Connecting to Outlook...")
-        self.outlook = win32com.client.Dispatch("Outlook.Application")
-        self.namespace = self.outlook.GetNamespace("MAPI")
-        self.inbox = self.namespace.GetDefaultFolder(6)
-        
-        # Set up folder structure for email organization
-        self._setup_outlook_folders()
-        print("✅ Connected to Outlook successfully")
+        try:
+            self.outlook = win32com.client.Dispatch("Outlook.Application")
+            self.namespace = self.outlook.GetNamespace("MAPI")
+            
+            # Test accessing the default folder before storing it
+            print("🔍 Testing Outlook inbox access...")
+            inbox = self.namespace.GetDefaultFolder(6)  # 6 = olFolderInbox
+            
+            # Try to access the Items property to verify it works
+            try:
+                _ = inbox.Items.Count  # This will trigger the error if there is one
+                print(f"✅ Inbox contains {inbox.Items.Count} items")
+            except Exception as items_error:
+                raise Exception(f"Cannot access inbox items: {str(items_error)}")
+            
+            self.inbox = inbox
+            
+            # Set up folder structure for email organization
+            self._setup_outlook_folders()
+            print("✅ Connected to Outlook successfully")
+            
+        except Exception as e:
+            print(f"❌ Failed to connect to Outlook: {str(e)}")
+            raise
     
     def _setup_outlook_folders(self):
         """Set up Outlook folders for organizing emails"""
@@ -128,6 +145,168 @@ class OutlookManager:
         
         return recent_emails
     
+    def get_conversation_emails(self, conversation_id):
+        """Get all emails in a conversation using ConversationID"""
+        if not self.inbox:
+            raise Exception("Not connected to Outlook")
+            
+        try:
+            # Search all emails in inbox with the same ConversationID
+            conversation_emails = []
+            
+            # Iterate through all emails to find matching ConversationID
+            # (Restrict method syntax is problematic with ConversationID)
+            for item in self.inbox.Items:
+                try:
+                    # Only include MailItem objects (not meeting requests, etc.)
+                    if item.Class == 43:  # olMail = 43
+                        if hasattr(item, 'ConversationID') and item.ConversationID == conversation_id:
+                            conversation_emails.append(item)
+                except:
+                    # Skip items that can't be accessed
+                    continue
+            
+            # Sort by received time (oldest first)
+            conversation_emails.sort(key=lambda x: x.ReceivedTime)
+            return conversation_emails
+            
+        except Exception as e:
+            print(f"⚠️  Warning: Could not retrieve conversation emails for {conversation_id}: {e}")
+            return []
+    
+    def get_emails_with_full_conversations(self, days_back=7, max_emails=100):
+        """Get recent emails and include their full conversation threads"""
+        if not self.inbox:
+            raise Exception("Not connected to Outlook. Call connect_to_outlook() first.")
+            
+        from datetime import timedelta
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        
+        try:
+            # Get recent emails as starting point - use simpler approach
+            print("🔍 Accessing Outlook inbox items...")
+            
+            recent_emails = []
+            all_relevant_emails = []
+            
+            # Access inbox items safely with proper error handling
+            try:
+                inbox_items = self.inbox.Items
+            except Exception as items_error:
+                raise Exception(f"Could not access Outlook inbox items: {str(items_error)}")
+            
+            # Simple iteration approach that was working before
+            for email in inbox_items:
+                try:
+                    # Skip if not a mail item
+                    if not hasattr(email, 'Class') or email.Class != 43:  # olMail = 43
+                        continue
+                    
+                    # Check recent emails
+                    if hasattr(email, 'ReceivedTime'):
+                        email_date = email.ReceivedTime.replace(tzinfo=None)
+                        if email_date >= cutoff_date:
+                            recent_emails.append(email)
+                        
+                        # Also collect for extended search (30 days)
+                        extended_cutoff = datetime.now() - timedelta(days=30)
+                        if email_date >= extended_cutoff:
+                            all_relevant_emails.append(email)
+                    
+                    # Limit to prevent excessive processing
+                    if len(recent_emails) >= max_emails * 2:
+                        break
+                        
+                except Exception as item_error:
+                    # Skip problematic items and continue
+                    continue
+            
+            # Limit all_relevant_emails as well
+            all_relevant_emails = all_relevant_emails[:max_emails * 5]
+            
+            if not recent_emails:
+                print("⚠️  No recent emails found in the specified time range")
+                return []
+        
+        except Exception as access_error:
+            raise Exception(f"Failed to access Outlook emails: {str(access_error)}")
+        
+        # Group by conversation using all available emails
+        conversation_groups = {}
+        processed_conversations = set()
+        
+        print(f"🔍 Analyzing {len(recent_emails)} recent emails for conversation threads...")
+        print(f"📧 Searching {len(all_relevant_emails)} total emails for full threads...")
+        
+        for email in recent_emails:
+            try:
+                # Ensure email is a mail item
+                if not hasattr(email, 'Class') or email.Class != 43:  # olMail = 43
+                    continue
+                    
+                conversation_id = email.ConversationID if hasattr(email, 'ConversationID') else f"single_{email.EntryID}"
+                
+                # Skip if we've already processed this conversation
+                if conversation_id in processed_conversations:
+                    continue
+                
+                # Find all emails with same ConversationID in our broader set
+                full_conversation = []
+                if conversation_id.startswith("single_"):
+                    # This is a fallback single email
+                    full_conversation = [email]
+                else:
+                    # Look for conversation matches
+                    for e in all_relevant_emails:
+                        try:
+                            if (hasattr(e, 'ConversationID') and 
+                                hasattr(e, 'Class') and 
+                                e.Class == 43 and  # Only mail items
+                                e.ConversationID == conversation_id):
+                                full_conversation.append(e)
+                        except:
+                            # Skip emails that can't be accessed
+                            continue
+                    
+                    # If no conversation emails found, treat as single email
+                    if not full_conversation:
+                        full_conversation = [email]
+                        conversation_id = f"single_{email.EntryID}"
+                
+                if full_conversation:
+                    # Sort by date
+                    full_conversation.sort(key=lambda x: x.ReceivedTime)
+                    
+                    conversation_groups[conversation_id] = {
+                        'emails': full_conversation,
+                        'topic': getattr(email, 'ConversationTopic', None) or email.Subject,
+                        'latest_date': max(e.ReceivedTime for e in full_conversation),
+                        'recent_trigger': email  # The recent email that triggered including this conversation
+                    }
+                    processed_conversations.add(conversation_id)
+                    
+            except Exception as e:
+                # Fallback: treat as single email if conversation API fails
+                print(f"⚠️  Warning: Could not process conversation for '{email.Subject[:50]}': {e}")
+                fallback_id = f"single_{email.EntryID}"
+                conversation_groups[fallback_id] = {
+                    'emails': [email],
+                    'topic': email.Subject,
+                    'latest_date': email.ReceivedTime,
+                    'recent_trigger': email
+                }
+        
+        print(f"📊 Found {len(conversation_groups)} conversation threads")
+        
+        # Sort conversations by latest activity
+        sorted_conversations = sorted(
+            conversation_groups.items(),
+            key=lambda x: x[1]['latest_date'],
+            reverse=True
+        )
+        
+        return sorted_conversations[:max_emails]
+    
     def get_email_body(self, email):
         """Get email body safely"""
         return email.Body[:1000] if email.Body else ""
@@ -154,16 +333,19 @@ class OutlookManager:
             email = suggestion_data['email_object']
             category = suggestion_data['ai_suggestion']
             thread_data = suggestion_data.get('thread_data', {})
-            thread_emails = thread_data.get('thread_emails', [email])
             
-            if len(thread_emails) > 1:
+            # Get all emails in thread (use new structure)
+            all_emails = thread_data.get('all_emails', [email])
+            thread_count = thread_data.get('thread_count', 1)
+            
+            if thread_count > 1:
                 print(f"\n📧 Processing THREAD {i}/{len(email_suggestions)}: {email.Subject[:50]}...")
                 print(f"   Category: {category.replace('_', ' ').title()}")
-                print(f"   Thread size: {len(thread_emails)} emails")
+                print(f"   Thread size: {thread_count} emails")
                 
                 # Move all emails in the thread
                 thread_success = 0
-                for thread_email in thread_emails:
+                for thread_email in all_emails:
                     try:
                         if self.move_email_to_category(thread_email, category):
                             thread_success += 1
@@ -173,11 +355,11 @@ class OutlookManager:
                         print(f"❌ Error processing thread email: {e}")
                         error_count += 1
                 
-                if thread_success == len(thread_emails):
+                if thread_success == len(all_emails):
                     success_count += 1
-                    print(f"✅ Moved entire thread ({len(thread_emails)} emails)")
+                    print(f"✅ Moved entire thread ({len(all_emails)} emails)")
                 else:
-                    print(f"⚠️  Partially moved thread ({thread_success}/{len(thread_emails)} emails)")
+                    print(f"⚠️  Partially moved thread ({thread_success}/{len(all_emails)} emails)")
             else:
                 print(f"\n📧 Processing {i}/{len(email_suggestions)}: {email.Subject[:50]}...")
                 print(f"   Category: {category.replace('_', ' ').title()}")

@@ -339,6 +339,51 @@ Learning History: {len(learning_data)} previous decisions"""
         combined_df.to_csv(self.modification_file, index=False)
         print(f"💾 Modification recorded to {self.modification_file}")
     
+    def generate_fyi_summary(self, email_content, context):
+        """Generate a bullet point summary for FYI notices"""
+        try:
+            inputs = self._create_email_inputs(email_content, context)
+            result = self.execute_prompty('fyi_summary.prompty', inputs)
+            
+            if result and result.strip():
+                summary = result.strip().split('\n')[0]  # Take first line only
+                # Ensure it starts with bullet point
+                if not summary.startswith('•'):
+                    summary = f"• {summary}"
+                return summary
+            else:
+                return f"• {email_content.get('subject', 'Unknown')[:80]}"
+                
+        except Exception as e:
+            print(f"⚠️  Failed to generate FYI summary: {e}")
+            return f"• {email_content.get('subject', 'Unknown')[:80]}"
+    
+    def generate_newsletter_summary(self, email_content, context):
+        """Generate a paragraph summary for newsletters"""
+        try:
+            inputs = self._create_email_inputs(email_content, context)
+            result = self.execute_prompty('newsletter_summary.prompty', inputs)
+            
+            if result and result.strip():
+                # Clean up the result - should be paragraph format
+                summary = result.strip()
+                # Remove any markdown formatting
+                summary = re.sub(r'^#+\s*', '', summary)  # Remove headers
+                summary = re.sub(r'\*\*(.*?)\*\*', r'\1', summary)  # Remove bold
+                summary = re.sub(r'\*(.*?)\*', r'\1', summary)  # Remove italic
+                
+                # Limit length for display
+                if len(summary) > 300:
+                    summary = summary[:297] + "..."
+                    
+                return summary
+            else:
+                return f"Newsletter from {email_content.get('sender', 'Unknown')}: {email_content.get('subject', 'No summary available')}"
+                
+        except Exception as e:
+            print(f"⚠️  Failed to generate newsletter summary: {e}")
+            return f"Newsletter from {email_content.get('sender', 'Unknown')}: {email_content.get('subject', 'No summary available')}"
+
     def record_batch_processing(self, success_count, error_count, categories_used):
         """Record batch processing results for learning AND finalize accuracy tracking"""
         batch_entry = {
@@ -470,6 +515,8 @@ Learning History: {len(learning_data)} previous decisions"""
             'optional_action',
             'job_listing',
             'optional_event',
-            'spam_to_delete',
-            'general_information'
+            'work_relevant',
+            'fyi',
+            'newsletter',
+            'spam_to_delete'
         ]

@@ -73,6 +73,8 @@
         .optional-actions { background: #e7f3ff; border-left: 5px solid #17a2b8; }
         .job-listings { background: #e8f5e8; border-left: 5px solid #28a745; }
         .optional-events { background: #f8e8ff; border-left: 5px solid #6f42c1; }
+        .fyi-notices { background: #f0f8ff; border-left: 5px solid #20b2aa; }
+        .newsletters { background: #fff8dc; border-left: 5px solid #ff8c00; }
         
         .section-title {
             font-size: 1.4em;
@@ -312,6 +314,59 @@
                 {% endfor %}
             {% else %}
                 <div class="empty-section">No optional events found</div>
+            {% endif %}
+        </div>
+
+        <!-- FYI Notices Section -->
+        <div class="section">
+            <div class="section-header fyi-notices">
+                <span style="font-size: 1.2em;">📋</span>
+                <h3 class="section-title">FYI NOTICES ({{fyi_notices|length}})</h3>
+            </div>
+            {% if fyi_notices %}
+                <div class="item">
+                    <div class="item-content">
+                        {% for item in fyi_notices %}
+                        <div style="margin-bottom: 8px;">{{item.summary}} ({{item.sender}})</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="empty-section">No FYI notices found</div>
+            {% endif %}
+        </div>
+
+        <!-- Newsletter Summary Section -->
+        <div class="section">
+            <div class="section-header newsletters">
+                <span style="font-size: 1.2em;">📰</span>
+                <h3 class="section-title">NEWSLETTERS SUMMARY ({{newsletters|length}})</h3>
+            </div>
+            {% if newsletters %}
+                {% if newsletters|length > 1 %}
+                <div class="item">
+                    <div class="item-title">Combined Newsletter Highlights</div>
+                    <div class="item-content">
+                        {% for item in newsletters %}
+                        <div style="margin-bottom: 15px;">
+                            <strong>{{loop.index}}.</strong> {{item.summary}}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                {% for item in newsletters %}
+                <div class="item">
+                    <div class="item-title">{{item.subject}}</div>
+                    <div class="item-meta">From: {{item.sender}}, {{item.date}}</div>
+                    <div class="item-content">
+                        <div>{{item.summary}}</div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            {% else %}
+                <div class="empty-section">No newsletters found</div>
             {% endif %}
         </div>
 

@@ -20,7 +20,9 @@ class EmailProcessor:
             'team_action': [],
             'optional_action': [],
             'job_listing': [],
-            'optional_event': []
+            'optional_event': [],
+            'fyi': [],
+            'newsletter': []
         }
         self.email_suggestions = []
     
@@ -32,45 +34,54 @@ class EmailProcessor:
         # Load learning data
         learning_data = self.ai_processor.load_learning_data()
         
-        # Get recent emails
-        recent_emails = self.outlook_manager.get_recent_emails(days_back=7, max_emails=max_emails)
+        # Get conversations with full thread context using Outlook APIs
+        print("🔗 Retrieving conversations using Outlook conversation APIs...")
+        conversation_data = self.outlook_manager.get_emails_with_full_conversations(days_back=7, max_emails=max_emails)
         
-        # Group emails by conversation thread
-        print("🔗 Grouping emails by conversation threads...")
-        thread_groups = self.email_analyzer.group_emails_by_thread(recent_emails)
-        
-        # Select representative email from each thread
-        representative_emails = self.email_analyzer.select_thread_representatives(thread_groups, max_emails)
-        
-        print(f"📊 Analyzing {len(representative_emails)} unique conversations (consolidated from {len(recent_emails)} individual emails)...")
+        print(f"📊 Analyzing {len(conversation_data)} unique conversations...")
         
         # Initialize accuracy tracking for this session
-        self.ai_processor.start_accuracy_session(len(representative_emails))
+        self.ai_processor.start_accuracy_session(len(conversation_data))
         
         # Reset data storage
         self._reset_data_storage()
         
-        # Process each representative email
+        # Process each conversation
         categories = defaultdict(list)
         
-        for i, email_data in enumerate(representative_emails, 1):
-            email = email_data['representative']
-            thread_count = email_data['thread_count']
+        for i, (conversation_id, conv_info) in enumerate(conversation_data, 1):
+            emails = conv_info['emails']
+            topic = conv_info['topic']
+            latest_date = conv_info['latest_date']
+            trigger_email = conv_info['recent_trigger']
+            
+            thread_count = len(emails)
             thread_info = f" (Thread: {thread_count} emails)" if thread_count > 1 else ""
             
-            print(f"\n📧 CONVERSATION {i}/{len(representative_emails)}{thread_info}")
+            print(f"\n📧 CONVERSATION {i}/{len(conversation_data)}{thread_info}")
             print("=" * 50)
-            print(f"Subject: {email.Subject}")
-            print(f"From: {email.SenderName}")
-            print(f"Date: {email.ReceivedTime.strftime('%Y-%m-%d %H:%M')}")
+            print(f"Topic: {topic}")
+            print(f"Representative Email: {trigger_email.Subject}")
+            print(f"From: {trigger_email.SenderName}")
+            print(f"Date: {trigger_email.ReceivedTime.strftime('%Y-%m-%d %H:%M')}")
             
             if thread_count > 1:
-                print(f"🔗 Thread Summary: {thread_count} emails in conversation")
-                print(f"   Participants: {', '.join(email_data['participants'][:3])}{'...' if len(email_data['participants']) > 3 else ''}")
-                print(f"   Latest: {email_data['latest_date'].strftime('%Y-%m-%d %H:%M')}")
+                participants = list(set(email.SenderName for email in emails))
+                print(f"🔗 Full Conversation Thread: {thread_count} emails")
+                print(f"   Participants: {', '.join(participants[:3])}{'...' if len(participants) > 3 else ''}")
+                print(f"   Date Range: {min(e.ReceivedTime for e in emails).strftime('%Y-%m-%d')} to {latest_date.strftime('%Y-%m-%d %H:%M')}")
             
-            # Generate AI summary
-            email_content = self._create_email_content_dict(email)
+            # Use the most recent/relevant email for AI processing
+            representative_email = self._choose_representative_email(emails)
+            
+            # Generate AI summary using representative email but with full thread context
+            email_content = self._create_email_content_dict(representative_email)
+            
+            # Add thread context to the email content for better AI analysis
+            if thread_count > 1:
+                thread_context = self._build_thread_context(emails, representative_email)
+                email_content['body'] += f"\n\n--- CONVERSATION THREAD CONTEXT ---\n{thread_context}"
+            
             ai_summary = self.ai_processor.generate_email_summary(email_content)
             if ai_summary:
                 print(f"📋 AI Summary: {ai_summary}")
@@ -79,24 +90,92 @@ class EmailProcessor:
             suggestion = self.ai_processor.classify_email(email_content, learning_data)
             print(f"🤖 AI Classification: {suggestion.replace('_', ' ').title()}")
             
-            # Store email suggestion
+            # Store email suggestion with full conversation context
             email_suggestion = {
-                'email_object': email,
+                'email_object': representative_email,
                 'ai_suggestion': suggestion,
-                'thread_data': email_data
+                'thread_data': {
+                    'conversation_id': conversation_id,
+                    'thread_count': thread_count,
+                    'all_emails': emails,  # Include all emails in thread
+                    'participants': participants if thread_count > 1 else [representative_email.SenderName],
+                    'latest_date': latest_date,
+                    'topic': topic
+                }
             }
             
-            # Process based on category
-            self._process_email_by_category(email, email_data, suggestion)
-            
-            categories[suggestion].append(email)
             self.email_suggestions.append(email_suggestion)
-            print("✅ Processing complete")
+            
+            # Process based on category
+            self._process_email_by_category(representative_email, email_suggestion['thread_data'], suggestion)
+            
+            categories[suggestion].append(representative_email)
         
         # Show categorization summary
         self.summary_generator.show_categorization_preview(categories)
         
         return self.email_suggestions
+    
+    def _choose_representative_email(self, emails):
+        """Choose the best email to represent a conversation thread"""
+        if len(emails) == 1:
+            return emails[0]
+            
+        # Sort by date (newest first)
+        sorted_emails = sorted(emails, key=lambda x: x.ReceivedTime, reverse=True)
+        
+        # Strategy: Prefer the latest email that's not just "Thanks" or "Got it"
+        for email in sorted_emails:
+            try:
+                body = email.Body[:1000] if hasattr(email, 'Body') and email.Body else ""
+                body_lower = body.lower()
+                subject = email.Subject.lower()
+                
+                # Skip very short responses
+                if len(body) < 50 and any(phrase in body_lower for phrase in ['thanks', 'got it', 'received', 'ok']):
+                    continue
+                    
+                # Skip auto-replies
+                if 'auto' in subject or 'out of office' in body_lower:
+                    continue
+                    
+                return email
+            except:
+                # If there's any error accessing properties, just use this email
+                return email
+        
+        # Fallback: return the latest email
+        return sorted_emails[0]
+    
+    def _build_thread_context(self, emails, representative_email):
+        """Build context summary from conversation thread"""
+        try:
+            if len(emails) <= 1:
+                return ""
+                
+            # Sort emails chronologically
+            sorted_emails = sorted(emails, key=lambda x: x.ReceivedTime)
+            
+            context_parts = []
+            context_parts.append(f"This is part of a {len(emails)}-email conversation thread.")
+            
+            # Add participant summary
+            participants = list(set(email.SenderName for email in emails))
+            context_parts.append(f"Participants: {', '.join(participants)}")
+            
+            # Add key emails summary (excluding the representative)
+            other_emails = [e for e in sorted_emails if e.EntryID != representative_email.EntryID][:3]
+            if other_emails:
+                context_parts.append("Related messages in thread:")
+                for email in other_emails:
+                    date_str = email.ReceivedTime.strftime('%m/%d %H:%M')
+                    subject = email.Subject[:50] + "..." if len(email.Subject) > 50 else email.Subject
+                    context_parts.append(f"- {date_str} from {email.SenderName}: {subject}")
+            
+            return "\n".join(context_parts)
+            
+        except Exception as e:
+            return f"Thread context unavailable: {str(e)}"
     
     def _reset_data_storage(self):
         """Reset data storage for new processing run"""
@@ -105,7 +184,9 @@ class EmailProcessor:
             'team_action': [],
             'optional_action': [],
             'job_listing': [],
-            'optional_event': []
+            'optional_event': [],
+            'fyi': [],
+            'newsletter': []
         }
         self.email_suggestions = []
     
@@ -200,11 +281,43 @@ class EmailProcessor:
                 thread_count = email_data.get('thread_count', 1)
                 if thread_count > 1:
                     print(f"   Note: Will handle entire thread ({thread_count} emails)")
-            elif suggestion == 'general_information':
-                print("ℹ️  Informational content")
+            elif suggestion == 'work_relevant':
+                print("ℹ️  Work-relevant informational content")
                 thread_count = email_data.get('thread_count', 1)
                 if thread_count > 1:
                     print(f"   Note: Thread summary ({thread_count} emails)")
+            elif suggestion == 'fyi':
+                print("📋 Processing FYI notice...")
+                # Generate FYI summary
+                email_content = self._create_email_content_dict(email)
+                context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+                fyi_summary = self.ai_processor.generate_fyi_summary(email_content, context)
+                
+                print(f"   • Summary: {fyi_summary}")
+                
+                fyi_data = {
+                    'email_object': email,
+                    'summary': fyi_summary,
+                    'thread_data': email_data
+                }
+                self.action_items_data['fyi'].append(fyi_data)
+                
+            elif suggestion == 'newsletter':
+                print("📰 Processing newsletter...")
+                # Generate newsletter summary
+                email_content = self._create_email_content_dict(email)
+                context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+                newsletter_summary = self.ai_processor.generate_newsletter_summary(email_content, context)
+                
+                print(f"   • Newsletter: {email.Subject}")
+                print(f"   • Key highlights captured for summary")
+                
+                newsletter_data = {
+                    'email_object': email,
+                    'summary': newsletter_summary,
+                    'thread_data': email_data
+                }
+                self.action_items_data['newsletter'].append(newsletter_data)
     
     def generate_summary(self):
         """Generate and display the focused summary"""
