@@ -317,31 +317,6 @@ Learning History: {len(learning_data)} previous decisions"""
         
         combined_df.to_csv(self.learning_file, index=False)
     
-    def record_suggestion_modification(self, email_data, old_category, new_category, user_explanation):
-        """Record the suggestion modification to CSV for learning"""
-        modification_entry = {
-            'timestamp': datetime.now().isoformat(),
-            'subject': email_data['subject'],
-            'sender': email_data['sender'],
-            'email_date': email_data['date'],
-            'old_suggestion': old_category,
-            'new_suggestion': new_category,
-            'user_explanation': user_explanation,
-            'body_preview': email_data.get('body', '')[:200]
-        }
-        
-        # Save to CSV
-        new_df = pd.DataFrame([modification_entry])
-        
-        if os.path.exists(self.modification_file):
-            existing_df = pd.read_csv(self.modification_file)
-            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-        else:
-            combined_df = new_df
-            
-        combined_df.to_csv(self.modification_file, index=False)
-        print(f"💾 Modification recorded to {self.modification_file}")
-    
     def generate_fyi_summary(self, email_content, context):
         """Generate a bullet point summary for FYI notices"""
         try:
@@ -426,9 +401,9 @@ Learning History: {len(learning_data)} previous decisions"""
         """Record the suggestion modification to CSV for learning AND track for accuracy"""
         modification_entry = {
             'timestamp': datetime.now().isoformat(),
-            'subject': email_data['subject'],
-            'sender': email_data['sender'],
-            'email_date': email_data['date'],
+            'subject': email_data.get('subject', 'Unknown'),
+            'sender': email_data.get('sender', 'Unknown'),
+            'email_date': email_data.get('date', email_data.get('received_time', 'Unknown')),
             'old_suggestion': old_category,
             'new_suggestion': new_category,
             'user_explanation': user_explanation,

@@ -1026,6 +1026,7 @@ class UnifiedEmailGUI:
         email_info = {
             'subject': email_data.get('subject', 'Unknown'),
             'sender': email_data.get('sender_name', 'Unknown'),
+            'date': email_data.get('received_time', 'Unknown'),  # Use received_time as date
             'body': email_data.get('body', '')[:500]  # Truncate for storage
         }
         self.ai_processor.record_suggestion_modification(email_info, old_category, new_category, user_explanation)
