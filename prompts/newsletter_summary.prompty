@@ -1,0 +1,57 @@
+---
+name: Newsletter Summary Generator
+description: Generate paragraph summaries for newsletters and periodic digests
+version: 1.0
+tags: [email, summary, newsletter, digest]
+model:
+  api: chat
+  configuration:
+    type: azure_openai
+  parameters:
+    temperature: 0.3
+    max_tokens: 300
+inputs:
+  context:
+    type: string
+  username:
+    type: string
+  subject:
+    type: string
+  sender:
+    type: string
+  date:
+    type: string
+  body:
+    type: string
+outputs:
+  summary:
+    type: string
+---
+
+system:
+Generate a concise paragraph summary for newsletters and periodic digests. Focus on the most relevant and valuable information for {{username}} based on their job context.
+
+user:
+## Context Information
+{{context}}
+
+## Newsletter to Summarize
+**Subject:** {{subject}}  
+**From:** {{sender}}  
+**Date:** {{date}}  
+**Body:** {{body}}
+
+Create a paragraph summary that captures the key highlights from this newsletter.
+
+Requirements:
+- Single paragraph (3-5 sentences maximum)
+- Maximum 200 words
+- Focus on information most relevant to {{username}}'s role
+- Include any important dates, updates, or announcements
+- Professional tone suitable for executive summary
+- No bullet points or lists - paragraph format only
+
+Example format:
+The Microsoft Tech Newsletter highlighted three key developments: the launch of Azure AI Studio with enhanced machine learning capabilities, upcoming security updates scheduled for November, and new compliance features for enterprise customers. The newsletter also announced a virtual conference on cloud architecture best practices happening December 15th, with early bird registration ending October 30th. Additionally, there were updates on cost optimization tools and performance improvements across Azure services.
+
+Return only the paragraph summary, nothing else.
