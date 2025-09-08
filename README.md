@@ -83,11 +83,10 @@ The AI system needs to understand your job context and skills to classify emails
 
 #### `job_summery.md`
 Describe your role, responsibilities, and work focus areas:
+
 ```markdown
 I am a Software Engineer working on Azure Compute Node Services, specifically:
-- Instance Metadata Service (IMDS) development
-- WireServer endpoint implementation  
-- Security Champion responsibilities
+- Your job role here
 [Add your specific job context...]
 ```
 
@@ -112,7 +111,7 @@ your_username
 - **Smart Email Classification**: Automatically categorizes emails into actionable categories
 - **ADHD-Friendly Summaries**: Focused, concise summaries without distractions
 - **Secure Authentication**: Multiple authentication options with security best practices
-- **Learning System**: Improves classification accuracy based on your feedback
+- **Learning System**: Improves classification accuracy based on your feedback - TODO: Currently stores this but does not learn from it yet
 - **Customizable Categories**: Tailored to professional workflows and priorities
 
 ## 📖 Documentation

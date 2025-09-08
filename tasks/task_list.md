@@ -19,7 +19,7 @@
   - ✅ Created comprehensive documentation (`docs/ACCURACY_TRACKING.md`)
   - ✅ Successfully tested accuracy calculation and report generation
 
-- Make a GUI for viewing and modifying suggestions. Please think though how you'll do this first.
+- Make a GUI for viewing and modifying suggestions. Please think though how you'll do this first. Take a minute to review the existing application structure to make sure you understand how it works and do not break things.
 
 The UI should show a list of the AI suggestions. Users should be able to reclassify a suggestion using a drop down menu. This can be done in a desktop app window launched by the python script.
 

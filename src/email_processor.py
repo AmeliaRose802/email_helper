@@ -205,8 +205,6 @@ class EmailProcessor:
                 thread_count = email_data.get('thread_count', 1)
                 if thread_count > 1:
                     print(f"   Note: Thread summary ({thread_count} emails)")
-            else:
-                print("📄 Basic categorization")
     
     def generate_summary(self):
         """Generate and display the focused summary"""
