@@ -19,9 +19,11 @@
   - ✅ Created comprehensive documentation (`docs/ACCURACY_TRACKING.md`)
   - ✅ Successfully tested accuracy calculation and report generation
 
-- The links included in tasks are nonsense/broken. Instead, can we include links to open the emails themselves in either outlook or the web version? Let me know the complexity of doing this
+- Make a GUI for viewing and modifying suggestions. Please think though how you'll do this first.
 
-- Make a GUI for viewing and modifying suggestions. Suggestions should be visble. The user should be able to change the classification using a drop down menu.
+The UI should show a list of the AI suggestions. Users should be able to reclassify a suggestion using a drop down menu. This can be done in a desktop app window launched by the python script.
+
+- The links included in tasks are nonsense/broken. Instead, can we include links to open the emails themselves in either outlook or the web version? Let me know the complexity of doing this
 
 - ✅ **COMPLETED**: classification_rules.md does not appear to contain any internal info. It should go back into the promptly file email_classifier_system.prompty.
   - ✅ Integrated classification rules directly into `email_classifier_system.prompty`
