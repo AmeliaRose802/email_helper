@@ -44,6 +44,9 @@ class EmailProcessor:
         
         print(f"📊 Analyzing {len(representative_emails)} unique conversations (consolidated from {len(recent_emails)} individual emails)...")
         
+        # Initialize accuracy tracking for this session
+        self.ai_processor.start_accuracy_session(len(representative_emails))
+        
         # Reset data storage
         self._reset_data_storage()
         

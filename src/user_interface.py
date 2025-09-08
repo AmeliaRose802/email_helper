@@ -49,10 +49,11 @@ class UserInterface:
             print("1. ✏️  Edit a suggestion by number")
             print("2. 📋 View all suggestions") 
             print("3. ✅ Apply categorization to Outlook")
-            print("4. 🚪 Continue (accept all suggestions)")
-            print("5. 🛑 Quit")
+            print("4. � Show accuracy report")
+            print("5. �🚪 Continue (accept all suggestions)")
+            print("6. 🛑 Quit")
             
-            choice = input("\nEnter your choice (1-5): ").strip()
+            choice = input("\nEnter your choice (1-6): ").strip()
             
             if choice == '1':
                 self._handle_edit_suggestion()
@@ -61,13 +62,15 @@ class UserInterface:
             elif choice == '3':
                 self._apply_categorization_to_outlook()
             elif choice == '4':
+                self._show_accuracy_report()
+            elif choice == '5':
                 print("✅ Continuing with current suggestions...")
                 break
-            elif choice == '5':
+            elif choice == '6':
                 print("🛑 Exiting program...")
                 exit(0)
             else:
-                print("❌ Invalid choice. Please enter 1, 2, 3, 4, or 5.")
+                print("❌ Invalid choice. Please enter 1, 2, 3, 4, 5, or 6.")
     
     def _apply_categorization_to_outlook(self):
         """Apply the current categorization to emails in Outlook"""
@@ -93,6 +96,23 @@ class UserInterface:
         # Record the batch processing
         categories_used = len(set(s['ai_suggestion'] for s in self.email_suggestions))
         self.ai_processor.record_batch_processing(success_count, error_count, categories_used)
+    
+    def _show_accuracy_report(self):
+        """Display accuracy report to the user"""
+        print("\n" + "=" * 60)
+        print("📊 ACCURACY REPORT")
+        print("=" * 60)
+        
+        try:
+            # Show recent accuracy trends
+            self.ai_processor.show_accuracy_report(days_back=14)  # Last 2 weeks
+            
+            input("\n📖 Press Enter to continue...")
+            
+        except Exception as e:
+            print(f"❌ Could not generate accuracy report: {e}")
+            print("This might be the first run or there's insufficient data.")
+            input("\nPress Enter to continue...")
     
     def _handle_edit_suggestion(self):
         """Handle the process of editing a single suggestion"""
