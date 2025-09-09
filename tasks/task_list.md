@@ -8,4 +8,4 @@ Improvements:
 
 - Use some heruistic to retreve labeled examples similar to the current email from the modification suggestions. Then inject these examples into the prompt for few shot prompting.
 
-- The ai_deleted section should move out of the inbox
+- ✅ The ai_deleted section should move out of the inbox - **COMPLETED**: Moved 'spam_to_delete' category from inbox_categories to non_inbox_categories so AI-deleted emails are placed outside the inbox at the mail root level

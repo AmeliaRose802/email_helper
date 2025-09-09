@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """
-Outlook Manager - Handles Outlook connection and folder management
+Outlook Manager - H            # Categories that go into Inbox subfolders (actionable items)
+            inbox_categories = {
+                'required_personal_action': 'Required Actions (Me)',
+                'optional_action': 'Optional Actions',
+                'job_listing': 'Job Listings',
+                'work_relevant': 'Work Relevant'
+            }
+            
+            # Categories that should be outside Inbox (non-actionable/reference items)
+            non_inbox_categories = {
+                'team_action': 'Team Actions',
+                'optional_event': 'Optional Events', 
+                'fyi': 'FYI',
+                'newsletter': 'Newsletters',
+                'general_information': 'Summarized',
+                'spam_to_delete': 'ai_deleted'  # Move deleted items out of inbox
+            }nnection and folder management
 """
 
 import win32com.client
@@ -51,8 +67,7 @@ class OutlookManager:
                 'required_personal_action': 'Required Actions (Me)',
                 'optional_action': 'Optional Actions',
                 'job_listing': 'Job Listings',
-                'work_relevant': 'Work Relevant',
-                'spam_to_delete': 'ai_deleted'  # Keep spam folder in inbox for review
+                'work_relevant': 'Work Relevant'
             }
             
             # Categories that should be outside Inbox (non-actionable/reference items)
@@ -61,7 +76,8 @@ class OutlookManager:
                 'optional_event': 'Optional Events', 
                 'fyi': 'FYI',
                 'newsletter': 'Newsletters',
-                'general_information': 'Summarized'
+                'general_information': 'Summarized',
+                'spam_to_delete': 'ai_deleted'  # Move deleted items out of inbox
             }
             
             # Create inbox folders (actionable items)

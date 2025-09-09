@@ -1283,8 +1283,8 @@ class UnifiedEmailGUI:
             return
         
         # Calculate folder distribution for user preview
-        inbox_categories = {'required_personal_action', 'optional_action', 'job_listing', 'work_relevant', 'spam_to_delete'}
-        non_inbox_categories = {'team_action', 'optional_event', 'fyi', 'newsletter', 'general_information'}
+        inbox_categories = {'required_personal_action', 'optional_action', 'job_listing', 'work_relevant'}
+        non_inbox_categories = {'team_action', 'optional_event', 'fyi', 'newsletter', 'general_information', 'spam_to_delete'}
         
         inbox_count = sum(1 for s in self.email_suggestions if s['ai_suggestion'] in inbox_categories)
         non_inbox_count = sum(1 for s in self.email_suggestions if s['ai_suggestion'] in non_inbox_categories)
