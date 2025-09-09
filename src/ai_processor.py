@@ -561,7 +561,7 @@ Preview: {body_preview}
     def record_accepted_suggestions(self, email_suggestions):
         """Record all accepted suggestions that were applied to Outlook for fine-tuning data"""
         # Create accepted suggestions file path
-        accepted_file = os.path.join(self.user_feedback_dir, 'accepted_suggestions.csv')
+        accepted_file = os.path.join(self.runtime_data_dir, 'accepted_suggestions.csv')
         
         accepted_entries = []
         for suggestion_data in email_suggestions:
