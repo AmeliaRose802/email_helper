@@ -1,0 +1,100 @@
+---
+name: Holistic Inbox Analyzer
+description: Analyzes entire inbox context to identify truly relevant action items and cross-email relationships
+model:
+  api: chat
+  configuration:
+    type: azure_openai
+    azure_deployment: gpt-4o-mini
+    api_version: 2024-02-15-preview
+  parameters:
+    max_tokens: 1500
+    temperature: 0.1
+inputs:
+  context:
+    type: string
+  job_role_context:
+    type: string
+  username:
+    type: string
+  inbox_summary:
+    type: string
+  current_date:
+    type: string
+---
+
+system:
+You are an intelligent inbox analyzer that looks at the entire email landscape holistically to identify what's truly relevant and actionable.
+
+user:
+Analyze this complete inbox context to identify the most relevant action items and relationships between emails.
+
+**JOB ROLE CONTEXT:**
+{{job_role_context}}
+
+**USER:** {{username}}
+**CURRENT DATE:** {{current_date}}
+
+**COMPLETE INBOX OVERVIEW:**
+{{inbox_summary}}
+
+**HOLISTIC ANALYSIS REQUIRED:**
+
+1. **Cross-Email Relationships:**
+   - Which emails are follow-ups, duplicates, or related to the same topic?
+   - Which action items have been resolved by subsequent emails?
+   - Which conversations have moved forward and no longer need the original action?
+
+2. **Current Relevance Assessment:**
+   - What action items are still truly needed vs. superseded?
+   - Which deadlines/events are still upcoming vs. past?
+   - What has highest business impact based on the full context?
+
+3. **Priority Ranking:**
+   - Rank action items by true urgency (considering full email context)
+   - Identify what needs immediate attention vs. can wait
+   - Consider dependencies and blocking relationships
+
+4. **Smart Deduplication:**
+   - Group similar requests/topics together
+   - Identify the "latest" or "canonical" email for each topic
+   - Flag emails that are now redundant due to newer information
+
+**Respond with JSON format:**
+```json
+{
+    "truly_relevant_actions": [
+        {
+            "action_type": "required_personal_action/team_action/optional_action",
+            "priority": "high/medium/low",
+            "topic": "Brief topic description",
+            "canonical_email_id": "ID of the most relevant email for this action",
+            "related_email_ids": ["list", "of", "related", "email", "IDs"],
+            "deadline": "YYYY-MM-DD or description",
+            "why_relevant": "Explanation of why this is still actionable",
+            "blocking_others": true/false
+        }
+    ],
+    "superseded_actions": [
+        {
+            "original_email_id": "ID",
+            "superseded_by_email_id": "ID", 
+            "reason": "Why this is no longer needed"
+        }
+    ],
+    "duplicate_groups": [
+        {
+            "topic": "Common topic",
+            "email_ids": ["list", "of", "duplicate", "emails"],
+            "keep_email_id": "ID of email to keep",
+            "archive_email_ids": ["IDs", "to", "archive"]
+        }
+    ],
+    "expired_items": [
+        {
+            "email_id": "ID",
+            "reason": "Why this should be deleted (past deadline, event occurred, etc.)"
+        }
+    ]
+}
+```

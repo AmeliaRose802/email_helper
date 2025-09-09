@@ -443,6 +443,11 @@ class UnifiedEmailGUI:
         
         # Store results
         self.email_suggestions = self.email_processor.get_email_suggestions()
+        
+        # Apply holistic inbox analysis to refine suggestions
+        self.update_progress(95, "Applying holistic intelligence...")
+        self.email_suggestions = self._apply_holistic_inbox_analysis(self.email_suggestions)
+        
         self.action_items_data = self.email_processor.get_action_items_data()
         
         self.update_progress(100, "Processing complete")
@@ -473,14 +478,22 @@ class UnifiedEmailGUI:
         
         # Generate AI summary and classify
         ai_summary = self.ai_processor.generate_email_summary(email_content)
-        suggestion = self.ai_processor.classify_email(email_content, learning_data)
+        initial_suggestion = self.ai_processor.classify_email(email_content, learning_data)
         
-        # Store email suggestion with COM object for categorization
+        # Apply intelligent post-processing based on thread context and content
+        final_suggestion, processing_notes = self._apply_intelligent_processing(
+            initial_suggestion, email_content, thread_context if thread_count > 1 else "", 
+            emails_with_body, representative_email_data
+        )
+        
+        # Store email suggestion with enhanced data
         email_suggestion = {
             'email_data': representative_email_data,
             'email_object': representative_email_data['email_object'],
-            'ai_suggestion': suggestion,
-            'ai_summary': ai_summary,  # Include AI summary for display
+            'ai_suggestion': final_suggestion,
+            'ai_summary': ai_summary,
+            'initial_classification': initial_suggestion,  # Track original classification
+            'processing_notes': processing_notes,  # Track why it was reclassified or marked for deletion
             'thread_data': {
                 'conversation_id': conversation_id,
                 'thread_count': thread_count,
@@ -495,7 +508,44 @@ class UnifiedEmailGUI:
         self.email_processor.email_suggestions.append(email_suggestion)
         
         # Process by category using pre-extracted data (no COM access)
-        self._process_email_by_category_with_enriched_data(representative_email_data, email_suggestion['thread_data'], suggestion)
+        self._process_email_by_category_with_enriched_data(representative_email_data, email_suggestion['thread_data'], final_suggestion)
+    
+    def _apply_intelligent_processing(self, initial_classification, email_content, thread_context, emails_with_body, representative_email_data):
+        """Apply intelligent post-processing to refine classifications"""
+        processing_notes = []
+        final_classification = initial_classification
+        
+        # 1. Check if team action has been resolved by someone else in the thread
+        if initial_classification == 'team_action' and thread_context:
+            is_resolved, resolution_details = self.ai_processor.detect_resolved_team_action(email_content, thread_context)
+            if is_resolved:
+                final_classification = 'fyi'
+                processing_notes.append(f"Team action reclassified as FYI: {resolution_details}")
+                print(f"🔄 Intelligent Reclassification: Team action → FYI")
+                print(f"   Reason: {resolution_details}")
+        
+        # 2. Check if optional items have passed their deadline and should be deleted
+        if initial_classification in ['optional_action', 'optional_event']:
+            # First get action details to check for deadline info
+            try:
+                context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+                action_details = self.ai_processor.extract_action_item_details(email_content, context)
+            except:
+                action_details = {}
+            
+            is_expired, deadline_details = self.ai_processor.check_optional_item_deadline(email_content, action_details)
+            if is_expired:
+                final_classification = 'spam_to_delete'
+                processing_notes.append(f"Optional item marked for deletion: {deadline_details}")
+                print(f"🗑️ Intelligent Cleanup: {initial_classification} → Delete")
+                print(f"   Reason: {deadline_details}")
+        
+        # 3. Future: Add more intelligent processing rules here
+        # - Check for duplicate requests
+        # - Detect if personal actions were delegated to others
+        # - Identify newsletters that are no longer relevant
+        
+        return final_classification, processing_notes
     
     def _build_thread_context_from_enriched_data(self, emails_with_body, representative_email_data):
         thread_context = []
@@ -510,6 +560,103 @@ class UnifiedEmailGUI:
             thread_context.append(context_entry)
         
         return "\n\n".join(thread_context)
+    
+    def _apply_holistic_inbox_analysis(self, all_email_suggestions):
+        """Apply holistic analysis to refine the entire inbox processing"""
+        try:
+            print("🧠 Performing holistic inbox analysis...")
+            
+            # Extract email data for holistic analysis
+            email_data_list = []
+            email_lookup = {}
+            
+            for suggestion in all_email_suggestions:
+                email_data = suggestion['email_data']
+                email_data_list.append(email_data)
+                email_lookup[email_data.get('entry_id', str(len(email_lookup)))] = suggestion
+            
+            # Perform holistic analysis
+            analysis, analysis_notes = self.ai_processor.analyze_inbox_holistically(email_data_list)
+            
+            if not analysis:
+                print(f"⚠️ Holistic analysis failed: {analysis_notes}")
+                return all_email_suggestions
+            
+            print(f"✅ Holistic analysis completed: {analysis_notes}")
+            
+            # Apply analysis results
+            modified_suggestions = self._apply_holistic_modifications(all_email_suggestions, analysis, email_lookup)
+            
+            return modified_suggestions
+            
+        except Exception as e:
+            print(f"⚠️ Holistic analysis error: {e}")
+            return all_email_suggestions
+    
+    def _apply_holistic_modifications(self, all_email_suggestions, analysis, email_lookup):
+        """Apply the holistic analysis results to modify email suggestions"""
+        modified_suggestions = all_email_suggestions.copy()
+        holistic_notes = []
+        
+        # 1. Handle superseded actions
+        for superseded in analysis.get('superseded_actions', []):
+            original_id = superseded.get('original_email_id')
+            reason = superseded.get('reason', 'Superseded by newer information')
+            
+            if original_id in email_lookup:
+                suggestion = email_lookup[original_id]
+                suggestion['ai_suggestion'] = 'fyi'  # Downgrade to FYI
+                suggestion['holistic_notes'] = suggestion.get('holistic_notes', [])
+                suggestion['holistic_notes'].append(f"Superseded: {reason}")
+                holistic_notes.append(f"Email '{suggestion['email_data'].get('subject', 'Unknown')[:50]}' superseded")
+        
+        # 2. Handle expired items
+        for expired in analysis.get('expired_items', []):
+            email_id = expired.get('email_id')
+            reason = expired.get('reason', 'Past deadline or event occurred')
+            
+            if email_id in email_lookup:
+                suggestion = email_lookup[email_id]
+                suggestion['ai_suggestion'] = 'spam_to_delete'  # Mark for deletion
+                suggestion['holistic_notes'] = suggestion.get('holistic_notes', [])
+                suggestion['holistic_notes'].append(f"Expired: {reason}")
+                holistic_notes.append(f"Email '{suggestion['email_data'].get('subject', 'Unknown')[:50]}' marked for deletion")
+        
+        # 3. Handle duplicate groups
+        for dup_group in analysis.get('duplicate_groups', []):
+            keep_id = dup_group.get('keep_email_id')
+            archive_ids = dup_group.get('archive_email_ids', [])
+            topic = dup_group.get('topic', 'Similar topic')
+            
+            for archive_id in archive_ids:
+                if archive_id in email_lookup and archive_id != keep_id:
+                    suggestion = email_lookup[archive_id]
+                    suggestion['ai_suggestion'] = 'fyi'  # Downgrade duplicates
+                    suggestion['holistic_notes'] = suggestion.get('holistic_notes', [])
+                    suggestion['holistic_notes'].append(f"Duplicate of {topic}")
+                    holistic_notes.append(f"Duplicate email archived: {topic}")
+        
+        # 4. Update priority based on truly relevant actions
+        for relevant_action in analysis.get('truly_relevant_actions', []):
+            canonical_id = relevant_action.get('canonical_email_id')
+            priority = relevant_action.get('priority', 'medium')
+            why_relevant = relevant_action.get('why_relevant', '')
+            
+            if canonical_id in email_lookup:
+                suggestion = email_lookup[canonical_id]
+                suggestion['holistic_priority'] = priority
+                suggestion['holistic_notes'] = suggestion.get('holistic_notes', [])
+                suggestion['holistic_notes'].append(f"Priority: {priority} - {why_relevant}")
+        
+        # Log holistic modifications
+        if holistic_notes:
+            print("🧠 Holistic Intelligence Applied:")
+            for note in holistic_notes[:5]:  # Show first 5 modifications
+                print(f"   • {note}")
+            if len(holistic_notes) > 5:
+                print(f"   • ... and {len(holistic_notes) - 5} more modifications")
+        
+        return modified_suggestions
     
     def _process_email_by_category_with_enriched_data(self, email_data, thread_data, category):
         if not hasattr(self.email_processor, 'action_items_data'):
@@ -621,13 +768,19 @@ class UnifiedEmailGUI:
         for item in self.email_tree.get_children():
             self.email_tree.delete(item)
         
-        # Load email suggestions with AI summaries
+        # Load email suggestions with AI summaries and processing notes
         for suggestion_data in self.email_suggestions:
             email_data = suggestion_data.get('email_data', {})
             suggestion = suggestion_data['ai_suggestion']
+            initial_classification = suggestion_data.get('initial_classification', suggestion)
+            processing_notes = suggestion_data.get('processing_notes', [])
             ai_summary = suggestion_data.get('ai_summary', 'No summary')
             thread_data = suggestion_data.get('thread_data', {})
             thread_count = thread_data.get('thread_count', 1)
+            
+            # Add processing note indicator to summary if reclassified
+            if processing_notes:
+                ai_summary = f"🔄 {ai_summary} | {'; '.join(processing_notes[:1])}"  # Show first note
             
             if thread_count > 1:
                 participants = thread_data.get('participants', [email_data.get('sender_name', 'Unknown')])
@@ -643,9 +796,12 @@ class UnifiedEmailGUI:
             else:
                 date = str(date)
             
+            # Show both original and final classification if different
             category = suggestion.replace('_', ' ').title()
+            if initial_classification != suggestion:
+                category = f"{category} (was {initial_classification.replace('_', ' ').title()})"
             
-            # Insert into treeview with AI summary
+            # Insert into treeview with enhanced AI summary
             self.email_tree.insert('', tk.END, values=(subject, sender, category, ai_summary, date))
     
     def on_email_select(self, event):
@@ -668,6 +824,8 @@ class UnifiedEmailGUI:
         suggestion_data = self.email_suggestions[index]
         email_data = suggestion_data.get('email_data', {})
         suggestion = suggestion_data['ai_suggestion']
+        initial_classification = suggestion_data.get('initial_classification', suggestion)
+        processing_notes = suggestion_data.get('processing_notes', [])
         ai_summary = suggestion_data.get('ai_summary', 'No summary available')
         
         # Update preview with AI summary first, then email body
@@ -680,6 +838,28 @@ class UnifiedEmailGUI:
         # Add AI Summary section at the top for faster review
         self.preview_text.insert(tk.END, "🤖 AI SUMMARY:\n", "header")
         self.preview_text.insert(tk.END, f"{ai_summary}\n\n", "summary")
+        
+        # Show intelligent processing notes if any
+        if processing_notes:
+            self.preview_text.insert(tk.END, "🧠 INTELLIGENT PROCESSING:\n", "header")
+            if initial_classification != suggestion:
+                self.preview_text.insert(tk.END, f"Reclassified: {initial_classification} → {suggestion}\n", "metadata")
+            for note in processing_notes:
+                self.preview_text.insert(tk.END, f"• {note}\n", "metadata")
+            self.preview_text.insert(tk.END, "\n", "summary")
+        
+        # Show holistic insights if available
+        holistic_notes = suggestion_data.get('holistic_notes', [])
+        holistic_priority = suggestion_data.get('holistic_priority', None)
+        if holistic_notes or holistic_priority:
+            self.preview_text.insert(tk.END, "🌐 HOLISTIC INSIGHTS:\n", "header")
+            if holistic_priority:
+                priority_color = {"high": "error", "medium": "warning", "low": "metadata"}.get(holistic_priority, "metadata")
+                self.preview_text.insert(tk.END, f"Priority: {holistic_priority.upper()}\n", priority_color)
+            for note in holistic_notes:
+                self.preview_text.insert(tk.END, f"• {note}\n", "metadata")
+            self.preview_text.insert(tk.END, "\n", "summary")
+        
         self.preview_text.insert(tk.END, "=" * 50 + "\n", "separator")
         self.preview_text.insert(tk.END, "📧 EMAIL CONTENT:\n\n", "header")
         
@@ -730,6 +910,15 @@ class UnifiedEmailGUI:
         self.preview_text.tag_configure("body", 
                                        font=("Arial", 9), 
                                        foreground="#2c3e50")
+        
+        # Priority colors for holistic insights
+        self.preview_text.tag_configure("error", 
+                                       font=("Arial", 9, "bold"), 
+                                       foreground="#e74c3c")
+        
+        self.preview_text.tag_configure("warning", 
+                                       font=("Arial", 9, "bold"), 
+                                       foreground="#f39c12")
         
         # Configure link click behavior
         self.preview_text.tag_bind("link", "<Button-1>", self._on_link_click)

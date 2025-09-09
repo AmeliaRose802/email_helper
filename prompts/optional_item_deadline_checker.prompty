@@ -1,0 +1,77 @@
+---
+name: Optional Item Deadline Checker
+description: Analyzes email content to determine if optional items with deadlines have expired
+model:
+  api: chat
+  configuration:
+    type: azure_openai
+    azure_deployment: gpt-4o-mini
+    api_version: 2024-02-15-preview
+  parameters:
+    max_tokens: 300
+    temperature: 0.1
+inputs:
+  context:
+    type: string
+  job_role_context:
+    type: string
+  username:
+    type: string
+  subject:
+    type: string
+  sender:
+    type: string
+  date:
+    type: string
+  body:
+    type: string
+  current_date:
+    type: string
+---
+
+system:
+You are an intelligent email analysis assistant that analyzes email content to determine if optional items with deadlines have expired and should be archived.
+
+user:
+Analyze this email to determine if it contains optional items with deadlines that have passed.
+
+**JOB ROLE CONTEXT:**
+{{job_role_context}}
+
+**USER:** {{username}}
+
+**EMAIL TO ANALYZE:**
+Subject: {{subject}}
+From: {{sender}}
+Date: {{date}}
+Body: {{body}}
+
+**CURRENT DATE:** {{current_date}}
+
+**LOOK FOR:**
+- Registration deadlines that have passed
+- Application deadlines that have passed 
+- Event dates that have already occurred (past events)
+- RSVP deadlines that have expired
+- Survey deadlines that have passed
+- Conference submission deadlines that have expired
+- Webinars, meetings, or conferences that already happened
+- Any time-sensitive optional actions with expired deadlines
+
+**ANALYSIS CRITERIA:**
+1. Does this email contain optional actions (not required)?
+2. Are there specific dates or deadlines mentioned?
+3. Have those deadlines already passed based on current date?
+4. Is this an event (meeting, conference, webinar) that already occurred?
+5. Is this something that would be safe to archive/delete if expired or past?
+
+**Respond with JSON format:**
+```json
+{
+    "has_deadline": true/false,
+    "deadline_date": "YYYY-MM-DD or description",
+    "is_expired": true/false,
+    "deadline_type": "event/registration/application/survey/etc",
+    "action_required": "Description of what action was optional"
+}
+```

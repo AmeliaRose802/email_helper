@@ -95,7 +95,11 @@ class OutlookManager:
             return None
     
     def move_email_to_category(self, email, category):
-        """Move email to appropriate category folder with location logging"""
+        """Move email to appropriate category folder with location logging"""        
+        return self._move_to_folder_or_categorize(email, category)
+    
+    def _move_to_folder_or_categorize(self, email, category):
+        """Handle normal folder moves or categorization fallback"""
         if category not in self.folders or not self.folders[category]:
             # Fallback: just add category to email if folder not available
             self._add_category_to_email(email, category)
@@ -338,7 +342,7 @@ class OutlookManager:
         
         # Show folder organization info
         print("\n📂 FOLDER ORGANIZATION:")
-        print("   🎯 INBOX (Actionable): Required Actions, Optional Actions, Job Listings, Work Relevant")
+        print("   🎯 INBOX (Actionable): Required Actions, Optional Actions, Job Listings, Work Relevant, Spam Review")
         print("   📚 OUTSIDE INBOX (Reference): Team Actions, Optional Events, FYI, Newsletters")
         print()
             
@@ -360,12 +364,23 @@ class OutlookManager:
             email = suggestion_data['email_object']
             category = suggestion_data['ai_suggestion']
             thread_data = suggestion_data.get('thread_data', {})
+            processing_notes = suggestion_data.get('processing_notes', [])
             
             # Count folder destinations
-            if category in non_inbox_categories:
+            if category == 'spam_to_delete':
+                inbox_count += 1  # Spam folder is in inbox for review
+            elif category in non_inbox_categories:
                 non_inbox_count += 1
             else:
                 inbox_count += 1
+            
+            # Show processing details
+            subject = email.Subject[:50] if hasattr(email, 'Subject') else 'Unknown'
+            print(f"   📧 {subject}...")
+            print(f"      └─ Action: {category.replace('_', ' ').title()}")
+            if processing_notes:
+                for note in processing_notes:
+                    print(f"      └─ 🧠 {note}")
             
             # Get all emails in thread (use new structure)
             all_emails = thread_data.get('all_emails', [email])

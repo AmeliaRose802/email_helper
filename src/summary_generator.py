@@ -5,7 +5,6 @@ Summary Generator - Handles summary creation, display, and file output
 
 from datetime import datetime
 import os
-import webbrowser
 from jinja2 import Environment, FileSystemLoader
 
 
@@ -91,9 +90,9 @@ class SummaryGenerator:
                 summary_sections['job_listings'].append({
                     'subject': subject,
                     'sender': sender,
-                    'qualification_match': job_data['qualification_match'],
-                    'links': job_data['links'],
-                    'due_date': job_data['due_date']
+                    'qualification_match': job_data.get('qualification_match', 'No qualification analysis available'),
+                    'links': job_data.get('links', []),
+                    'due_date': job_data.get('due_date', 'No deadline specified')
                 })
         
         # Optional events - use collected event data
@@ -107,8 +106,8 @@ class SummaryGenerator:
                     'subject': subject,
                     'sender': sender,
                     'date': event_data.get('date', event_data.get('event_date', 'Unknown')),
-                    'relevance': event_data['relevance'],
-                    'links': event_data['links']
+                    'relevance': event_data.get('relevance', 'Professional development opportunity'),
+                    'links': event_data.get('links', [])
                 })
         
         # FYI notices - use collected FYI data
@@ -126,7 +125,7 @@ class SummaryGenerator:
                     'subject': fyi_data.get('email_subject', 'Unknown Subject'),
                     'sender': fyi_data.get('email_sender', 'Unknown Sender'),
                     'date': date_str,
-                    'summary': fyi_data['summary']
+                    'summary': fyi_data.get('summary', 'No summary available')
                 })
         
         # Newsletters - use collected newsletter data
@@ -144,7 +143,7 @@ class SummaryGenerator:
                     'subject': newsletter_data.get('email_subject', 'Unknown Subject'),
                     'sender': newsletter_data.get('email_sender', 'Unknown Sender'),
                     'date': date_str,
-                    'summary': newsletter_data['summary']
+                    'summary': newsletter_data.get('summary', 'No summary available')
                 })
         
         return summary_sections
@@ -280,12 +279,11 @@ class SummaryGenerator:
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(html_content)
         
-        # Open in default browser
+        # File saved - no longer opening in browser since we display in-app
         file_path = os.path.abspath(filepath)
-        webbrowser.open(f'file://{file_path}')
         
         print(f"💾 HTML summary saved to: {filepath}")
-        print(f"🌐 Opened in browser automatically")
+        print(f"📱 Summary displayed in application - browser opening disabled")
         return filepath
     
     def display_suggestions_for_editing(self, email_suggestions):

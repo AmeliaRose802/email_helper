@@ -171,6 +171,188 @@ Learning History: {len(learning_data)} previous decisions"""
             
         return result.strip().lower() if result else "general_information"
     
+    def detect_resolved_team_action(self, email_content, thread_context=""):
+        """Detect if a team action has already been addressed by someone else in the conversation thread"""
+        if not thread_context:
+            return False, "No thread context available"
+        
+        try:
+            # Create inputs for the prompty file
+            inputs = self._create_email_inputs(email_content, self.get_standard_context())
+            inputs['thread_context'] = thread_context
+            
+            # Use the dedicated prompty file
+            result = self.execute_prompty('team_action_resolution_detector.prompty', inputs)
+            
+            if not result:
+                return False, "AI analysis unavailable"
+            
+            # Clean and parse JSON response
+            result = result.strip()
+            result = re.sub(r'^```json\n?|^```\n?|```$', '', result).strip()
+            
+            try:
+                parsed = json.loads(result)
+                is_resolved = parsed.get('is_resolved', False)
+                evidence = parsed.get('resolution_evidence', 'No evidence found')
+                resolver = parsed.get('resolver', 'Unknown')
+                
+                return is_resolved, f"Resolution evidence: {evidence} (by {resolver})"
+                
+            except json.JSONDecodeError:
+                # Fallback: simple text analysis
+                result_lower = result.lower()
+                resolution_keywords = ['resolved', 'completed', 'done', 'fixed', 'handled', 'taken care of']
+                is_resolved = any(keyword in result_lower for keyword in resolution_keywords)
+                return is_resolved, f"Text analysis result: {result[:100]}"
+                
+        except Exception as e:
+            return False, f"Analysis error: {str(e)}"
+    
+    def check_optional_item_deadline(self, email_content, action_details=None):
+        """Check if an optional item's deadline has passed and should be deleted"""
+        try:
+            current_date = datetime.now()
+            
+            # Try to extract deadline from action details first
+            if action_details and 'due_date' in action_details:
+                due_date_str = action_details['due_date']
+                if due_date_str and due_date_str != "No specific deadline":
+                    deadline = self._parse_date_string(due_date_str)
+                    if deadline and deadline < current_date:
+                        return True, f"Deadline {due_date_str} has passed"
+            
+            # Use the dedicated prompty file for deadline analysis
+            inputs = self._create_email_inputs(email_content, self.get_standard_context())
+            inputs['current_date'] = current_date.strftime('%Y-%m-%d')
+            
+            result = self.execute_prompty('optional_item_deadline_checker.prompty', inputs)
+            
+            if not result:
+                return False, "Unable to analyze deadline"
+            
+            # Clean and parse JSON response
+            result = result.strip()
+            result = re.sub(r'^```json\n?|^```\n?|```$', '', result).strip()
+            
+            try:
+                parsed = json.loads(result)
+                is_expired = parsed.get('is_expired', False)
+                deadline_info = parsed.get('deadline_date', 'Unknown')
+                deadline_type = parsed.get('deadline_type', 'general')
+                
+                if is_expired:
+                    return True, f"Expired {deadline_type} deadline: {deadline_info}"
+                else:
+                    return False, f"Active or no deadline found: {deadline_info}"
+                    
+            except json.JSONDecodeError:
+                # Simple text analysis fallback
+                result_lower = result.lower()
+                expired_keywords = ['expired', 'passed', 'missed', 'closed', 'ended']
+                is_expired = any(keyword in result_lower for keyword in expired_keywords)
+                return is_expired, f"Text analysis: {result[:100]}"
+                
+        except Exception as e:
+            return False, f"Deadline analysis error: {str(e)}"
+    
+    def analyze_inbox_holistically(self, all_email_data):
+        """Analyze the entire inbox context to identify truly relevant actions and relationships"""
+        try:
+            # Build comprehensive inbox summary
+            inbox_summary = self._build_inbox_context_summary(all_email_data)
+            
+            # Create inputs for holistic analysis
+            inputs = {
+                'context': self.get_standard_context(),
+                'job_role_context': self.get_job_role_context(),
+                'username': self.get_username(),
+                'inbox_summary': inbox_summary,
+                'current_date': datetime.now().strftime('%Y-%m-%d')
+            }
+            
+            # Execute holistic analysis
+            result = self.execute_prompty('holistic_inbox_analyzer.prompty', inputs)
+            
+            if not result:
+                return None, "Holistic analysis unavailable"
+            
+            # Clean and parse JSON response
+            result = result.strip()
+            result = re.sub(r'^```json\n?|^```\n?|```$', '', result).strip()
+            
+            try:
+                analysis = json.loads(result)
+                return analysis, "Holistic analysis completed successfully"
+                
+            except json.JSONDecodeError as e:
+                # Return basic structure if JSON parsing fails
+                return {
+                    "truly_relevant_actions": [],
+                    "superseded_actions": [],
+                    "duplicate_groups": [],
+                    "expired_items": []
+                }, f"Analysis completed with parsing issues: {str(e)}"
+                
+        except Exception as e:
+            return None, f"Holistic analysis error: {str(e)}"
+    
+    def _build_inbox_context_summary(self, all_email_data):
+        """Build a comprehensive summary of all emails for holistic analysis"""
+        summary_parts = []
+        
+        for i, email_data in enumerate(all_email_data):
+            # Extract key information from each email
+            entry_id = email_data.get('entry_id', f'email_{i}')
+            subject = email_data.get('subject', 'Unknown Subject')
+            sender = email_data.get('sender_name', email_data.get('sender', 'Unknown Sender'))
+            received_time = email_data.get('received_time', 'Unknown Date')
+            body_preview = email_data.get('body', '')[:300] + ('...' if len(email_data.get('body', '')) > 300 else '')
+            
+            if hasattr(received_time, 'strftime'):
+                date_str = received_time.strftime('%Y-%m-%d %H:%M')
+            else:
+                date_str = str(received_time)
+            
+            email_summary = f"""EMAIL_ID: {entry_id}
+Subject: {subject}
+From: {sender}
+Date: {date_str}
+Preview: {body_preview}
+"""
+            summary_parts.append(email_summary)
+        
+        return "\n---\n".join(summary_parts)
+    
+    def _parse_date_string(self, date_str):
+        """Parse various date string formats"""
+        if not date_str or date_str == "No specific deadline":
+            return None
+            
+        try:
+            # Common date formats
+            date_formats = [
+                '%Y-%m-%d',
+                '%m/%d/%Y', 
+                '%d/%m/%Y',
+                '%B %d, %Y',
+                '%b %d, %Y',
+                '%Y-%m-%d %H:%M',
+                '%m/%d/%Y %H:%M'
+            ]
+            
+            for fmt in date_formats:
+                try:
+                    return datetime.strptime(date_str, fmt)
+                except ValueError:
+                    continue
+            
+            # If no format matches, return None
+            return None
+            
+        except Exception:
+            return None
+    
     def load_learning_data(self):
         """Load previous learning feedback for context"""
         try:

@@ -1,0 +1,71 @@
+---
+name: Team Action Resolution Detector
+description: Analyzes email thread context to determine if a team action has already been resolved by someone else
+model:
+  api: chat
+  configuration:
+    type: azure_openai
+    azure_deployment: gpt-4o-mini
+    api_version: 2024-02-15-preview
+  parameters:
+    max_tokens: 300
+    temperature: 0.1
+inputs:
+  context:
+    type: string
+  job_role_context:
+    type: string
+  username:
+    type: string
+  subject:
+    type: string
+  sender:
+    type: string
+  date:
+    type: string
+  body:
+    type: string
+  thread_context:
+    type: string
+---
+
+system:
+You are an intelligent email analysis assistant that analyzes email conversation threads to determine if team actions have already been resolved by someone else.
+
+user:
+Analyze this email conversation thread to determine if a team action has already been resolved by someone else.
+
+**JOB ROLE CONTEXT:**
+{{job_role_context}}
+
+**USER:** {{username}}
+
+**CURRENT EMAIL:**
+Subject: {{subject}}
+From: {{sender}}
+Date: {{date}}
+Body: {{body}}
+
+**CONVERSATION THREAD CONTEXT:**
+{{thread_context}}
+
+**ANALYSIS REQUIRED:**
+1. Is this email asking for team action or input?
+2. Do any replies in the thread show someone already took action or provided the requested information?
+3. Are there clear indicators that the issue/request has been resolved?
+
+**Look for indicators like:**
+- "Done", "Completed", "Fixed", "Resolved"
+- Someone providing the requested information
+- Confirmation that action was taken
+- "Thanks, got it" or similar acknowledgments
+- Follow-up emails showing the task was handled
+
+**Respond with JSON format:**
+```json
+{
+    "is_resolved": true/false,
+    "resolution_evidence": "Brief explanation of what shows it's resolved",
+    "resolver": "Who resolved it (if identifiable)"
+}
+```
