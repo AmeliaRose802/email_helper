@@ -139,7 +139,7 @@ class AIProcessor:
             'subject': email_content.get('subject', ''),
             'sender': email_content.get('sender', ''),
             'date': email_content.get('date', ''),
-            'body': email_content.get('body', '')[:3000]
+            'body': email_content.get('body', '')[:8000]  # Increased from 3000 to 8000 for much larger context
         }
     
     def classify_email(self, email_content, learning_data):
@@ -248,7 +248,7 @@ Learning History: {len(learning_data)} previous decisions"""
         email_content = {
             'subject': subject,
             'sender': 'Unknown',
-            'body': body[:500],
+            'body': body[:3000],  # Increased from 500 to 3000 for better context
             'date': ''
         }
         
@@ -278,7 +278,8 @@ Learning History: {len(learning_data)} previous decisions"""
             
             if result and result.strip():
                 summary = re.sub(r'^#+\s*|\*\*(.*?)\*\*|\*(.*?)\*', r'\1\2', result.strip())
-                return summary[:300] + "..." if len(summary) > 300 else summary
+                # Remove the 300 character truncation to allow full newsletter summaries
+                return summary
             return f"Newsletter from {email_content.get('sender', 'Unknown')}: {email_content.get('subject', 'No summary')}"
         except Exception:
             return f"Newsletter from {email_content.get('sender', 'Unknown')}: {email_content.get('subject', 'No summary')}"

@@ -6,6 +6,7 @@ import threading
 import os
 import webbrowser
 import sys
+import re
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -204,11 +205,143 @@ class UnifiedEmailGUI:
         ttk.Button(control_frame, text="Process New Batch", 
                   command=self.start_new_session).pack(side=tk.LEFT, padx=5)
         
+        # Enhanced summary text widget with rich formatting
         self.summary_text = scrolledtext.ScrolledText(main_frame, wrap=tk.WORD, 
-                                                     height=20, state=tk.DISABLED)
+                                                     height=20, state=tk.DISABLED,
+                                                     font=('Segoe UI', 10))
         self.summary_text.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # Configure rich text formatting tags for summary display
+        self._configure_summary_text_tags()
+    
+    def _configure_summary_text_tags(self):
+        """Configure rich text formatting tags for beautiful summary display"""
+        # Main title
+        self.summary_text.tag_configure("main_title", 
+                                       font=("Segoe UI", 16, "bold"), 
+                                       foreground="#007acc",
+                                       justify="center")
+        
+        # Subtitle
+        self.summary_text.tag_configure("subtitle", 
+                                       font=("Segoe UI", 12), 
+                                       foreground="#666666",
+                                       justify="center")
+        
+        # Overview stats
+        self.summary_text.tag_configure("overview_title", 
+                                       font=("Segoe UI", 14, "bold"), 
+                                       foreground="#005a8b")
+        
+        self.summary_text.tag_configure("overview_stats", 
+                                       font=("Segoe UI", 11), 
+                                       background="#e8f4fd",
+                                       foreground="#005a8b")
+        
+        # Section headers with different colors
+        self.summary_text.tag_configure("section_required", 
+                                       font=("Segoe UI", 13, "bold"), 
+                                       foreground="#dc3545",
+                                       background="#ffe6e6")
+        
+        self.summary_text.tag_configure("section_team", 
+                                       font=("Segoe UI", 13, "bold"), 
+                                       foreground="#856404",
+                                       background="#fff3cd")
+        
+        self.summary_text.tag_configure("section_optional", 
+                                       font=("Segoe UI", 13, "bold"), 
+                                       foreground="#0c5460",
+                                       background="#d1ecf1")
+        
+        self.summary_text.tag_configure("section_jobs", 
+                                       font=("Segoe UI", 13, "bold"), 
+                                       foreground="#155724",
+                                       background="#d4edda")
+        
+        self.summary_text.tag_configure("section_events", 
+                                       font=("Segoe UI", 13, "bold"), 
+                                       foreground="#4c1d95",
+                                       background="#f8e8ff")
+        
+        self.summary_text.tag_configure("section_fyi", 
+                                       font=("Segoe UI", 13, "bold"), 
+                                       foreground="#0369a1",
+                                       background="#f0f8ff")
+        
+        self.summary_text.tag_configure("section_newsletter", 
+                                       font=("Segoe UI", 13, "bold"), 
+                                       foreground="#ea580c",
+                                       background="#fff8dc")
+        
+        # Item titles
+        self.summary_text.tag_configure("item_title", 
+                                       font=("Segoe UI", 11, "bold"), 
+                                       foreground="#333333")
+        
+        # Item metadata (from, date, etc.)
+        self.summary_text.tag_configure("item_meta", 
+                                       font=("Segoe UI", 9), 
+                                       foreground="#666666")
+        
+        # Item content labels
+        self.summary_text.tag_configure("content_label", 
+                                       font=("Segoe UI", 10, "bold"), 
+                                       foreground="#555555")
+        
+        # Item content text
+        self.summary_text.tag_configure("content_text", 
+                                       font=("Segoe UI", 10), 
+                                       foreground="#333333")
+        
+        # Links
+        self.summary_text.tag_configure("link", 
+                                       font=("Segoe UI", 9, "underline"), 
+                                       foreground="#007acc")
+        
+        # Separators
+        self.summary_text.tag_configure("separator", 
+                                       font=("Consolas", 8), 
+                                       foreground="#cccccc")
+        
+        # Empty section message
+        self.summary_text.tag_configure("empty_section", 
+                                       font=("Segoe UI", 10, "italic"), 
+                                       foreground="#999999",
+                                       justify="center")
+        
+        # Configure link click behavior
+        self.summary_text.tag_bind("link", "<Button-1>", self._on_summary_link_click)
+        self.summary_text.tag_bind("link", "<Enter>", lambda e: self.summary_text.config(cursor="hand2"))
+        self.summary_text.tag_bind("link", "<Leave>", lambda e: self.summary_text.config(cursor=""))
+    
+    def _on_summary_link_click(self, event):
+        """Handle link clicks in the summary display"""
+        # Get the tag at the click position
+        tags = self.summary_text.tag_names(tk.CURRENT)
+        for tag in tags:
+            if tag.startswith("link_"):
+                # Extract URL from tag
+                url = tag.replace("link_", "", 1)
+                try:
+                    import webbrowser
+                    webbrowser.open(url)
+                except Exception as e:
+                    messagebox.showwarning("Error Opening Link", f"Could not open URL: {url}\n\nError: {str(e)}")
+                break
     
     def get_category_display_names(self):
+        return [
+            "Required Personal Action",
+            "Team Action", 
+            "Optional Action", 
+            "Job Listing",
+            "Optional Event",
+            "FYI Notice",
+            "Newsletter",
+            "Work Relevant",
+            "Spam To Delete"
+        ]
         return [
             "Required Personal Action",
             "Team Action", 
@@ -469,6 +602,20 @@ class UnifiedEmailGUI:
         self.load_processed_emails()
         self.notebook.select(1)
         
+        # Automatically select and display the first email for faster review
+        self.root.after(100, self._auto_select_first_email)
+    
+    def _auto_select_first_email(self):
+        """Automatically select the first email when review pane opens"""
+        children = self.email_tree.get_children()
+        if children:
+            # Select the first item
+            first_item = children[0]
+            self.email_tree.selection_set(first_item)
+            self.email_tree.focus(first_item)
+            # Display its details
+            self.display_email_details(0)
+        
     def load_processed_emails(self):
         # Clear existing items
         for item in self.email_tree.get_children():
@@ -527,17 +674,18 @@ class UnifiedEmailGUI:
         self.preview_text.config(state=tk.NORMAL)
         self.preview_text.delete(1.0, tk.END)
         
-        # Add AI Summary section at the top for faster review
-        self.preview_text.insert(tk.END, "🤖 AI SUMMARY:\n")
-        self.preview_text.insert(tk.END, f"{ai_summary}\n\n")
-        self.preview_text.insert(tk.END, "=" * 50 + "\n")
-        self.preview_text.insert(tk.END, "📧 EMAIL CONTENT:\n\n")
+        # Configure text tags for better formatting
+        self._configure_text_tags()
         
-        # Add email body (truncated for performance)
+        # Add AI Summary section at the top for faster review
+        self.preview_text.insert(tk.END, "🤖 AI SUMMARY:\n", "header")
+        self.preview_text.insert(tk.END, f"{ai_summary}\n\n", "summary")
+        self.preview_text.insert(tk.END, "=" * 50 + "\n", "separator")
+        self.preview_text.insert(tk.END, "📧 EMAIL CONTENT:\n\n", "header")
+        
+        # Process and add email body with clickable links
         body = email_data.get('body', 'No content available')
-        self.preview_text.insert(tk.END, body[:1000])
-        if len(body) > 1000:
-            self.preview_text.insert(tk.END, "\n\n[... truncated ...]")
+        self._insert_formatted_email_body(body)
         
         self.preview_text.config(state=tk.DISABLED)
         
@@ -548,6 +696,147 @@ class UnifiedEmailGUI:
         # Clear explanation and disable apply button
         self.explanation_var.set("")
         self.apply_btn.config(state=tk.DISABLED)
+    
+    def _configure_text_tags(self):
+        """Configure text formatting tags for better email display"""
+        # Header style for section titles
+        self.preview_text.tag_configure("header", 
+                                       font=("Arial", 10, "bold"), 
+                                       foreground="#2c3e50")
+        
+        # Summary style with light background
+        self.preview_text.tag_configure("summary", 
+                                       font=("Arial", 9), 
+                                       background="#f8f9fa",
+                                       foreground="#2c3e50")
+        
+        # Separator line
+        self.preview_text.tag_configure("separator", 
+                                       font=("Courier", 8), 
+                                       foreground="#bdc3c7")
+        
+        # Clickable link style
+        self.preview_text.tag_configure("link", 
+                                       font=("Arial", 9, "underline"), 
+                                       foreground="#3498db",
+                                       background="#ecf0f1")
+        
+        # Email metadata style
+        self.preview_text.tag_configure("metadata", 
+                                       font=("Arial", 8, "italic"), 
+                                       foreground="#7f8c8d")
+        
+        # Normal body text
+        self.preview_text.tag_configure("body", 
+                                       font=("Arial", 9), 
+                                       foreground="#2c3e50")
+        
+        # Configure link click behavior
+        self.preview_text.tag_bind("link", "<Button-1>", self._on_link_click)
+        self.preview_text.tag_bind("link", "<Enter>", lambda e: self.preview_text.config(cursor="hand2"))
+        self.preview_text.tag_bind("link", "<Leave>", lambda e: self.preview_text.config(cursor=""))
+    
+    def _insert_formatted_email_body(self, body):
+        """Insert email body with clickable links and better formatting"""
+        # Increase body length limit significantly for better context
+        if len(body) > 10000:
+            body = body[:10000] + "\n\n[... content truncated for readability ...]"
+        
+        # Clean up common email formatting issues
+        body = self._clean_email_formatting(body)
+        
+        # Find all URLs in the text
+        url_pattern = r'http[s]?://[^\s<>"\'\[\](){}|\\^`]+'
+        urls = []
+        
+        # Store URLs and their positions
+        for match in re.finditer(url_pattern, body):
+            urls.append({
+                'start': match.start(),
+                'end': match.end(),
+                'url': match.group(),
+                'display_url': self._create_display_url(match.group())
+            })
+        
+        # Insert text with clickable links
+        last_pos = 0
+        for url_info in urls:
+            # Insert text before the URL
+            text_before = body[last_pos:url_info['start']]
+            self.preview_text.insert(tk.END, text_before, "body")
+            
+            # Insert clickable URL
+            link_start = self.preview_text.index(tk.END)
+            self.preview_text.insert(tk.END, url_info['display_url'], "link")
+            link_end = self.preview_text.index(tk.END)
+            
+            # Store the actual URL for click handling
+            self.preview_text.tag_add(f"url_{url_info['start']}", link_start, link_end)
+            self.preview_text.tag_configure(f"url_{url_info['start']}", 
+                                          foreground="#3498db", 
+                                          underline=True)
+            self.preview_text.tag_bind(f"url_{url_info['start']}", "<Button-1>", 
+                                     lambda e, url=url_info['url']: self._open_url(url))
+            
+            last_pos = url_info['end']
+        
+        # Insert remaining text
+        remaining_text = body[last_pos:]
+        self.preview_text.insert(tk.END, remaining_text, "body")
+    
+    def _clean_email_formatting(self, body):
+        """Clean up common email formatting issues for better readability"""
+        # Remove excessive blank lines
+        body = re.sub(r'\n{3,}', '\n\n', body)
+        
+        # Clean up outlook-style forwarded/reply headers
+        body = re.sub(r'_{10,}', '\n' + '─' * 40 + '\n', body)
+        
+        # Clean up common email signatures separators
+        body = re.sub(r'-{5,}', '─' * 25, body)
+        
+        # Remove excessive spaces while preserving intentional formatting
+        lines = body.split('\n')
+        cleaned_lines = []
+        for line in lines:
+            # Clean up excessive spaces but preserve indentation
+            cleaned_line = re.sub(r'[ \t]{2,}', ' ', line.rstrip())
+            cleaned_lines.append(cleaned_line)
+        
+        return '\n'.join(cleaned_lines)
+    
+    def _create_display_url(self, url):
+        """Create a more readable display version of the URL"""
+        # Truncate very long URLs for better readability
+        if len(url) > 60:
+            # Try to show meaningful part of URL
+            from urllib.parse import urlparse
+            try:
+                parsed = urlparse(url)
+                domain = parsed.netloc
+                path = parsed.path[:30] + '...' if len(parsed.path) > 30 else parsed.path
+                return f"{domain}{path}"
+            except:
+                # Fallback: simple truncation
+                return url[:50] + "..."
+        return url
+    
+    def _on_link_click(self, event):
+        """Handle link clicks in the text widget"""
+        # Get the tag at the click position
+        tags = self.preview_text.tag_names(tk.CURRENT)
+        for tag in tags:
+            if tag.startswith("url_"):
+                # This will be handled by the specific URL tag binding
+                break
+    
+    def _open_url(self, url):
+        """Open URL in default browser"""
+        import webbrowser
+        try:
+            webbrowser.open(url)
+        except Exception as e:
+            messagebox.showwarning("Error Opening Link", f"Could not open URL: {url}\n\nError: {str(e)}")
     
     def on_category_change(self, event):
         if self.current_email_index is not None:
@@ -704,9 +993,26 @@ class UnifiedEmailGUI:
             messagebox.showwarning("No Data", "No email suggestions to apply.")
             return
         
+        # Calculate folder distribution for user preview
+        inbox_categories = {'required_personal_action', 'optional_action', 'job_listing', 'work_relevant', 'spam_to_delete'}
+        non_inbox_categories = {'team_action', 'optional_event', 'fyi', 'newsletter', 'general_information'}
+        
+        inbox_count = sum(1 for s in self.email_suggestions if s['ai_suggestion'] in inbox_categories)
+        non_inbox_count = sum(1 for s in self.email_suggestions if s['ai_suggestion'] in non_inbox_categories)
+        
         def confirmation_callback(email_count):
-            return messagebox.askyesno("Confirm Application", 
-                                     f"Apply categorization to {email_count} emails in Outlook?")
+            message = f"""Apply categorization to {email_count} emails in Outlook?
+
+📂 FOLDER ORGANIZATION:
+🎯 INBOX (Actionable): {inbox_count} emails
+   • Required Actions, Optional Actions, Job Listings, Work Relevant
+   
+📚 OUTSIDE INBOX (Reference): {non_inbox_count} emails  
+   • Team Actions, Optional Events, FYI, Newsletters
+
+This will help keep your inbox focused on actionable items only."""
+            
+            return messagebox.askyesno("Confirm Application", message)
         
         success_count, error_count = self.outlook_manager.apply_categorization_batch(
             self.email_suggestions, 
@@ -716,11 +1022,15 @@ class UnifiedEmailGUI:
         messagebox.showinfo("Complete", 
                           f"Categorization applied!\n\n"
                           f"✅ Successfully processed: {success_count}\n"
+                          f"🎯 Inbox (actionable): {inbox_count} emails\n"
+                          f"📚 Outside inbox (reference): {non_inbox_count} emails\n"
                           f"❌ Errors: {error_count}")
     
     def proceed_to_summary(self):
         self.notebook.tab(2, state="normal")
         self.notebook.select(2)
+        # Automatically generate and display the formatted summary
+        self.root.after(100, self.generate_summary)
     
     def generate_summary(self):
         self.generate_summary_btn.config(state=tk.DISABLED)
@@ -728,40 +1038,250 @@ class UnifiedEmailGUI:
         # Generate summary sections
         self.summary_sections = self.summary_generator.build_summary_sections(self.action_items_data)
         
-        # Create text summary for display
-        summary_text = self.create_summary_text(self.summary_sections)
+        # Display beautifully formatted summary in the app
+        self.display_formatted_summary_in_app(self.summary_sections)
         
-        # Update summary display
-        self.summary_text.config(state=tk.NORMAL)
-        self.summary_text.delete(1.0, tk.END)
-        self.summary_text.insert(tk.END, summary_text)
-        self.summary_text.config(state=tk.DISABLED)
-        
-        # Save HTML summary
+        # Also save HTML summary for browser viewing (keep existing functionality)
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.saved_summary_path = self.summary_generator.save_focused_summary(self.summary_sections, timestamp)
         
         self.generate_summary_btn.config(state=tk.NORMAL)
     
-    def create_summary_text(self, summary_sections):
-        text_parts = []
+    def display_formatted_summary_in_app(self, summary_sections):
+        """Display beautifully formatted summary directly in the application"""
+        # Clear existing content
+        self.summary_text.config(state=tk.NORMAL)
+        self.summary_text.delete(1.0, tk.END)
+        
+        # Calculate totals
         total_items = sum(len(items) for items in summary_sections.values())
-        text_parts.append(f"Summary: {total_items} items processed")
-        text_parts.append("=" * 50)
+        high_priority = len(summary_sections.get('required_actions', []))
         
-        for section_key, items in summary_sections.items():
+        # Header
+        self.summary_text.insert(tk.END, "📊 Email Summary\n", "main_title")
+        self.summary_text.insert(tk.END, "Focused & Actionable\n\n", "subtitle")
+        
+        # Overview section
+        self.summary_text.insert(tk.END, "📊 Summary Overview\n", "overview_title")
+        self.summary_text.insert(tk.END, "═" * 50 + "\n", "separator")
+        overview_text = f"Total Items: {total_items}    |    High Priority: {high_priority}\n"
+        overview_text += "Stay focused - relevant items only!\n\n"
+        self.summary_text.insert(tk.END, overview_text, "overview_stats")
+        
+        # Define sections with their styling
+        sections_config = [
+            ('required_actions', '🔴 REQUIRED ACTION ITEMS (ME)', 'section_required', self._display_action_items),
+            ('team_actions', '👥 TEAM ACTION ITEMS', 'section_team', self._display_action_items),
+            ('optional_actions', '📝 OPTIONAL ACTION ITEMS', 'section_optional', self._display_optional_actions),
+            ('job_listings', '💼 JOB LISTINGS', 'section_jobs', self._display_job_listings),
+            ('optional_events', '🎪 OPTIONAL EVENTS', 'section_events', self._display_events),
+            ('fyi_notices', '📋 FYI NOTICES', 'section_fyi', self._display_fyi_notices),
+            ('newsletters', '📰 NEWSLETTERS SUMMARY', 'section_newsletter', self._display_newsletters)
+        ]
+        
+        # Display each section
+        for section_key, title, style_tag, display_func in sections_config:
+            items = summary_sections.get(section_key, [])
+            if not items and section_key in ['required_actions', 'team_actions']:
+                # Always show critical sections even if empty
+                pass
+            elif not items:
+                # Skip empty optional sections
+                continue
+            
+            # Section header with count
+            section_title = f"{title} ({len(items)})\n"
+            self.summary_text.insert(tk.END, section_title, style_tag)
+            self.summary_text.insert(tk.END, "─" * len(section_title) + "\n", "separator")
+            
             if items:
-                section_title = section_key.replace('_', ' ').title()
-                text_parts.append(f"\n{section_title} ({len(items)} items):")
-                for i, item in enumerate(items[:5], 1):  # Show first 5 items
-                    if 'subject' in item:
-                        text_parts.append(f"  {i}. {item['subject']}")
-                    elif 'summary' in item:
-                        text_parts.append(f"  {i}. {item['summary'][:100]}...")
-                if len(items) > 5:
-                    text_parts.append(f"  ... and {len(items) - 5} more")
+                display_func(items)
+            else:
+                self.summary_text.insert(tk.END, f"No {title.split()[-1].lower()} found\n\n", "empty_section")
+            
+            self.summary_text.insert(tk.END, "\n", "content_text")
         
-        return "\n".join(text_parts)
+        self.summary_text.config(state=tk.DISABLED)
+        # Scroll to top for better user experience
+        self.summary_text.see("1.0")
+    
+    def _display_action_items(self, items):
+        """Display required or team action items with full details"""
+        for i, item in enumerate(items, 1):
+            # Item title
+            self.summary_text.insert(tk.END, f"{i}. {item['subject']}\n", "item_title")
+            
+            # Metadata
+            self.summary_text.insert(tk.END, f"   From: {item['sender']}\n", "item_meta")
+            
+            # Action details
+            self.summary_text.insert(tk.END, "   Due: ", "content_label")
+            self.summary_text.insert(tk.END, f"{item['due_date']}\n", "content_text")
+            
+            self.summary_text.insert(tk.END, "   Action: ", "content_label")
+            self.summary_text.insert(tk.END, f"{item.get('action_required', 'Review email')}\n", "content_text")
+            
+            self.summary_text.insert(tk.END, "   Why: ", "content_label")
+            self.summary_text.insert(tk.END, f"{item['explanation']}\n", "content_text")
+            
+            # Links
+            if item.get('links'):
+                self.summary_text.insert(tk.END, "   Links: ", "content_label")
+                for j, link in enumerate(item['links'][:2]):
+                    link_text = f"Link {j+1}"
+                    link_start = self.summary_text.index(tk.END)
+                    self.summary_text.insert(tk.END, link_text, "link")
+                    link_end = self.summary_text.index(tk.END)
+                    
+                    # Create unique tag for this link
+                    link_tag = f"link_{hash(link)}"
+                    self.summary_text.tag_add(link_tag, link_start, link_end)
+                    self.summary_text.tag_configure(link_tag, foreground="#007acc", underline=True)
+                    self.summary_text.tag_bind(link_tag, "<Button-1>", lambda e, url=link: self._open_url(url))
+                    
+                    if j < min(len(item['links']), 2) - 1:
+                        self.summary_text.insert(tk.END, " | ", "content_text")
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            self.summary_text.insert(tk.END, "\n", "content_text")
+    
+    def _display_optional_actions(self, items):
+        """Display optional action items with relevance context"""
+        for i, item in enumerate(items, 1):
+            # Item title
+            self.summary_text.insert(tk.END, f"{i}. {item['subject']}\n", "item_title")
+            
+            # Metadata
+            self.summary_text.insert(tk.END, f"   From: {item['sender']}\n", "item_meta")
+            
+            # Optional action details
+            self.summary_text.insert(tk.END, "   What: ", "content_label")
+            self.summary_text.insert(tk.END, f"{item.get('action_required', 'Provide feedback')}\n", "content_text")
+            
+            self.summary_text.insert(tk.END, "   Why relevant: ", "content_label")
+            self.summary_text.insert(tk.END, f"{item['why_relevant']}\n", "content_text")
+            
+            self.summary_text.insert(tk.END, "   Context: ", "content_label")
+            self.summary_text.insert(tk.END, f"{item['explanation']}\n", "content_text")
+            
+            # Links
+            if item.get('links'):
+                self.summary_text.insert(tk.END, "   Links: ", "content_label")
+                for j, link in enumerate(item['links'][:2]):
+                    link_text = f"Link {j+1}"
+                    link_start = self.summary_text.index(tk.END)
+                    self.summary_text.insert(tk.END, link_text, "link")
+                    link_end = self.summary_text.index(tk.END)
+                    
+                    # Create unique tag for this link
+                    link_tag = f"link_{hash(link)}"
+                    self.summary_text.tag_add(link_tag, link_start, link_end)
+                    self.summary_text.tag_configure(link_tag, foreground="#007acc", underline=True)
+                    self.summary_text.tag_bind(link_tag, "<Button-1>", lambda e, url=link: self._open_url(url))
+                    
+                    if j < min(len(item['links']), 2) - 1:
+                        self.summary_text.insert(tk.END, " | ", "content_text")
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            self.summary_text.insert(tk.END, "\n", "content_text")
+    
+    def _display_job_listings(self, items):
+        """Display job listings with qualification match"""
+        for i, item in enumerate(items, 1):
+            # Item title
+            self.summary_text.insert(tk.END, f"{i}. {item['subject']}\n", "item_title")
+            
+            # Metadata
+            self.summary_text.insert(tk.END, f"   From: {item['sender']}\n", "item_meta")
+            
+            # Job details
+            self.summary_text.insert(tk.END, "   Match: ", "content_label")
+            self.summary_text.insert(tk.END, f"{item['qualification_match']}\n", "content_text")
+            
+            self.summary_text.insert(tk.END, "   Due: ", "content_label")
+            self.summary_text.insert(tk.END, f"{item['due_date']}\n", "content_text")
+            
+            # Links
+            if item.get('links'):
+                self.summary_text.insert(tk.END, "   Apply: ", "content_label")
+                for j, link in enumerate(item['links'][:2]):
+                    link_text = f"Apply {j+1}"
+                    link_start = self.summary_text.index(tk.END)
+                    self.summary_text.insert(tk.END, link_text, "link")
+                    link_end = self.summary_text.index(tk.END)
+                    
+                    # Create unique tag for this link
+                    link_tag = f"link_{hash(link)}"
+                    self.summary_text.tag_add(link_tag, link_start, link_end)
+                    self.summary_text.tag_configure(link_tag, foreground="#007acc", underline=True)
+                    self.summary_text.tag_bind(link_tag, "<Button-1>", lambda e, url=link: self._open_url(url))
+                    
+                    if j < min(len(item['links']), 2) - 1:
+                        self.summary_text.insert(tk.END, " | ", "content_text")
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            self.summary_text.insert(tk.END, "\n", "content_text")
+    
+    def _display_events(self, items):
+        """Display optional events with relevance"""
+        for i, item in enumerate(items, 1):
+            # Item title
+            self.summary_text.insert(tk.END, f"{i}. {item['subject']}\n", "item_title")
+            
+            # Metadata
+            self.summary_text.insert(tk.END, f"   From: {item['sender']}\n", "item_meta")
+            
+            # Event details
+            self.summary_text.insert(tk.END, "   Date: ", "content_label")
+            self.summary_text.insert(tk.END, f"{item['date']}\n", "content_text")
+            
+            self.summary_text.insert(tk.END, "   Why relevant: ", "content_label")
+            self.summary_text.insert(tk.END, f"{item['relevance']}\n", "content_text")
+            
+            # Links
+            if item.get('links'):
+                self.summary_text.insert(tk.END, "   Register: ", "content_label")
+                for j, link in enumerate(item['links'][:2]):
+                    link_text = f"Register {j+1}"
+                    link_start = self.summary_text.index(tk.END)
+                    self.summary_text.insert(tk.END, link_text, "link")
+                    link_end = self.summary_text.index(tk.END)
+                    
+                    # Create unique tag for this link
+                    link_tag = f"link_{hash(link)}"
+                    self.summary_text.tag_add(link_tag, link_start, link_end)
+                    self.summary_text.tag_configure(link_tag, foreground="#007acc", underline=True)
+                    self.summary_text.tag_bind(link_tag, "<Button-1>", lambda e, url=link: self._open_url(url))
+                    
+                    if j < min(len(item['links']), 2) - 1:
+                        self.summary_text.insert(tk.END, " | ", "content_text")
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            self.summary_text.insert(tk.END, "\n", "content_text")
+    
+    def _display_fyi_notices(self, items):
+        """Display FYI notices as bullet points"""
+        for item in items:
+            bullet_text = f"• {item['summary']} ({item['sender']})\n"
+            self.summary_text.insert(tk.END, bullet_text, "content_text")
+        self.summary_text.insert(tk.END, "\n", "content_text")
+    
+    def _display_newsletters(self, items):
+        """Display newsletter summaries"""
+        if len(items) > 1:
+            # Combined newsletter highlights
+            self.summary_text.insert(tk.END, "Combined Newsletter Highlights:\n", "item_title")
+            for i, item in enumerate(items, 1):
+                newsletter_text = f"{i}. {item['summary']}\n"
+                self.summary_text.insert(tk.END, newsletter_text, "content_text")
+        else:
+            # Single newsletter
+            for item in items:
+                self.summary_text.insert(tk.END, f"{item['subject']}\n", "item_title")
+                self.summary_text.insert(tk.END, f"From: {item['sender']}, {item['date']}\n", "item_meta")
+                self.summary_text.insert(tk.END, f"{item['summary']}\n", "content_text")
+        
+        self.summary_text.insert(tk.END, "\n", "content_text")
     
     def open_summary_in_browser(self):
         if hasattr(self, 'saved_summary_path') and self.saved_summary_path:

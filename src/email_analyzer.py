@@ -404,7 +404,7 @@ class EmailAnalyzer:
         # Strategy: Prefer the latest email that's not just "Thanks" or "Got it"
         for email in sorted_emails:
             try:
-                body = email.Body[:1000] if hasattr(email, 'Body') and email.Body else ""
+                body = email.Body[:5000] if hasattr(email, 'Body') and email.Body else ""
                 body_lower = body.lower()
                 subject = email.Subject.lower()
                 
@@ -430,7 +430,7 @@ class EmailAnalyzer:
         scored_emails = []
         
         for email in sorted_emails:
-            body = email.Body[:1000] if email.Body else ""
+            body = email.Body[:5000] if email.Body else ""
             body_lower = body.lower()
             subject = email.Subject.lower()
             score = 0

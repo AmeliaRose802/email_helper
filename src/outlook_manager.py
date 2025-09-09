@@ -40,28 +40,38 @@ class OutlookManager:
             raise
     
     def _setup_outlook_folders(self):
-        """Set up Outlook folders for organizing emails"""
+        """Set up Outlook folders for organizing emails with proper hierarchy"""
         try:
-            # Get the Inbox folder as the root for our organization
+            # Get the Inbox folder and main mail root
             inbox_folder = self.inbox
+            mail_root = inbox_folder.Parent  # This gets the main Mail folder (parent of Inbox)
             
-            # Folder mapping for categories - all under Inbox
-            folder_names = {
+            # Categories that should remain in Inbox (actionable items)
+            inbox_categories = {
                 'required_personal_action': 'Required Actions (Me)',
-                'team_action': 'Team Actions', 
                 'optional_action': 'Optional Actions',
-                'job_listing': 'Job Listings',  # Use existing Job Listings folder
-                'optional_event': 'Optional Events',
+                'job_listing': 'Job Listings',
                 'work_relevant': 'Work Relevant',
-                'fyi': 'FYI',
-                'newsletter': 'Newsletters',
-                'spam_to_delete': 'ai_deleted',  # Use existing ai_deleted folder
-                'general_information': 'Summarized'  # Use existing Summarized folder
+                'spam_to_delete': 'ai_deleted'  # Keep spam folder in inbox for review
             }
             
-            # Create folders if they don't exist (all under Inbox)
-            for category, folder_name in folder_names.items():
+            # Categories that should be outside Inbox (non-actionable/reference items)
+            non_inbox_categories = {
+                'team_action': 'Team Actions',
+                'optional_event': 'Optional Events', 
+                'fyi': 'FYI',
+                'newsletter': 'Newsletters',
+                'general_information': 'Summarized'
+            }
+            
+            # Create inbox folders (actionable items)
+            for category, folder_name in inbox_categories.items():
                 folder = self._create_folder_if_not_exists(inbox_folder, folder_name)
+                self.folders[category] = folder
+            
+            # Create non-inbox folders (reference/FYI items) at mail root level
+            for category, folder_name in non_inbox_categories.items():
+                folder = self._create_folder_if_not_exists(mail_root, folder_name)
                 self.folders[category] = folder
                 
         except Exception as e:
@@ -85,7 +95,7 @@ class OutlookManager:
             return None
     
     def move_email_to_category(self, email, category):
-        """Move email to appropriate category folder"""
+        """Move email to appropriate category folder with location logging"""
         if category not in self.folders or not self.folders[category]:
             # Fallback: just add category to email if folder not available
             self._add_category_to_email(email, category)
@@ -94,12 +104,23 @@ class OutlookManager:
         try:
             target_folder = self.folders[category]
             email.Move(target_folder)
+            
+            # Log where the email was moved for user awareness
+            folder_location = "Inbox" if self._is_inbox_subfolder(target_folder) else "Mail Root"
+            print(f"📁 Moved '{email.Subject[:50]}...' to {target_folder.Name} ({folder_location})")
             return True
             
         except Exception as e:
             print(f"⚠️  Could not move email: {e}")
             # Fallback: add category instead
             self._add_category_to_email(email, category)
+            return False
+    
+    def _is_inbox_subfolder(self, folder):
+        """Check if a folder is a subfolder of Inbox"""
+        try:
+            return folder.Parent.Name == self.inbox.Name
+        except:
             return False
             
     def _add_category_to_email(self, email, category):
@@ -306,14 +327,20 @@ class OutlookManager:
         return sorted_conversations[:max_emails]
     
     def get_email_body(self, email):
-        """Get email body safely"""
-        return email.Body[:1000] if email.Body else ""
+        """Get email body safely with larger context window"""
+        return email.Body[:5000] if email.Body else ""
     
     def apply_categorization_batch(self, email_suggestions, confirmation_callback=None):
-        """Apply categorization to a batch of emails"""
+        """Apply categorization to a batch of emails with improved folder organization"""
         if not email_suggestions:
             print("❌ No email suggestions to process.")
             return 0, 0
+        
+        # Show folder organization info
+        print("\n📂 FOLDER ORGANIZATION:")
+        print("   🎯 INBOX (Actionable): Required Actions, Optional Actions, Job Listings, Work Relevant")
+        print("   📚 OUTSIDE INBOX (Reference): Team Actions, Optional Events, FYI, Newsletters")
+        print()
             
         # Ask for confirmation if callback provided
         if confirmation_callback and not confirmation_callback(len(email_suggestions)):
@@ -323,11 +350,22 @@ class OutlookManager:
         # Track results
         success_count = 0
         error_count = 0
+        inbox_count = 0
+        non_inbox_count = 0
+        
+        # Categories that go outside inbox
+        non_inbox_categories = {'team_action', 'optional_event', 'fyi', 'newsletter', 'general_information'}
         
         for i, suggestion_data in enumerate(email_suggestions, 1):
             email = suggestion_data['email_object']
             category = suggestion_data['ai_suggestion']
             thread_data = suggestion_data.get('thread_data', {})
+            
+            # Count folder destinations
+            if category in non_inbox_categories:
+                non_inbox_count += 1
+            else:
+                inbox_count += 1
             
             # Get all emails in thread (use new structure)
             all_emails = thread_data.get('all_emails', [email])
@@ -351,7 +389,8 @@ class OutlookManager:
                 else:
                     pass  # Partially moved thread
             else:
-                print(f"   Category: {category.replace('_', ' ').title()}")
+                print(f"   📧 {email.Subject[:50]}...")
+                print(f"      └─ Category: {category.replace('_', ' ').title()}")
                 
                 try:
                     if self.move_email_to_category(email, category):
@@ -363,8 +402,11 @@ class OutlookManager:
                     print(f"❌ Error processing email: {e}")
                     error_count += 1
         
-        print(f"\n✅ CATEGORIZATION COMPLETE - Successfully processed: {success_count} emails")
+        print(f"\n✅ CATEGORIZATION COMPLETE:")
+        print(f"   📊 Total processed: {success_count} emails")
+        print(f"   🎯 Remaining in Inbox: {inbox_count} emails (actionable items)")
+        print(f"   📚 Moved outside Inbox: {non_inbox_count} emails (reference/FYI items)")
         if error_count > 0:
-            print(f"   Errors encountered: {error_count} emails")
+            print(f"   ❌ Errors encountered: {error_count} emails")
         
         return success_count, error_count

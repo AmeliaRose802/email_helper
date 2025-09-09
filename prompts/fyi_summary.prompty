@@ -9,7 +9,7 @@ model:
     type: azure_openai
   parameters:
     temperature: 0.2
-    max_tokens: 80
+    max_tokens: 200
 inputs:
   context:
     type: string
