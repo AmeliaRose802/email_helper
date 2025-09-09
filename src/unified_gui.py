@@ -160,8 +160,14 @@ class UnifiedEmailGUI:
         details_frame = ttk.LabelFrame(main_frame, text="Email Details", padding="10")
         details_frame.grid(row=1, column=2, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(10, 0))
         details_frame.columnconfigure(1, weight=1)
-        details_frame.rowconfigure(3, weight=1)
+        details_frame.rowconfigure(4, weight=1)
         
+        ttk.Label(details_frame, text="Category:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.category_var = tk.StringVar()
+        self.category_combo = ttk.Combobox(details_frame, textvariable=self.category_var, 
+                                          values=self.get_category_display_names(), 
+                                          state="readonly")
+        self.category_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
         ttk.Label(details_frame, text="Category:").grid(row=0, column=0, sticky=tk.W, pady=2)
         self.category_var = tk.StringVar()
         self.category_combo = ttk.Combobox(details_frame, textvariable=self.category_var, 
@@ -170,17 +176,22 @@ class UnifiedEmailGUI:
         self.category_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
         self.category_combo.bind('<<ComboboxSelected>>', self.on_category_change)
         
-        ttk.Label(details_frame, text="Reason:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        # Add info label about auto-apply
+        info_label = ttk.Label(details_frame, text="ℹ️ Changes apply automatically when category changes or switching emails", 
+                              font=('Segoe UI', 8), foreground="#666666")
+        info_label.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(0, 5))
+        
+        ttk.Label(details_frame, text="Reason (optional):").grid(row=2, column=0, sticky=tk.W, pady=2)
         self.explanation_var = tk.StringVar()
         self.explanation_entry = ttk.Entry(details_frame, textvariable=self.explanation_var)
-        self.explanation_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
+        self.explanation_entry.grid(row=2, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
         
-        self.apply_btn = ttk.Button(details_frame, text="Apply Change", 
+        self.apply_btn = ttk.Button(details_frame, text="Manual Apply", 
                                    command=self.apply_category_change, state=tk.DISABLED)
-        self.apply_btn.grid(row=2, column=1, sticky=tk.E, pady=5, padx=(5, 0))
+        self.apply_btn.grid(row=3, column=1, sticky=tk.E, pady=5, padx=(5, 0))
         
         self.preview_text = scrolledtext.ScrolledText(details_frame, height=8, wrap=tk.WORD, state=tk.DISABLED)
-        self.preview_text.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(5, 0))
+        self.preview_text.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(5, 0))
         
         self.current_email_index = None
         self.original_category = None
@@ -905,6 +916,9 @@ class UnifiedEmailGUI:
             self.email_tree.insert('', 'end', values=(subject, sender, category, ai_summary, date_str))
 
     def on_email_select(self, event):
+        # Auto-apply any pending changes before switching
+        self._auto_apply_pending_changes()
+        
         selection = self.email_tree.selection()
         if not selection:
             return
@@ -918,6 +932,25 @@ class UnifiedEmailGUI:
         
         if index is not None and index < len(self.email_suggestions):
             self.display_email_details(index)
+    
+    def _auto_apply_pending_changes(self):
+        """Automatically apply any pending category changes when switching emails"""
+        if (self.current_email_index is not None and 
+            hasattr(self, 'category_var') and hasattr(self, 'original_category')):
+            
+            current_category = self.get_category_internal_name(self.category_var.get())
+            if current_category != self.original_category:
+                # Get explanation if provided, otherwise use default
+                explanation = self.explanation_var.get().strip()
+                if not explanation:
+                    explanation = "Category changed without explanation"
+                
+                # Apply the change silently
+                self.edit_suggestion(self.current_email_index, current_category, explanation)
+                
+                # Update UI to reflect the change was applied
+                self.apply_btn.config(state=tk.DISABLED)
+                self.load_processed_emails()  # Refresh list to show updated category
     
     def display_email_details(self, index):
         self.current_email_index = index
@@ -1131,7 +1164,20 @@ class UnifiedEmailGUI:
         if self.current_email_index is not None:
             current_category = self.get_category_internal_name(self.category_var.get())
             if current_category != self.original_category:
-                self.apply_btn.config(state=tk.NORMAL)
+                # Immediately apply the change when category is changed
+                explanation = self.explanation_var.get().strip()
+                if not explanation:
+                    explanation = "Category changed via dropdown"
+                
+                self.edit_suggestion(self.current_email_index, current_category, explanation)
+                self.original_category = current_category
+                
+                # Clear explanation field and disable apply button since change is already applied
+                self.explanation_var.set("")
+                self.apply_btn.config(state=tk.DISABLED)
+                
+                # Refresh the tree to show the updated category
+                self.refresh_email_tree()
             else:
                 self.apply_btn.config(state=tk.DISABLED)
     
@@ -1143,9 +1189,9 @@ class UnifiedEmailGUI:
         new_category = self.get_category_internal_name(new_display_category)
         explanation = self.explanation_var.get().strip()
         
+        # Make explanation optional - use default if empty
         if not explanation:
-            messagebox.showwarning("Missing Information", "Please provide a reason for the change.")
-            return
+            explanation = "Manual category change applied"
         
         # Apply the change
         self.edit_suggestion(self.current_email_index, new_category, explanation)
@@ -1278,6 +1324,9 @@ class UnifiedEmailGUI:
             self.action_items_data[new_category].append(event_item)
     
     def apply_to_outlook(self):
+        # Auto-apply any pending changes before applying to Outlook
+        self._auto_apply_pending_changes()
+        
         if not self.email_suggestions:
             messagebox.showwarning("No Data", "No email suggestions to apply.")
             return
