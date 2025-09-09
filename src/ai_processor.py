@@ -557,6 +557,63 @@ Preview: {body_preview}
             'new_category': new_category,
             'timestamp': datetime.now()
         })
+
+    def record_accepted_suggestions(self, email_suggestions):
+        """Record all accepted suggestions that were applied to Outlook for fine-tuning data"""
+        # Create accepted suggestions file path
+        accepted_file = os.path.join(self.user_feedback_dir, 'accepted_suggestions.csv')
+        
+        accepted_entries = []
+        for suggestion_data in email_suggestions:
+            email_data = suggestion_data.get('email_data', {})
+            suggestion = suggestion_data.get('ai_suggestion', 'unknown')
+            initial_classification = suggestion_data.get('initial_classification', suggestion)
+            processing_notes = suggestion_data.get('processing_notes', [])
+            ai_summary = suggestion_data.get('ai_summary', '')
+            
+            # Determine if this was modified or accepted as-is
+            was_modified = suggestion != initial_classification
+            modification_reason = "User modified in review" if was_modified else "Accepted as suggested"
+            
+            # Get email date
+            email_date = email_data.get('received_time', email_data.get('date', 'Unknown'))
+            if hasattr(email_date, 'strftime'):
+                email_date = email_date.strftime('%Y-%m-%d %H:%M:%S')
+            
+            accepted_entry = {
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'subject': email_data.get('subject', 'Unknown'),
+                'sender': email_data.get('sender_name', email_data.get('sender', 'Unknown')),
+                'email_date': str(email_date),
+                'initial_ai_suggestion': initial_classification,
+                'final_applied_category': suggestion,
+                'was_modified': was_modified,
+                'modification_reason': modification_reason,
+                'processing_notes': '; '.join(processing_notes) if processing_notes else '',
+                'ai_summary': ai_summary[:500],  # Truncate for storage
+                'body_preview': email_data.get('body', '')[:300],
+                'thread_count': suggestion_data.get('thread_data', {}).get('thread_count', 1)
+            }
+            accepted_entries.append(accepted_entry)
+        
+        if not accepted_entries:
+            return
+        
+        try:
+            new_df = pd.DataFrame(accepted_entries)
+            
+            # Append to existing file or create new one
+            if os.path.exists(accepted_file):
+                existing_df = pd.read_csv(accepted_file)
+                combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+            else:
+                combined_df = new_df
+                
+            combined_df.to_csv(accepted_file, index=False)
+            print(f"📊 Recorded {len(accepted_entries)} accepted suggestions for fine-tuning data")
+            
+        except Exception as e:
+            print(f"⚠️ Error recording accepted suggestions: {e}")
     
     def finalize_accuracy_session(self, success_count=None, error_count=None, categories_used=None):
         if self.session_total_emails == 0:

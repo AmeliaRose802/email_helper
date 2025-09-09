@@ -1308,6 +1308,10 @@ This will help keep your inbox focused on actionable items only."""
             confirmation_callback
         )
         
+        # Record all accepted suggestions for fine-tuning data (both modified and unmodified)
+        if success_count > 0:
+            self.ai_processor.record_accepted_suggestions(self.email_suggestions)
+        
         messagebox.showinfo("Complete", 
                           f"Categorization applied!\n\n"
                           f"✅ Successfully processed: {success_count}\n"
