@@ -12,80 +12,111 @@ class SummaryGenerator:
     def __init__(self):
         pass
     
-    def _create_content_hash(self, subject, sender, due_date=None, action_required=None):
-        """Create a hash for content-based deduplication"""
-        import hashlib
-        import re
+    def _ai_detect_duplicate_intent(self, new_item, existing_items, ai_processor=None):
+        """Use AI to detect if new item is a duplicate of existing items"""
+        if not ai_processor or not existing_items:
+            return False, None
         
-        # Normalize subject by removing common variations
-        normalized_subject = subject.lower().strip()
-        
-        # Remove common subject prefixes and suffixes
-        prefixes_to_remove = ['re:', 'fw:', 'fwd:', 'forward:', '[external]', '[reminder]', '[action required]']
-        for prefix in prefixes_to_remove:
-            if normalized_subject.startswith(prefix):
-                normalized_subject = normalized_subject[len(prefix):].strip()
-        
-        # Remove task IDs, ticket numbers, and similar variations
-        normalized_subject = re.sub(r'\b\w*\d{4,}\w*\b', '', normalized_subject)  # Remove alphanumeric IDs
-        normalized_subject = re.sub(r'#\d+', '', normalized_subject)  # Remove ticket numbers
-        normalized_subject = re.sub(r'task\s+id:?\s*\w+', '', normalized_subject)  # Remove task ID references
-        
-        # Remove extra whitespace and standardize
-        normalized_subject = ' '.join(normalized_subject.split())
-        
-        # Normalize sender
-        normalized_sender = sender.lower().strip()
-        
-        # Create content signature with core elements only
-        content_parts = [
-            normalized_subject,
-            normalized_sender,
-        ]
-        
-        # Add due date if provided and meaningful
-        if due_date and due_date != 'No specific deadline':
-            # Normalize date format
-            normalized_date = due_date.lower().strip()
-            content_parts.append(normalized_date)
-        
-        # For action_required, extract the core action verb/concept
-        if action_required and action_required not in ['Review email', 'Details in email']:
-            # Normalize action to focus on key concepts
-            normalized_action = action_required.lower().strip()
+        try:
+            # Load the duplicate detection prompt
+            import os
+            prompts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts')
+            prompt_file = os.path.join(prompts_dir, 'email_duplicate_detection.prompty')
             
-            # Extract key action concepts (remove minor variations)
-            key_concepts = []
-            if 'certificate' in normalized_action or 'cert' in normalized_action:
-                key_concepts.append('certificate')
-            if 'yubikey' in normalized_action or 'yubi' in normalized_action:
-                key_concepts.append('yubikey')
-            if 'request' in normalized_action:
-                key_concepts.append('request')
-            if 'renew' in normalized_action or 'new' in normalized_action:
-                key_concepts.append('renew')
-            if 'expire' in normalized_action or 'expir' in normalized_action:
-                key_concepts.append('expire')
+            # Read the prompt template
+            if os.path.exists(prompt_file):
+                with open(prompt_file, 'r', encoding='utf-8') as f:
+                    prompt_template = f.read()
+                    # Extract the actual prompt content (skip the YAML header)
+                    if '---' in prompt_template:
+                        parts = prompt_template.split('---', 2)
+                        if len(parts) >= 3:
+                            system_prompt = parts[2].strip()
+                        else:
+                            system_prompt = prompt_template
+                    else:
+                        system_prompt = prompt_template
+            else:
+                # Fallback if prompt file doesn't exist
+                system_prompt = """You are analyzing email action items to detect duplicates. Determine if the NEW ITEM is essentially about the same task/issue as any EXISTING ITEMS, even if wording differs.
+
+Consider as duplicates: multiple reminders about same deadline/certificate, different emails about same maintenance/policy, follow-ups about same request.
+
+Respond with ONLY: "DUPLICATE:X" (X=item number) or "UNIQUE"."""
+            
+            # Create comparison content for AI
+            new_summary = f"Subject: {new_item.get('subject', new_item.get('summary', 'Unknown'))}\nSender: {new_item.get('sender', 'Unknown')}\nAction: {new_item.get('action_required', new_item.get('summary', 'N/A'))}\nDue: {new_item.get('due_date', 'N/A')}"
+            
+            existing_summaries = []
+            for i, item in enumerate(existing_items):
+                existing_summary = f"Item {i+1} - Subject: {item.get('subject', item.get('summary', 'Unknown'))}\nSender: {item.get('sender', 'Unknown')}\nAction: {item.get('action_required', item.get('summary', 'N/A'))}\nDue: {item.get('due_date', 'N/A')}"
+                existing_summaries.append(existing_summary)
+            
+            # Build the complete prompt
+            full_prompt = f"""{system_prompt}
+
+NEW ITEM:
+{new_summary}
+
+EXISTING ITEMS:
+{chr(10).join(existing_summaries)}
+
+Your response:"""
+
+            # Use AI to analyze duplication
+            response = ai_processor.query_ai(full_prompt, max_tokens=50)
+            
+            if response and response.strip().upper().startswith('DUPLICATE:'):
+                try:
+                    duplicate_index = int(response.strip().upper().replace('DUPLICATE:', '')) - 1
+                    if 0 <= duplicate_index < len(existing_items):
+                        return True, existing_items[duplicate_index]
+                except ValueError:
+                    pass
+            
+            return False, None
+            
+        except Exception as e:
+            print(f"⚠️  AI duplicate detection failed: {e}")
+            return False, None
+    
+    def _remove_duplicate_items(self, summary_sections, ai_processor):
+        """Remove duplicate action items, FYIs, etc. from final summary sections using AI"""
+        duplicates_removed = 0
+        
+        # Process action-oriented sections that benefit from duplicate detection
+        action_sections = ['required_actions', 'team_actions', 'optional_actions', 'fyi_notices']
+        
+        for section_name in action_sections:
+            if section_name not in summary_sections or len(summary_sections[section_name]) <= 1:
+                continue
                 
-            # Only add action concepts if we found meaningful ones
-            if key_concepts:
-                content_parts.extend(sorted(key_concepts))  # Sort for consistency
+            items = summary_sections[section_name]
+            unique_items = []
+            
+            for item in items:
+                # Check if this item is a duplicate of any item already in unique_items
+                is_duplicate, duplicate_of = self._ai_detect_duplicate_intent(
+                    item, unique_items, ai_processor
+                )
+                
+                if not is_duplicate:
+                    unique_items.append(item)
+                else:
+                    duplicates_removed += 1
+                    duplicate_subject = (duplicate_of.get('subject', duplicate_of.get('summary', 'unknown')))[:40] if duplicate_of else 'unknown item'
+                    item_subject = (item.get('subject', item.get('summary', 'unknown')))[:40]
+                    print(f"🤖 Removed duplicate {section_name[:-1]}: '{item_subject}...' → similar to '{duplicate_subject}...'")
+            
+            # Update the section with deduplicated items
+            summary_sections[section_name] = unique_items
         
-        # Create hash from combined content
-        content_string = '|'.join(content_parts)
-        return hashlib.md5(content_string.encode('utf-8')).hexdigest()
-    
-    def _is_duplicate_content(self, subject, sender, due_date, action_required, processed_hashes):
-        """Check if this content is a duplicate of something already processed"""
-        content_hash = self._create_content_hash(subject, sender, due_date, action_required)
+        if duplicates_removed > 0:
+            print(f"📋 Final summary: {duplicates_removed} duplicate items removed")
         
-        if content_hash in processed_hashes:
-            return True, content_hash
-        else:
-            processed_hashes.add(content_hash)
-            return False, content_hash
+        return summary_sections
     
-    def build_summary_sections(self, action_items_data):
+    def build_summary_sections(self, action_items_data, ai_processor=None):
         """Build summary sections using collected AI analysis data"""
         summary_sections = {
             'required_actions': [],
@@ -97,9 +128,8 @@ class SummaryGenerator:
             'newsletters': []
         }
         
-        # Track processed emails and content to prevent duplicates
+        # Track processed emails to prevent exact duplicates
         processed_entry_ids = set()
-        processed_content_hashes = set()  # For content-based deduplication
         
         # Required personal actions - use collected action details
         if 'required_personal_action' in action_items_data:
@@ -115,27 +145,17 @@ class SummaryGenerator:
                     due_date = action_details.get('due_date', 'No specific deadline')
                     action_required = action_details.get('action_required', 'Review email')
                     
-                    # Check for content-based duplicates
-                    is_duplicate, content_hash = self._is_duplicate_content(
-                        subject, sender, due_date, action_required, processed_content_hashes
-                    )
-                    
-                    if not is_duplicate:
-                        processed_entry_ids.add(email_obj.EntryID)
-                        
-                        summary_sections['required_actions'].append({
-                            'subject': subject,
-                            'sender': sender,
-                            'due_date': due_date,
-                            'explanation': action_details.get('explanation', 'Details in email'),
-                            'action_required': action_required,
-                            'links': action_details.get('links', []),
-                            'priority': 1,
-                            '_entry_id': email_obj.EntryID,  # Track for future deduplication
-                            '_content_hash': content_hash  # Track content hash
-                        })
-                    else:
-                        print(f"📋 Filtered duplicate content: '{subject[:50]}...' from {sender}")
+                    processed_entry_ids.add(email_obj.EntryID)
+                    summary_sections['required_actions'].append({
+                        'subject': subject,
+                        'sender': sender,
+                        'due_date': due_date,
+                        'action_required': action_required,
+                        'explanation': action_details.get('explanation', 'Details in email'),
+                        'links': action_details.get('links', []),
+                        'priority': 1,
+                        '_entry_id': email_obj.EntryID
+                    })
         
         # Team actions - use collected action details
         if 'team_action' in action_items_data:
@@ -151,27 +171,17 @@ class SummaryGenerator:
                     due_date = action_details.get('due_date', 'No specific deadline')
                     action_required = action_details.get('action_required', 'Review email')
                     
-                    # Check for content-based duplicates
-                    is_duplicate, content_hash = self._is_duplicate_content(
-                        subject, sender, due_date, action_required, processed_content_hashes
-                    )
-                    
-                    if not is_duplicate:
-                        processed_entry_ids.add(email_obj.EntryID)
-                        
-                        summary_sections['team_actions'].append({
-                            'subject': subject,
-                            'sender': sender,
-                            'due_date': due_date,
-                            'explanation': action_details.get('explanation', 'Details in email'),
-                            'action_required': action_required,
-                            'links': action_details.get('links', []),
-                            'priority': 2,
-                            '_entry_id': email_obj.EntryID,  # Track for future deduplication
-                            '_content_hash': content_hash  # Track content hash
-                        })
-                    else:
-                        print(f"📋 Filtered duplicate content: '{subject[:50]}...' from {sender}")
+                    processed_entry_ids.add(email_obj.EntryID)
+                    summary_sections['team_actions'].append({
+                        'subject': subject,
+                        'sender': sender,
+                        'due_date': due_date,
+                        'explanation': action_details.get('explanation', 'Details in email'),
+                        'action_required': action_required,
+                        'links': action_details.get('links', []),
+                        'priority': 2,
+                        '_entry_id': email_obj.EntryID
+                    })
         
         # Optional actions - use collected action details
         if 'optional_action' in action_items_data:
@@ -186,26 +196,16 @@ class SummaryGenerator:
                     sender = item_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender'))
                     action_required = action_details.get('action_required', 'Review email')
                     
-                    # Check for content-based duplicates (no due_date for optional actions)
-                    is_duplicate, content_hash = self._is_duplicate_content(
-                        subject, sender, None, action_required, processed_content_hashes
-                    )
-                    
-                    if not is_duplicate:
-                        processed_entry_ids.add(email_obj.EntryID)
-                        
-                        summary_sections['optional_actions'].append({
-                            'subject': subject,
-                            'sender': sender,
-                            'explanation': action_details.get('explanation', 'Details in email'),
-                            'action_required': action_required,
-                            'links': action_details.get('links', []),
-                            'why_relevant': action_details.get('relevance', 'General professional interest'),
-                            '_entry_id': email_obj.EntryID,  # Track for future deduplication
-                            '_content_hash': content_hash  # Track content hash
-                        })
-                    else:
-                        print(f"📋 Filtered duplicate content: '{subject[:50]}...' from {sender}")
+                    processed_entry_ids.add(email_obj.EntryID)
+                    summary_sections['optional_actions'].append({
+                        'subject': subject,
+                        'sender': sender,
+                        'explanation': action_details.get('explanation', 'Details in email'),
+                        'action_required': action_required,
+                        'links': action_details.get('links', []),
+                        'why_relevant': action_details.get('relevance', 'General professional interest'),
+                        '_entry_id': email_obj.EntryID
+                    })
         
         # Job listings - use collected job data
         if 'job_listing' in action_items_data:
@@ -297,14 +297,14 @@ class SummaryGenerator:
                         '_entry_id': email_obj.EntryID  # Track for future deduplication
                     })
         
-        # Log deduplication results
+        # Log processing results
         total_processed = len(processed_entry_ids)
-        total_content_hashes = len(processed_content_hashes)
         if total_processed > 0:
-            print(f"📋 Summary built from {total_processed} unique emails")
-            if total_content_hashes < total_processed:
-                duplicates_filtered = total_processed - total_content_hashes
-                print(f"   📋 Content duplicates filtered: {duplicates_filtered} similar items removed")
+            print(f"📋 Built initial summary from {total_processed} unique emails")
+        
+        # Apply AI-powered duplicate detection to final summary sections
+        if ai_processor:
+            summary_sections = self._remove_duplicate_items(summary_sections, ai_processor)
         
         return summary_sections
     
