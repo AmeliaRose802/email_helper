@@ -37,13 +37,14 @@ class TaskPersistence:
         current_tasks = {
             'required_actions': [],
             'team_actions': [],
+            'completed_team_actions': [],
             'optional_actions': [],
             'job_listings': [],
             'optional_events': []
         }
         
         # Extract actionable tasks from summary sections
-        for section_key in ['required_actions', 'team_actions', 'optional_actions', 'job_listings', 'optional_events']:
+        for section_key in ['required_actions', 'team_actions', 'completed_team_actions', 'optional_actions', 'job_listings', 'optional_events']:
             if section_key in summary_sections:
                 for task in summary_sections[section_key]:
                     # Add batch metadata
@@ -74,6 +75,7 @@ class TaskPersistence:
             return {
                 'required_actions': [],
                 'team_actions': [],
+                'completed_team_actions': [],
                 'optional_actions': [],
                 'job_listings': [],
                 'optional_events': []
@@ -85,6 +87,7 @@ class TaskPersistence:
                 return data.get('tasks', {
                     'required_actions': [],
                     'team_actions': [],
+                    'completed_team_actions': [],
                     'optional_actions': [],
                     'job_listings': [],
                     'optional_events': []
@@ -94,6 +97,7 @@ class TaskPersistence:
             return {
                 'required_actions': [],
                 'team_actions': [],
+                'completed_team_actions': [],
                 'optional_actions': [],
                 'job_listings': [],
                 'optional_events': []
@@ -144,6 +148,7 @@ class TaskPersistence:
         comprehensive_summary = {
             'required_actions': [],
             'team_actions': [],
+            'completed_team_actions': [],
             'optional_actions': [],
             'job_listings': [],
             'optional_events': [],
@@ -152,7 +157,7 @@ class TaskPersistence:
         }
         
         # Merge actionable tasks (current + outstanding)
-        for section_key in ['required_actions', 'team_actions', 'optional_actions', 'job_listings', 'optional_events']:
+        for section_key in ['required_actions', 'team_actions', 'completed_team_actions', 'optional_actions', 'job_listings', 'optional_events']:
             # Add outstanding tasks first (older, potentially higher priority)
             comprehensive_summary[section_key].extend(outstanding_tasks.get(section_key, []))
             
@@ -281,7 +286,7 @@ class TaskPersistence:
     def _sort_tasks_by_priority(self, summary_sections: Dict) -> None:
         """Sort tasks within each section by priority and due date"""
         for section_key in summary_sections:
-            if section_key in ['required_actions', 'team_actions', 'optional_actions']:
+            if section_key in ['required_actions', 'team_actions', 'completed_team_actions', 'optional_actions']:
                 summary_sections[section_key].sort(key=lambda x: (
                     x.get('batch_count', 1),  # Older tasks first (higher batch count)
                     x.get('priority', 99),    # Higher priority first

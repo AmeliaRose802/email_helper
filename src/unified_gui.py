@@ -304,6 +304,11 @@ class UnifiedEmailGUI:
                                        font=("Segoe UI", 11, "bold"), 
                                        foreground="#333333")
         
+        # Completed item titles (with green checkmark styling)
+        self.summary_text.tag_configure("item_title_completed", 
+                                       font=("Segoe UI", 11, "bold"), 
+                                       foreground="#228B22")
+        
         # Item metadata (from, date, etc.)
         self.summary_text.tag_configure("item_meta", 
                                        font=("Segoe UI", 9), 
@@ -334,6 +339,16 @@ class UnifiedEmailGUI:
                                        font=("Segoe UI", 10, "italic"), 
                                        foreground="#999999",
                                        justify="center")
+        
+        # Completion status styling
+        self.summary_text.tag_configure("completion_status", 
+                                       font=("Segoe UI", 10, "bold"), 
+                                       foreground="#228B22")
+        
+        # Completion notes
+        self.summary_text.tag_configure("completion_note", 
+                                       font=("Segoe UI", 9, "italic"), 
+                                       foreground="#555555")
         
         # Configure link click behavior
         self.summary_text.tag_bind("link", "<Button-1>", self._on_summary_link_click)
@@ -1441,6 +1456,7 @@ This will help keep your inbox focused on actionable items only."""
         sections_config = [
             ('required_actions', '🔴 REQUIRED ACTION ITEMS (ME)', 'section_required', self._display_action_items),
             ('team_actions', '👥 TEAM ACTION ITEMS', 'section_team', self._display_action_items),
+            ('completed_team_actions', '✅ COMPLETED TEAM ACTIONS', 'section_completed', self._display_completed_team_actions),
             ('optional_actions', '📝 OPTIONAL ACTION ITEMS', 'section_optional', self._display_optional_actions),
             ('job_listings', '💼 JOB LISTINGS', 'section_jobs', self._display_job_listings),
             ('optional_events', '🎪 OPTIONAL EVENTS', 'section_events', self._display_events),
@@ -1533,6 +1549,38 @@ This will help keep your inbox focused on actionable items only."""
             
             self.summary_text.insert(tk.END, "\n", "content_text")
     
+    def _display_completed_team_actions(self, items):
+        """Display completed team action items with completion details"""
+        for i, item in enumerate(items, 1):
+            # Item title with completion indicator
+            self.summary_text.insert(tk.END, f"{i}. ✅ {item['subject']}\n", "item_title_completed")
+            
+            # Metadata
+            self.summary_text.insert(tk.END, f"   From: {item['sender']}", "item_meta")
+            if item.get('first_seen'):
+                try:
+                    first_seen = datetime.strptime(item['first_seen'], '%Y-%m-%d %H:%M:%S')
+                    days_old = (datetime.now() - first_seen).days
+                    if days_old > 0:
+                        self.summary_text.insert(tk.END, f"  |  First seen: {days_old} days ago", "item_meta")
+                except:
+                    pass
+            self.summary_text.insert(tk.END, "\n", "item_meta")
+            
+            # Original action details (for reference)
+            self.summary_text.insert(tk.END, "   Original Action: ", "content_label")
+            self.summary_text.insert(tk.END, f"{item.get('action_required', 'Review email')}\n", "content_text")
+            
+            # Completion details
+            self.summary_text.insert(tk.END, "   ✅ Status: ", "content_label")
+            self.summary_text.insert(tk.END, "COMPLETED\n", "completion_status")
+            
+            if item.get('completion_note'):
+                self.summary_text.insert(tk.END, "   📝 Note: ", "content_label")
+                self.summary_text.insert(tk.END, f"{item['completion_note']}\n", "completion_note")
+            
+            self.summary_text.insert(tk.END, "\n", "content_text")
+
     def _display_optional_actions(self, items):
         """Display optional action items with relevance context"""
         for i, item in enumerate(items, 1):
