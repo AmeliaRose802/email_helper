@@ -171,6 +171,19 @@ Learning History: {len(learning_data)} previous decisions"""
             
         return result.strip().lower() if result else "general_information"
     
+    def classify_email_improved(self, email_content, learning_data):
+        """Test the improved classification prompt"""
+        context = f"""{self.get_standard_context()}
+Learning History: {len(learning_data)} previous decisions"""
+        
+        inputs = self._create_email_inputs(email_content, context)
+        result = self.execute_prompty('email_classifier_system_improved.prompty', inputs)
+        
+        if not result or result in ["AI processing unavailable", "AI processing failed"]:
+            return "general_information"
+            
+        return result.strip().lower() if result else "general_information"
+    
     def detect_resolved_team_action(self, email_content, thread_context=""):
         """Detect if a team action has already been addressed by someone else in the conversation thread"""
         if not thread_context:
