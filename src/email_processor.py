@@ -190,6 +190,20 @@ class EmailProcessor:
     
     def _process_email_by_category(self, email, email_data, suggestion):
         """Process email based on its AI-suggested category"""
+        # Check for duplicates using EntryID
+        entry_id = getattr(email, 'EntryID', None)
+        if not entry_id:
+            print(f"⚠️  Warning: Email has no EntryID, skipping: {getattr(email, 'Subject', 'Unknown')}")
+            return
+        
+        # Check if we've already processed this exact email
+        for category_data in self.action_items_data.values():
+            for existing_item in category_data:
+                existing_email = existing_item.get('email_object')
+                if existing_email and getattr(existing_email, 'EntryID', None) == entry_id:
+                    print(f"⚠️  Duplicate email detected and skipped: {email.Subject[:50]}...")
+                    return
+        
         # Process action items with detailed output
         if suggestion in ['required_personal_action', 'team_action', 'optional_action']:
             print("🔍 Extracting action item details...")
@@ -240,6 +254,9 @@ class EmailProcessor:
             
             self.action_items_data[suggestion].append({
                 'email_object': email,
+                'email_subject': email.Subject,
+                'email_sender': email.SenderName,
+                'email_date': email.ReceivedTime,
                 'action_details': action_details,
                 'thread_data': email_data
             })
@@ -257,6 +274,9 @@ class EmailProcessor:
             
             job_data = {
                 'email_object': email,
+                'email_subject': email.Subject,
+                'email_sender': email.SenderName,
+                'email_date': email.ReceivedTime,
                 'qualification_match': qualification_match,
                 'due_date': metadata['due_date'],
                 'links': metadata['links'],
@@ -277,6 +297,9 @@ class EmailProcessor:
             
             event_data = {
                 'email_object': email,
+                'email_subject': email.Subject,
+                'email_sender': email.SenderName,
+                'email_date': email.ReceivedTime,
                 'date': metadata['due_date'],
                 'relevance': relevance,
                 'links': metadata['links'],
@@ -307,6 +330,9 @@ class EmailProcessor:
                 
                 fyi_data = {
                     'email_object': email,
+                    'email_subject': email.Subject,
+                    'email_sender': email.SenderName,
+                    'email_date': email.ReceivedTime,
                     'summary': fyi_summary,
                     'thread_data': email_data
                 }
@@ -324,6 +350,9 @@ class EmailProcessor:
                 
                 newsletter_data = {
                     'email_object': email,
+                    'email_subject': email.Subject,
+                    'email_sender': email.SenderName,
+                    'email_date': email.ReceivedTime,
                     'summary': newsletter_summary,
                     'thread_data': email_data
                 }

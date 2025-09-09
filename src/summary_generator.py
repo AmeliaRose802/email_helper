@@ -24,127 +24,174 @@ class SummaryGenerator:
             'newsletters': []
         }
         
+        # Track processed emails to prevent duplicates
+        processed_entry_ids = set()
+        
         # Required personal actions - use collected action details
         if 'required_personal_action' in action_items_data:
             for item_data in action_items_data['required_personal_action']:
-                action_details = item_data['action_details']
-                
-                # Use enriched email data instead of COM object properties
-                subject = item_data.get('email_subject', 'Unknown Subject')
-                sender = item_data.get('email_sender', 'Unknown Sender')
-                
-                summary_sections['required_actions'].append({
-                    'subject': subject,
-                    'sender': sender,
-                    'due_date': action_details.get('due_date', 'No specific deadline'),
-                    'explanation': action_details.get('explanation', 'Details in email'),
-                    'action_required': action_details.get('action_required', 'Review email'),
-                    'links': action_details.get('links', []),
-                    'priority': 1
-                })
+                email_obj = item_data.get('email_object')
+                if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
+                    processed_entry_ids.add(email_obj.EntryID)
+                    
+                    action_details = item_data['action_details']
+                    
+                    # Use enriched email data instead of COM object properties
+                    subject = item_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject'))
+                    sender = item_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender'))
+                    
+                    summary_sections['required_actions'].append({
+                        'subject': subject,
+                        'sender': sender,
+                        'due_date': action_details.get('due_date', 'No specific deadline'),
+                        'explanation': action_details.get('explanation', 'Details in email'),
+                        'action_required': action_details.get('action_required', 'Review email'),
+                        'links': action_details.get('links', []),
+                        'priority': 1,
+                        '_entry_id': email_obj.EntryID  # Track for future deduplication
+                    })
         
         # Team actions - use collected action details
         if 'team_action' in action_items_data:
             for item_data in action_items_data['team_action']:
-                action_details = item_data['action_details']
-                
-                # Use enriched email data instead of COM object properties
-                subject = item_data.get('email_subject', 'Unknown Subject')
-                sender = item_data.get('email_sender', 'Unknown Sender')
-                
-                summary_sections['team_actions'].append({
-                    'subject': subject,
-                    'sender': sender,
-                    'due_date': action_details.get('due_date', 'No specific deadline'),
-                    'explanation': action_details.get('explanation', 'Details in email'),
-                    'action_required': action_details.get('action_required', 'Review email'),
-                    'links': action_details.get('links', []),
-                    'priority': 2
-                })
+                email_obj = item_data.get('email_object')
+                if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
+                    processed_entry_ids.add(email_obj.EntryID)
+                    
+                    action_details = item_data['action_details']
+                    
+                    # Use enriched email data instead of COM object properties
+                    subject = item_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject'))
+                    sender = item_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender'))
+                    
+                    summary_sections['team_actions'].append({
+                        'subject': subject,
+                        'sender': sender,
+                        'due_date': action_details.get('due_date', 'No specific deadline'),
+                        'explanation': action_details.get('explanation', 'Details in email'),
+                        'action_required': action_details.get('action_required', 'Review email'),
+                        'links': action_details.get('links', []),
+                        'priority': 2,
+                        '_entry_id': email_obj.EntryID  # Track for future deduplication
+                    })
         
         # Optional actions - use collected action details
         if 'optional_action' in action_items_data:
             for item_data in action_items_data['optional_action']:
-                action_details = item_data['action_details']
-                
-                # Use enriched email data instead of COM object properties
-                subject = item_data.get('email_subject', 'Unknown Subject')
-                sender = item_data.get('email_sender', 'Unknown Sender')
-                
-                summary_sections['optional_actions'].append({
-                    'subject': subject,
-                    'sender': sender,
-                    'explanation': action_details.get('explanation', 'Details in email'),
-                    'action_required': action_details.get('action_required', 'Review email'),
-                    'links': action_details.get('links', []),
-                    'why_relevant': action_details.get('relevance', 'General professional interest')
-                })
+                email_obj = item_data.get('email_object')
+                if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
+                    processed_entry_ids.add(email_obj.EntryID)
+                    
+                    action_details = item_data['action_details']
+                    
+                    # Use enriched email data instead of COM object properties
+                    subject = item_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject'))
+                    sender = item_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender'))
+                    
+                    summary_sections['optional_actions'].append({
+                        'subject': subject,
+                        'sender': sender,
+                        'explanation': action_details.get('explanation', 'Details in email'),
+                        'action_required': action_details.get('action_required', 'Review email'),
+                        'links': action_details.get('links', []),
+                        'why_relevant': action_details.get('relevance', 'General professional interest'),
+                        '_entry_id': email_obj.EntryID  # Track for future deduplication
+                    })
         
         # Job listings - use collected job data
         if 'job_listing' in action_items_data:
             for job_data in action_items_data['job_listing']:
-                # Use enriched email data instead of COM object properties
-                subject = job_data.get('email_subject', 'Unknown Subject')
-                sender = job_data.get('email_sender', 'Unknown Sender')
-                
-                summary_sections['job_listings'].append({
-                    'subject': subject,
-                    'sender': sender,
-                    'qualification_match': job_data.get('qualification_match', 'No qualification analysis available'),
-                    'links': job_data.get('links', []),
-                    'due_date': job_data.get('due_date', 'No deadline specified')
-                })
+                email_obj = job_data.get('email_object')
+                if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
+                    processed_entry_ids.add(email_obj.EntryID)
+                    
+                    # Use enriched email data instead of COM object properties
+                    subject = job_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject'))
+                    sender = job_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender'))
+                    
+                    summary_sections['job_listings'].append({
+                        'subject': subject,
+                        'sender': sender,
+                        'qualification_match': job_data.get('qualification_match', 'No qualification analysis available'),
+                        'links': job_data.get('links', []),
+                        'due_date': job_data.get('due_date', 'No deadline specified'),
+                        '_entry_id': email_obj.EntryID  # Track for future deduplication
+                    })
         
         # Optional events - use collected event data
         if 'optional_event' in action_items_data:
             for event_data in action_items_data['optional_event']:
-                # Use enriched email data instead of COM object properties
-                subject = event_data.get('email_subject', 'Unknown Subject')
-                sender = event_data.get('email_sender', 'Unknown Sender')
-                
-                summary_sections['optional_events'].append({
-                    'subject': subject,
-                    'sender': sender,
-                    'date': event_data.get('date', event_data.get('event_date', 'Unknown')),
-                    'relevance': event_data.get('relevance', 'Professional development opportunity'),
-                    'links': event_data.get('links', [])
-                })
+                email_obj = event_data.get('email_object')
+                if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
+                    processed_entry_ids.add(email_obj.EntryID)
+                    
+                    # Use enriched email data instead of COM object properties
+                    subject = event_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject'))
+                    sender = event_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender'))
+                    
+                    summary_sections['optional_events'].append({
+                        'subject': subject,
+                        'sender': sender,
+                        'date': event_data.get('date', event_data.get('event_date', 'Unknown')),
+                        'relevance': event_data.get('relevance', 'Professional development opportunity'),
+                        'links': event_data.get('links', []),
+                        '_entry_id': email_obj.EntryID  # Track for future deduplication
+                    })
         
         # FYI notices - use collected FYI data
         if 'fyi' in action_items_data:
             for fyi_data in action_items_data['fyi']:
-                date_str = 'Unknown'
-                if 'email_date' in fyi_data and fyi_data['email_date']:
-                    date = fyi_data['email_date']
-                    if hasattr(date, 'strftime'):
-                        date_str = date.strftime('%Y-%m-%d')
-                    else:
-                        date_str = str(date)[:10]
-                
-                summary_sections['fyi_notices'].append({
-                    'subject': fyi_data.get('email_subject', 'Unknown Subject'),
-                    'sender': fyi_data.get('email_sender', 'Unknown Sender'),
-                    'date': date_str,
-                    'summary': fyi_data.get('summary', 'No summary available')
-                })
+                email_obj = fyi_data.get('email_object')
+                if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
+                    processed_entry_ids.add(email_obj.EntryID)
+                    
+                    date_str = 'Unknown'
+                    if 'email_date' in fyi_data and fyi_data['email_date']:
+                        date = fyi_data['email_date']
+                        if hasattr(date, 'strftime'):
+                            date_str = date.strftime('%Y-%m-%d')
+                        else:
+                            date_str = str(date)[:10]
+                    elif hasattr(email_obj, 'ReceivedTime'):
+                        date_str = email_obj.ReceivedTime.strftime('%Y-%m-%d')
+                    
+                    summary_sections['fyi_notices'].append({
+                        'subject': fyi_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject')),
+                        'sender': fyi_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender')),
+                        'date': date_str,
+                        'summary': fyi_data.get('summary', 'No summary available'),
+                        '_entry_id': email_obj.EntryID  # Track for future deduplication
+                    })
         
         # Newsletters - use collected newsletter data
         if 'newsletter' in action_items_data:
             for newsletter_data in action_items_data['newsletter']:
-                date_str = 'Unknown'
-                if 'email_date' in newsletter_data and newsletter_data['email_date']:
-                    date = newsletter_data['email_date']
-                    if hasattr(date, 'strftime'):
-                        date_str = date.strftime('%Y-%m-%d')
-                    else:
-                        date_str = str(date)[:10]
-                
-                summary_sections['newsletters'].append({
-                    'subject': newsletter_data.get('email_subject', 'Unknown Subject'),
-                    'sender': newsletter_data.get('email_sender', 'Unknown Sender'),
-                    'date': date_str,
-                    'summary': newsletter_data.get('summary', 'No summary available')
-                })
+                email_obj = newsletter_data.get('email_object')
+                if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
+                    processed_entry_ids.add(email_obj.EntryID)
+                    
+                    date_str = 'Unknown'
+                    if 'email_date' in newsletter_data and newsletter_data['email_date']:
+                        date = newsletter_data['email_date']
+                        if hasattr(date, 'strftime'):
+                            date_str = date.strftime('%Y-%m-%d')
+                        else:
+                            date_str = str(date)[:10]
+                    elif hasattr(email_obj, 'ReceivedTime'):
+                        date_str = email_obj.ReceivedTime.strftime('%Y-%m-%d')
+                    
+                    summary_sections['newsletters'].append({
+                        'subject': newsletter_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject')),
+                        'sender': newsletter_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender')),
+                        'date': date_str,
+                        'summary': newsletter_data.get('summary', 'No summary available'),
+                        '_entry_id': email_obj.EntryID  # Track for future deduplication
+                    })
+        
+        # Log deduplication results
+        total_processed = len(processed_entry_ids)
+        if total_processed > 0:
+            print(f"📋 Summary built from {total_processed} unique emails (duplicates filtered)")
         
         return summary_sections
     
