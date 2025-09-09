@@ -12,6 +12,79 @@ class SummaryGenerator:
     def __init__(self):
         pass
     
+    def _create_content_hash(self, subject, sender, due_date=None, action_required=None):
+        """Create a hash for content-based deduplication"""
+        import hashlib
+        import re
+        
+        # Normalize subject by removing common variations
+        normalized_subject = subject.lower().strip()
+        
+        # Remove common subject prefixes and suffixes
+        prefixes_to_remove = ['re:', 'fw:', 'fwd:', 'forward:', '[external]', '[reminder]', '[action required]']
+        for prefix in prefixes_to_remove:
+            if normalized_subject.startswith(prefix):
+                normalized_subject = normalized_subject[len(prefix):].strip()
+        
+        # Remove task IDs, ticket numbers, and similar variations
+        normalized_subject = re.sub(r'\b\w*\d{4,}\w*\b', '', normalized_subject)  # Remove alphanumeric IDs
+        normalized_subject = re.sub(r'#\d+', '', normalized_subject)  # Remove ticket numbers
+        normalized_subject = re.sub(r'task\s+id:?\s*\w+', '', normalized_subject)  # Remove task ID references
+        
+        # Remove extra whitespace and standardize
+        normalized_subject = ' '.join(normalized_subject.split())
+        
+        # Normalize sender
+        normalized_sender = sender.lower().strip()
+        
+        # Create content signature with core elements only
+        content_parts = [
+            normalized_subject,
+            normalized_sender,
+        ]
+        
+        # Add due date if provided and meaningful
+        if due_date and due_date != 'No specific deadline':
+            # Normalize date format
+            normalized_date = due_date.lower().strip()
+            content_parts.append(normalized_date)
+        
+        # For action_required, extract the core action verb/concept
+        if action_required and action_required not in ['Review email', 'Details in email']:
+            # Normalize action to focus on key concepts
+            normalized_action = action_required.lower().strip()
+            
+            # Extract key action concepts (remove minor variations)
+            key_concepts = []
+            if 'certificate' in normalized_action or 'cert' in normalized_action:
+                key_concepts.append('certificate')
+            if 'yubikey' in normalized_action or 'yubi' in normalized_action:
+                key_concepts.append('yubikey')
+            if 'request' in normalized_action:
+                key_concepts.append('request')
+            if 'renew' in normalized_action or 'new' in normalized_action:
+                key_concepts.append('renew')
+            if 'expire' in normalized_action or 'expir' in normalized_action:
+                key_concepts.append('expire')
+                
+            # Only add action concepts if we found meaningful ones
+            if key_concepts:
+                content_parts.extend(sorted(key_concepts))  # Sort for consistency
+        
+        # Create hash from combined content
+        content_string = '|'.join(content_parts)
+        return hashlib.md5(content_string.encode('utf-8')).hexdigest()
+    
+    def _is_duplicate_content(self, subject, sender, due_date, action_required, processed_hashes):
+        """Check if this content is a duplicate of something already processed"""
+        content_hash = self._create_content_hash(subject, sender, due_date, action_required)
+        
+        if content_hash in processed_hashes:
+            return True, content_hash
+        else:
+            processed_hashes.add(content_hash)
+            return False, content_hash
+    
     def build_summary_sections(self, action_items_data):
         """Build summary sections using collected AI analysis data"""
         summary_sections = {
@@ -24,79 +97,115 @@ class SummaryGenerator:
             'newsletters': []
         }
         
-        # Track processed emails to prevent duplicates
+        # Track processed emails and content to prevent duplicates
         processed_entry_ids = set()
+        processed_content_hashes = set()  # For content-based deduplication
         
         # Required personal actions - use collected action details
         if 'required_personal_action' in action_items_data:
             for item_data in action_items_data['required_personal_action']:
                 email_obj = item_data.get('email_object')
                 if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
-                    processed_entry_ids.add(email_obj.EntryID)
                     
                     action_details = item_data['action_details']
                     
                     # Use enriched email data instead of COM object properties
                     subject = item_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject'))
                     sender = item_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender'))
+                    due_date = action_details.get('due_date', 'No specific deadline')
+                    action_required = action_details.get('action_required', 'Review email')
                     
-                    summary_sections['required_actions'].append({
-                        'subject': subject,
-                        'sender': sender,
-                        'due_date': action_details.get('due_date', 'No specific deadline'),
-                        'explanation': action_details.get('explanation', 'Details in email'),
-                        'action_required': action_details.get('action_required', 'Review email'),
-                        'links': action_details.get('links', []),
-                        'priority': 1,
-                        '_entry_id': email_obj.EntryID  # Track for future deduplication
-                    })
+                    # Check for content-based duplicates
+                    is_duplicate, content_hash = self._is_duplicate_content(
+                        subject, sender, due_date, action_required, processed_content_hashes
+                    )
+                    
+                    if not is_duplicate:
+                        processed_entry_ids.add(email_obj.EntryID)
+                        
+                        summary_sections['required_actions'].append({
+                            'subject': subject,
+                            'sender': sender,
+                            'due_date': due_date,
+                            'explanation': action_details.get('explanation', 'Details in email'),
+                            'action_required': action_required,
+                            'links': action_details.get('links', []),
+                            'priority': 1,
+                            '_entry_id': email_obj.EntryID,  # Track for future deduplication
+                            '_content_hash': content_hash  # Track content hash
+                        })
+                    else:
+                        print(f"📋 Filtered duplicate content: '{subject[:50]}...' from {sender}")
         
         # Team actions - use collected action details
         if 'team_action' in action_items_data:
             for item_data in action_items_data['team_action']:
                 email_obj = item_data.get('email_object')
                 if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
-                    processed_entry_ids.add(email_obj.EntryID)
                     
                     action_details = item_data['action_details']
                     
                     # Use enriched email data instead of COM object properties
                     subject = item_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject'))
                     sender = item_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender'))
+                    due_date = action_details.get('due_date', 'No specific deadline')
+                    action_required = action_details.get('action_required', 'Review email')
                     
-                    summary_sections['team_actions'].append({
-                        'subject': subject,
-                        'sender': sender,
-                        'due_date': action_details.get('due_date', 'No specific deadline'),
-                        'explanation': action_details.get('explanation', 'Details in email'),
-                        'action_required': action_details.get('action_required', 'Review email'),
-                        'links': action_details.get('links', []),
-                        'priority': 2,
-                        '_entry_id': email_obj.EntryID  # Track for future deduplication
-                    })
+                    # Check for content-based duplicates
+                    is_duplicate, content_hash = self._is_duplicate_content(
+                        subject, sender, due_date, action_required, processed_content_hashes
+                    )
+                    
+                    if not is_duplicate:
+                        processed_entry_ids.add(email_obj.EntryID)
+                        
+                        summary_sections['team_actions'].append({
+                            'subject': subject,
+                            'sender': sender,
+                            'due_date': due_date,
+                            'explanation': action_details.get('explanation', 'Details in email'),
+                            'action_required': action_required,
+                            'links': action_details.get('links', []),
+                            'priority': 2,
+                            '_entry_id': email_obj.EntryID,  # Track for future deduplication
+                            '_content_hash': content_hash  # Track content hash
+                        })
+                    else:
+                        print(f"📋 Filtered duplicate content: '{subject[:50]}...' from {sender}")
         
         # Optional actions - use collected action details
         if 'optional_action' in action_items_data:
             for item_data in action_items_data['optional_action']:
                 email_obj = item_data.get('email_object')
                 if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
-                    processed_entry_ids.add(email_obj.EntryID)
                     
                     action_details = item_data['action_details']
                     
                     # Use enriched email data instead of COM object properties
                     subject = item_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject'))
                     sender = item_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender'))
+                    action_required = action_details.get('action_required', 'Review email')
                     
-                    summary_sections['optional_actions'].append({
-                        'subject': subject,
-                        'sender': sender,
-                        'explanation': action_details.get('explanation', 'Details in email'),
-                        'action_required': action_details.get('action_required', 'Review email'),
-                        'links': action_details.get('links', []),
-                        'why_relevant': action_details.get('relevance', 'General professional interest'),
-                        '_entry_id': email_obj.EntryID  # Track for future deduplication
-                    })
+                    # Check for content-based duplicates (no due_date for optional actions)
+                    is_duplicate, content_hash = self._is_duplicate_content(
+                        subject, sender, None, action_required, processed_content_hashes
+                    )
+                    
+                    if not is_duplicate:
+                        processed_entry_ids.add(email_obj.EntryID)
+                        
+                        summary_sections['optional_actions'].append({
+                            'subject': subject,
+                            'sender': sender,
+                            'explanation': action_details.get('explanation', 'Details in email'),
+                            'action_required': action_required,
+                            'links': action_details.get('links', []),
+                            'why_relevant': action_details.get('relevance', 'General professional interest'),
+                            '_entry_id': email_obj.EntryID,  # Track for future deduplication
+                            '_content_hash': content_hash  # Track content hash
+                        })
+                    else:
+                        print(f"📋 Filtered duplicate content: '{subject[:50]}...' from {sender}")
         
         # Job listings - use collected job data
         if 'job_listing' in action_items_data:
@@ -190,8 +299,12 @@ class SummaryGenerator:
         
         # Log deduplication results
         total_processed = len(processed_entry_ids)
+        total_content_hashes = len(processed_content_hashes)
         if total_processed > 0:
-            print(f"📋 Summary built from {total_processed} unique emails (duplicates filtered)")
+            print(f"📋 Summary built from {total_processed} unique emails")
+            if total_content_hashes < total_processed:
+                duplicates_filtered = total_processed - total_content_hashes
+                print(f"   📋 Content duplicates filtered: {duplicates_filtered} similar items removed")
         
         return summary_sections
     
