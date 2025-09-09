@@ -6,6 +6,6 @@ Improvements:
 
 - Record all human accepted suggestions which were applied to outlook, not just the changed ones in the review view. This will allow us to have better data for fine tuning.
 
-- Should be able to select a column to sort by
-
 - Use some heruistic to retreve labeled examples similar to the current email from the modification suggestions. Then inject these examples into the prompt for few shot prompting.
+
+- The ai_deleted section should move out of the inbox

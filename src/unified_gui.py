@@ -15,6 +15,7 @@ from ai_processor import AIProcessor
 from email_analyzer import EmailAnalyzer
 from summary_generator import SummaryGenerator
 from email_processor import EmailProcessor
+from task_persistence import TaskPersistence
 
 
 class UnifiedEmailGUI:
@@ -30,6 +31,7 @@ class UnifiedEmailGUI:
             self.email_analyzer,
             self.summary_generator
         )
+        self.task_persistence = TaskPersistence()  # Add task persistence
         
         # Data storage
         self.email_suggestions = []
@@ -133,8 +135,13 @@ class UnifiedEmailGUI:
         columns = ('Subject', 'From', 'Category', 'AI Summary', 'Date')
         self.email_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', height=12)
         
+        # Initialize sorting state
+        self.sort_column = None
+        self.sort_reverse = False
+        
+        # Configure columns with sorting
         for col in columns:
-            self.email_tree.heading(col, text=col)
+            self.email_tree.heading(col, text=col, command=lambda c=col: self.sort_by_column(c))
             
         self.email_tree.column('Subject', width=250)
         self.email_tree.column('From', width=150)
@@ -192,6 +199,7 @@ class UnifiedEmailGUI:
         main_frame = ttk.Frame(self.summary_frame, padding="15")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
+        # Control frame with task management buttons
         control_frame = ttk.Frame(main_frame)
         control_frame.pack(pady=(0, 20))
         
@@ -201,6 +209,12 @@ class UnifiedEmailGUI:
         
         ttk.Button(control_frame, text="Open in Browser", 
                   command=self.open_summary_in_browser).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(control_frame, text="Task Statistics", 
+                  command=self.show_task_statistics).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(control_frame, text="Mark Tasks Complete", 
+                  command=self.show_task_completion_dialog).pack(side=tk.LEFT, padx=5)
         
         ttk.Button(control_frame, text="Process New Batch", 
                   command=self.start_new_session).pack(side=tk.LEFT, padx=5)
@@ -764,12 +778,83 @@ class UnifiedEmailGUI:
             self.display_email_details(0)
         
     def load_processed_emails(self):
+        """Load processed emails into the tree view"""
+        self.refresh_email_tree()
+    
+    def sort_by_column(self, col):
+        """Sort the email tree by the specified column"""
+        if not hasattr(self, 'email_suggestions') or not self.email_suggestions:
+            return
+        
+        # Toggle sort direction if clicking the same column
+        if self.sort_column == col:
+            self.sort_reverse = not self.sort_reverse
+        else:
+            self.sort_column = col
+            self.sort_reverse = False
+        
+        # Update column header to show sort direction
+        for column in ('Subject', 'From', 'Category', 'AI Summary', 'Date'):
+            if column == col:
+                direction = " ↓" if self.sort_reverse else " ↑"
+                self.email_tree.heading(column, text=f"{column}{direction}")
+            else:
+                self.email_tree.heading(column, text=column)
+        
+        # Create list of (index, sort_value) pairs
+        items_with_sort_keys = []
+        for i, suggestion in enumerate(self.email_suggestions):
+            email_data = suggestion['email_data']
+            
+            if col == 'Subject':
+                sort_key = email_data.get('subject', '').lower()
+            elif col == 'From':
+                sort_key = email_data.get('sender_name', email_data.get('sender', '')).lower()
+            elif col == 'Category':
+                # Sort by category priority: required_personal_action, team_action, etc.
+                category_priority = {
+                    'required_personal_action': 1,
+                    'team_action': 2,
+                    'optional_action': 3,
+                    'job_listing': 4,
+                    'optional_event': 5,
+                    'work_relevant': 6,
+                    'fyi': 7,
+                    'newsletter': 8,
+                    'spam_to_delete': 9
+                }
+                sort_key = category_priority.get(suggestion.get('ai_suggestion', ''), 99)
+            elif col == 'AI Summary':
+                sort_key = suggestion.get('ai_summary', '').lower()
+            elif col == 'Date':
+                # Sort by date (most recent first when not reversed)
+                received_time = email_data.get('received_time')
+                if hasattr(received_time, 'timestamp'):
+                    sort_key = received_time.timestamp()
+                else:
+                    sort_key = 0
+            else:
+                sort_key = ''
+            
+            items_with_sort_keys.append((i, sort_key))
+        
+        # Sort the items
+        items_with_sort_keys.sort(key=lambda x: x[1], reverse=self.sort_reverse)
+        
+        # Reorder the email_suggestions list and refresh the tree
+        self.email_suggestions = [self.email_suggestions[i] for i, _ in items_with_sort_keys]
+        self.refresh_email_tree()
+        
+        print(f"📊 Sorted by {col} ({'descending' if self.sort_reverse else 'ascending'})")
+    
+    def refresh_email_tree(self):
+        """Refresh the email tree view with current email_suggestions order"""
         # Clear existing items
         for item in self.email_tree.get_children():
             self.email_tree.delete(item)
         
-        # Load email suggestions with AI summaries and processing notes
-        for suggestion_data in self.email_suggestions:
+        # Repopulate with sorted data
+        for i, suggestion_data in enumerate(self.email_suggestions):
             email_data = suggestion_data.get('email_data', {})
             suggestion = suggestion_data['ai_suggestion']
             initial_classification = suggestion_data.get('initial_classification', suggestion)
@@ -782,28 +867,43 @@ class UnifiedEmailGUI:
             if processing_notes:
                 ai_summary = f"🔄 {ai_summary} | {'; '.join(processing_notes[:1])}"  # Show first note
             
+            # Handle thread data
             if thread_count > 1:
                 participants = thread_data.get('participants', [email_data.get('sender_name', 'Unknown')])
                 subject = f"🧵 {thread_data.get('topic', email_data.get('subject', 'Unknown'))} ({thread_count} emails)"
                 sender = f"{len(participants)} participants"
             else:
                 subject = email_data.get('subject', 'Unknown Subject')
-                sender = email_data.get('sender_name', 'Unknown Sender')
+                sender = email_data.get('sender_name', email_data.get('sender', 'Unknown Sender'))
             
-            date = email_data.get('received_time', 'Unknown Date')
-            if hasattr(date, 'strftime'):
-                date = date.strftime('%m-%d %H:%M')
+            # Format date
+            received_time = email_data.get('received_time', 'Unknown Date')
+            if hasattr(received_time, 'strftime'):
+                date_str = received_time.strftime('%m-%d %H:%M')
             else:
-                date = str(date)
+                date_str = str(received_time)[:10] if received_time != 'Unknown Date' else 'Unknown'
             
             # Show both original and final classification if different
             category = suggestion.replace('_', ' ').title()
             if initial_classification != suggestion:
                 category = f"{category} (was {initial_classification.replace('_', ' ').title()})"
             
-            # Insert into treeview with enhanced AI summary
-            self.email_tree.insert('', tk.END, values=(subject, sender, category, ai_summary, date))
-    
+            # Add priority indicator for holistic insights
+            holistic_priority = suggestion_data.get('holistic_priority', None)
+            if holistic_priority == 'high':
+                subject = f"🔴 {subject}"
+            elif holistic_priority == 'medium':
+                subject = f"🟡 {subject}"
+            
+            # Truncate long text for better display (but preserve thread indicators)
+            if not subject.startswith('🧵'):  # Don't truncate thread subjects
+                subject = subject[:47] + "..." if len(subject) > 50 else subject
+            if not sender.endswith('participants'):  # Don't truncate participant counts
+                sender = sender[:22] + "..." if len(sender) > 25 else sender
+            ai_summary = ai_summary[:47] + "..." if len(ai_summary) > 50 else ai_summary
+            
+            self.email_tree.insert('', 'end', values=(subject, sender, category, ai_summary, date_str))
+
     def on_email_select(self, event):
         selection = self.email_tree.selection()
         if not selection:
@@ -1224,15 +1324,21 @@ This will help keep your inbox focused on actionable items only."""
     def generate_summary(self):
         self.generate_summary_btn.config(state=tk.DISABLED)
         
-        # Generate summary sections
-        self.summary_sections = self.summary_generator.build_summary_sections(self.action_items_data)
+        # Generate summary sections from current batch
+        current_batch_sections = self.summary_generator.build_summary_sections(self.action_items_data)
         
-        # Display beautifully formatted summary in the app
+        # Get comprehensive summary that includes previous outstanding tasks
+        self.summary_sections = self.task_persistence.get_comprehensive_summary(current_batch_sections)
+        
+        # Save current batch tasks to persistent storage
+        batch_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.task_persistence.save_outstanding_tasks(current_batch_sections, batch_timestamp)
+        
+        # Display beautifully formatted comprehensive summary in the app
         self.display_formatted_summary_in_app(self.summary_sections)
         
         # Also save HTML summary for browser viewing (keep existing functionality)
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.saved_summary_path = self.summary_generator.save_focused_summary(self.summary_sections, timestamp)
+        self.saved_summary_path = self.summary_generator.save_focused_summary(self.summary_sections, batch_timestamp)
         
         self.generate_summary_btn.config(state=tk.NORMAL)
     
@@ -1242,19 +1348,40 @@ This will help keep your inbox focused on actionable items only."""
         self.summary_text.config(state=tk.NORMAL)
         self.summary_text.delete(1.0, tk.END)
         
-        # Calculate totals
+        # Calculate totals including task persistence info
         total_items = sum(len(items) for items in summary_sections.values())
         high_priority = len(summary_sections.get('required_actions', []))
         
-        # Header
-        self.summary_text.insert(tk.END, "📊 Email Summary\n", "main_title")
-        self.summary_text.insert(tk.END, "Focused & Actionable\n\n", "subtitle")
+        # Get task statistics for context
+        task_stats = self.task_persistence.get_task_statistics()
         
-        # Overview section
+        # Count items from previous batches (those with batch_count > 1)
+        outstanding_from_previous = 0
+        new_from_current = 0
+        for key, items in summary_sections.items():
+            if key in ['required_actions', 'team_actions', 'optional_actions', 'job_listings', 'optional_events']:
+                for item in items:
+                    batch_count = item.get('batch_count', 1)
+                    if batch_count > 1:
+                        outstanding_from_previous += 1
+                    else:
+                        new_from_current += 1
+        
+        # Header with comprehensive context
+        self.summary_text.insert(tk.END, "📊 Comprehensive Email & Task Summary\n", "main_title")
+        self.summary_text.insert(tk.END, "Current Batch + Outstanding Tasks\n\n", "subtitle")
+        
+        # Overview section with task persistence info
         self.summary_text.insert(tk.END, "📊 Summary Overview\n", "overview_title")
-        self.summary_text.insert(tk.END, "═" * 50 + "\n", "separator")
+        self.summary_text.insert(tk.END, "═" * 60 + "\n", "separator")
         overview_text = f"Total Items: {total_items}    |    High Priority: {high_priority}\n"
-        overview_text += "Stay focused - relevant items only!\n\n"
+        overview_text += f"New from current batch: {new_from_current}    |    "
+        overview_text += f"Outstanding from previous: {outstanding_from_previous}\n"
+        
+        if task_stats['old_tasks_count'] > 0:
+            overview_text += f"⚠️ Tasks older than 7 days: {task_stats['old_tasks_count']}\n"
+        
+        overview_text += "💡 Comprehensive view - all actionable items in one place!\n\n"
         self.summary_text.insert(tk.END, overview_text, "overview_stats")
         
         # Define sections with their styling
@@ -1297,11 +1424,25 @@ This will help keep your inbox focused on actionable items only."""
     def _display_action_items(self, items):
         """Display required or team action items with full details"""
         for i, item in enumerate(items, 1):
-            # Item title
-            self.summary_text.insert(tk.END, f"{i}. {item['subject']}\n", "item_title")
+            # Item title with persistence indicator
+            batch_count = item.get('batch_count', 1)
+            title_prefix = ""
+            if batch_count > 1:
+                title_prefix = f"📅 [{batch_count}x] "  # Show how many batches this task has appeared in
             
-            # Metadata
-            self.summary_text.insert(tk.END, f"   From: {item['sender']}\n", "item_meta")
+            self.summary_text.insert(tk.END, f"{i}. {title_prefix}{item['subject']}\n", "item_title")
+            
+            # Metadata with first seen info
+            self.summary_text.insert(tk.END, f"   From: {item['sender']}", "item_meta")
+            if item.get('first_seen'):
+                try:
+                    first_seen = datetime.strptime(item['first_seen'], '%Y-%m-%d %H:%M:%S')
+                    days_old = (datetime.now() - first_seen).days
+                    if days_old > 0:
+                        self.summary_text.insert(tk.END, f"  |  First seen: {days_old} days ago", "item_meta")
+                except:
+                    pass
+            self.summary_text.insert(tk.END, "\n", "item_meta")
             
             # Action details
             self.summary_text.insert(tk.END, "   Due: ", "content_label")
@@ -1312,6 +1453,11 @@ This will help keep your inbox focused on actionable items only."""
             
             self.summary_text.insert(tk.END, "   Why: ", "content_label")
             self.summary_text.insert(tk.END, f"{item['explanation']}\n", "content_text")
+            
+            # Task ID for completion tracking
+            if item.get('task_id'):
+                self.summary_text.insert(tk.END, "   Task ID: ", "content_label")
+                self.summary_text.insert(tk.END, f"{item['task_id']}\n", "item_meta")
             
             # Links
             if item.get('links'):
@@ -1337,11 +1483,25 @@ This will help keep your inbox focused on actionable items only."""
     def _display_optional_actions(self, items):
         """Display optional action items with relevance context"""
         for i, item in enumerate(items, 1):
-            # Item title
-            self.summary_text.insert(tk.END, f"{i}. {item['subject']}\n", "item_title")
+            # Item title with persistence indicator
+            batch_count = item.get('batch_count', 1)
+            title_prefix = ""
+            if batch_count > 1:
+                title_prefix = f"📅 [{batch_count}x] "
             
-            # Metadata
-            self.summary_text.insert(tk.END, f"   From: {item['sender']}\n", "item_meta")
+            self.summary_text.insert(tk.END, f"{i}. {title_prefix}{item['subject']}\n", "item_title")
+            
+            # Metadata with first seen info
+            self.summary_text.insert(tk.END, f"   From: {item['sender']}", "item_meta")
+            if item.get('first_seen'):
+                try:
+                    first_seen = datetime.strptime(item['first_seen'], '%Y-%m-%d %H:%M:%S')
+                    days_old = (datetime.now() - first_seen).days
+                    if days_old > 0:
+                        self.summary_text.insert(tk.END, f"  |  First seen: {days_old} days ago", "item_meta")
+                except:
+                    pass
+            self.summary_text.insert(tk.END, "\n", "item_meta")
             
             # Optional action details
             self.summary_text.insert(tk.END, "   What: ", "content_label")
@@ -1352,6 +1512,11 @@ This will help keep your inbox focused on actionable items only."""
             
             self.summary_text.insert(tk.END, "   Context: ", "content_label")
             self.summary_text.insert(tk.END, f"{item['explanation']}\n", "content_text")
+            
+            # Task ID for completion tracking
+            if item.get('task_id'):
+                self.summary_text.insert(tk.END, "   Task ID: ", "content_label")
+                self.summary_text.insert(tk.END, f"{item['task_id']}\n", "item_meta")
             
             # Links
             if item.get('links'):
@@ -1377,11 +1542,25 @@ This will help keep your inbox focused on actionable items only."""
     def _display_job_listings(self, items):
         """Display job listings with qualification match"""
         for i, item in enumerate(items, 1):
-            # Item title
-            self.summary_text.insert(tk.END, f"{i}. {item['subject']}\n", "item_title")
+            # Item title with persistence indicator
+            batch_count = item.get('batch_count', 1)
+            title_prefix = ""
+            if batch_count > 1:
+                title_prefix = f"📅 [{batch_count}x] "
             
-            # Metadata
-            self.summary_text.insert(tk.END, f"   From: {item['sender']}\n", "item_meta")
+            self.summary_text.insert(tk.END, f"{i}. {title_prefix}{item['subject']}\n", "item_title")
+            
+            # Metadata with first seen info
+            self.summary_text.insert(tk.END, f"   From: {item['sender']}", "item_meta")
+            if item.get('first_seen'):
+                try:
+                    first_seen = datetime.strptime(item['first_seen'], '%Y-%m-%d %H:%M:%S')
+                    days_old = (datetime.now() - first_seen).days
+                    if days_old > 0:
+                        self.summary_text.insert(tk.END, f"  |  First seen: {days_old} days ago", "item_meta")
+                except:
+                    pass
+            self.summary_text.insert(tk.END, "\n", "item_meta")
             
             # Job details
             self.summary_text.insert(tk.END, "   Match: ", "content_label")
@@ -1389,6 +1568,11 @@ This will help keep your inbox focused on actionable items only."""
             
             self.summary_text.insert(tk.END, "   Due: ", "content_label")
             self.summary_text.insert(tk.END, f"{item['due_date']}\n", "content_text")
+            
+            # Task ID for completion tracking
+            if item.get('task_id'):
+                self.summary_text.insert(tk.END, "   Task ID: ", "content_label")
+                self.summary_text.insert(tk.END, f"{item['task_id']}\n", "item_meta")
             
             # Links
             if item.get('links'):
@@ -1481,7 +1665,8 @@ This will help keep your inbox focused on actionable items only."""
     
     def start_new_session(self):
         result = messagebox.askyesno("New Session", 
-                                   "Start a new email processing session?")
+                                   "Start a new email processing session?\n\n"
+                                   "Note: Outstanding tasks from previous batches will still appear in the summary.")
         if result:
             # Reset all data
             self.email_suggestions = []
@@ -1517,6 +1702,185 @@ This will help keep your inbox focused on actionable items only."""
             
             # Reset status
             self.status_var.set("Ready")
+    
+    def show_task_statistics(self):
+        """Show dialog with task statistics and management options"""
+        stats = self.task_persistence.get_task_statistics()
+        
+        stats_window = tk.Toplevel(self.root)
+        stats_window.title("Task Statistics")
+        stats_window.geometry("600x500")
+        stats_window.transient(self.root)
+        
+        # Main frame
+        main_frame = ttk.Frame(stats_window, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Statistics display
+        stats_text = scrolledtext.ScrolledText(main_frame, width=70, height=20, 
+                                              font=('Consolas', 10))
+        stats_text.pack(fill=tk.BOTH, expand=True)
+        
+        # Format statistics
+        stats_content = f"""📊 TASK PERSISTENCE STATISTICS
+{'='*50}
+
+📈 Overview:
+   Outstanding Tasks: {stats['outstanding_total']}
+   Completed Tasks: {stats['completed_total']}
+   Old Tasks (>7 days): {stats['old_tasks_count']}
+
+📋 Breakdown by Category:
+   Required Actions: {stats['sections_breakdown'].get('required_actions', 0)}
+   Team Actions: {stats['sections_breakdown'].get('team_actions', 0)}
+   Optional Actions: {stats['sections_breakdown'].get('optional_actions', 0)}
+   Job Listings: {stats['sections_breakdown'].get('job_listings', 0)}
+   Optional Events: {stats['sections_breakdown'].get('optional_events', 0)}
+
+"""
+        
+        if stats['old_tasks']:
+            stats_content += f"⚠️ TASKS NEEDING ATTENTION (oldest first):\n"
+            stats_content += "-" * 50 + "\n"
+            for task_info in stats['old_tasks']:
+                task = task_info['task']
+                stats_content += f"• [{task_info['days_old']} days] {task.get('subject', 'No subject')}\n"
+                stats_content += f"  From: {task.get('sender', 'Unknown')}\n"
+                stats_content += f"  Action: {task.get('action_required', 'Review email')}\n"
+                stats_content += f"  Task ID: {task.get('task_id', 'N/A')}\n\n"
+        
+        stats_content += f"""
+💡 TASK MANAGEMENT TIPS:
+• Use 'Mark Tasks Complete' to remove finished tasks
+• Old tasks (>7 days) may need attention or removal
+• Task IDs can be used to mark specific tasks complete
+• Comprehensive summaries show both new and outstanding items
+        """
+        
+        stats_text.insert(tk.END, stats_content)
+        stats_text.config(state=tk.DISABLED)
+        
+        # Control buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(pady=(10, 0))
+        
+        ttk.Button(button_frame, text="Mark Tasks Complete", 
+                  command=lambda: self.show_task_completion_dialog(stats_window)).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(button_frame, text="Clean Old Completed", 
+                  command=self.cleanup_old_tasks).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(button_frame, text="Close", 
+                  command=stats_window.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def show_task_completion_dialog(self, parent_window=None):
+        """Show dialog for marking tasks as complete"""
+        outstanding_tasks = self.task_persistence.load_outstanding_tasks()
+        
+        # Collect all tasks with IDs
+        all_tasks = []
+        for section_key, tasks in outstanding_tasks.items():
+            for task in tasks:
+                if task.get('task_id'):
+                    all_tasks.append({
+                        'id': task['task_id'],
+                        'subject': task.get('subject', 'No subject'),
+                        'sender': task.get('sender', 'Unknown'),
+                        'section': section_key.replace('_', ' ').title(),
+                        'days_old': self._calculate_task_age(task)
+                    })
+        
+        if not all_tasks:
+            messagebox.showinfo("No Tasks", "No outstanding tasks found.")
+            return
+        
+        # Create completion dialog
+        if parent_window:
+            completion_window = tk.Toplevel(parent_window)
+        else:
+            completion_window = tk.Toplevel(self.root)
+        
+        completion_window.title("Mark Tasks Complete")
+        completion_window.geometry("700x400")
+        completion_window.transient(self.root)
+        
+        main_frame = ttk.Frame(completion_window, padding="15")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(main_frame, text="Select tasks to mark as complete:", 
+                 font=('Segoe UI', 11, 'bold')).pack(anchor=tk.W)
+        
+        # Task selection frame
+        list_frame = ttk.Frame(main_frame)
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+        
+        # Create listbox with checkboxes (simulate with selection)
+        task_listbox = tk.Listbox(list_frame, selectmode=tk.MULTIPLE, 
+                                 font=('Consolas', 9), height=15)
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=task_listbox.yview)
+        task_listbox.configure(yscrollcommand=scrollbar.set)
+        
+        task_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Populate task list
+        task_id_map = {}
+        for i, task in enumerate(all_tasks):
+            display_text = f"{task['id']} | {task['subject'][:40]}... | {task['section']}"
+            if task['days_old'] > 0:
+                display_text += f" | {task['days_old']}d old"
+            task_listbox.insert(tk.END, display_text)
+            task_id_map[i] = task['id']
+        
+        # Control buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(pady=(15, 0))
+        
+        def mark_selected_complete():
+            selected_indices = task_listbox.curselection()
+            if not selected_indices:
+                messagebox.showwarning("No Selection", "Please select tasks to mark complete.")
+                return
+            
+            selected_task_ids = [task_id_map[i] for i in selected_indices]
+            
+            # Confirm action
+            result = messagebox.askyesno("Confirm Completion", 
+                                       f"Mark {len(selected_task_ids)} tasks as complete?\n\n"
+                                       "This will remove them from future summaries.")
+            
+            if result:
+                self.task_persistence.mark_tasks_completed(selected_task_ids)
+                messagebox.showinfo("Tasks Completed", 
+                                  f"✅ Marked {len(selected_task_ids)} tasks as complete!")
+                completion_window.destroy()
+                
+                # Refresh summary if it's currently displayed
+                if hasattr(self, 'summary_sections') and self.summary_sections:
+                    self.generate_summary()
+        
+        ttk.Button(button_frame, text="Mark Selected Complete", 
+                  command=mark_selected_complete).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(button_frame, text="Cancel", 
+                  command=completion_window.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def cleanup_old_tasks(self):
+        """Clean up old completed tasks"""
+        result = messagebox.askyesno("Clean Up", 
+                                   "Remove completed tasks older than 30 days?\n\n"
+                                   "This will permanently delete old completed task records.")
+        if result:
+            self.task_persistence.cleanup_old_completed_tasks(days_to_keep=30)
+            messagebox.showinfo("Cleanup Complete", "Old completed tasks have been removed.")
+    
+    def _calculate_task_age(self, task):
+        """Calculate how many days old a task is"""
+        try:
+            first_seen = datetime.strptime(task.get('first_seen', ''), '%Y-%m-%d %H:%M:%S')
+            return (datetime.now() - first_seen).days
+        except:
+            return 0
     
     def run(self):
         self.root.mainloop()
