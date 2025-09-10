@@ -56,6 +56,17 @@ class TaskPersistence:
                         'status': 'outstanding',
                         'batch_count': 1
                     })
+                    
+                    # Convert _entry_id (singular) to _entry_ids (plural list) for email associations
+                    if '_entry_id' in task_with_metadata and task_with_metadata['_entry_id']:
+                        entry_id = task_with_metadata['_entry_id']
+                        task_with_metadata['_entry_ids'] = [entry_id]
+                        # Remove the singular version to avoid confusion
+                        del task_with_metadata['_entry_id']
+                    elif '_entry_ids' not in task_with_metadata:
+                        # Ensure _entry_ids field exists even if empty
+                        task_with_metadata['_entry_ids'] = []
+                    
                     current_tasks[section_key].append(task_with_metadata)
         
         # Merge with existing tasks (avoid duplicates, update batch counts)
@@ -140,6 +151,20 @@ class TaskPersistence:
             
             print(f"✅ Marked {len(newly_completed)} tasks as completed")
     
+    def get_entry_ids_for_tasks(self, task_ids: List[str]) -> List[str]:
+        """Get all email EntryIDs associated with the specified task IDs"""
+        outstanding_tasks = self.load_outstanding_tasks()
+        entry_ids = []
+        
+        for section_key in outstanding_tasks:
+            for task in outstanding_tasks[section_key]:
+                if task.get('task_id') in task_ids:
+                    # Get entry IDs
+                    task_entry_ids = task.get('_entry_ids', [])
+                    entry_ids.extend(task_entry_ids)
+        
+        return list(set(entry_ids))  # Remove duplicates
+    
     def get_comprehensive_summary(self, current_summary_sections: Dict[str, List[Dict]]) -> Dict[str, List[Dict]]:
         """Get comprehensive summary combining current batch with outstanding tasks from previous batches"""
         outstanding_tasks = self.load_outstanding_tasks()
@@ -170,6 +195,17 @@ class TaskPersistence:
                     # Add task_id to the current task for UI completion buttons
                     task_with_id = task.copy()
                     task_with_id['task_id'] = task_id
+                    
+                    # Convert _entry_id (singular) to _entry_ids (plural list) for email associations
+                    if '_entry_id' in task_with_id and task_with_id['_entry_id']:
+                        entry_id = task_with_id['_entry_id']
+                        task_with_id['_entry_ids'] = [entry_id]
+                        # Remove the singular version to avoid confusion
+                        del task_with_id['_entry_id']
+                    elif '_entry_ids' not in task_with_id:
+                        # Ensure _entry_ids field exists even if empty
+                        task_with_id['_entry_ids'] = []
+                    
                     comprehensive_summary[section_key].append(task_with_id)
         
         # Sort by priority and due date
@@ -273,9 +309,17 @@ class TaskPersistence:
                         break
                 
                 if existing_task:
-                    # Update existing task (increment batch count, update timestamp)
+                    # Update existing task (increment batch count, update timestamp, merge entry IDs)
                     existing_task['batch_timestamp'] = batch_timestamp
                     existing_task['batch_count'] = existing_task.get('batch_count', 1) + 1
+                    
+                    # Merge entry IDs (both tasks should have proper _entry_ids arrays)
+                    current_entry_ids = current_task.get('_entry_ids', [])
+                    existing_entry_ids = existing_task.get('_entry_ids', [])
+                    
+                    # Combine entry IDs without duplicates
+                    all_entry_ids = list(set(existing_entry_ids + current_entry_ids))
+                    existing_task['_entry_ids'] = all_entry_ids
                 else:
                     # Add new task
                     merged[section_key].append(current_task)

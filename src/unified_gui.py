@@ -488,7 +488,12 @@ class UnifiedEmailGUI:
         self.update_progress(95, "Applying holistic intelligence...")
         self.email_suggestions = self._apply_holistic_inbox_analysis(self.email_suggestions)
         
-        self.action_items_data = self.email_processor.get_action_items_data()
+        # Reprocess action items after holistic modifications
+        self._reprocess_action_items_after_holistic_changes()
+        
+        # Synchronize GUI's action_items_data with the updated email processor data
+        self.action_items_data = self.email_processor.action_items_data.copy()
+        print(f"📊 Final sync complete. Action items categories: {list(self.action_items_data.keys())}")
         
         self.update_progress(100, "Processing complete")
         self.root.after(0, self.on_processing_complete)
@@ -632,6 +637,61 @@ class UnifiedEmailGUI:
         except Exception as e:
             print(f"⚠️ Holistic analysis error: {e}")
             return all_email_suggestions
+    
+    def _reprocess_action_items_after_holistic_changes(self):
+        """Reprocess action items data to reflect holistic analysis changes"""
+        print("🔄 Synchronizing action items after holistic analysis...")
+        
+        # Create a mapping of email suggestions by EntryID for quick lookup
+        suggestion_lookup = {}
+        for suggestion in self.email_suggestions:
+            entry_id = suggestion.get('email_data', {}).get('entry_id')
+            if entry_id:
+                suggestion_lookup[entry_id] = suggestion
+        
+        # Get the current action items from email processor
+        current_action_items = self.email_processor.get_action_items_data()
+        changes_made = 0
+        
+        # For each category in action items, check if any emails have been reclassified by holistic analysis
+        for category, items in current_action_items.items():
+            items_to_remove = []
+            items_to_add = []
+            
+            for i, item in enumerate(items):
+                # Try to find the corresponding email suggestion using thread data
+                thread_data = item.get('thread_data', {})
+                entry_id = thread_data.get('entry_id')
+                
+                if entry_id and entry_id in suggestion_lookup:
+                    suggestion = suggestion_lookup[entry_id]
+                    new_category = suggestion['ai_suggestion']
+                    
+                    # If the category changed due to holistic analysis
+                    if new_category != category:
+                        items_to_remove.append(i)
+                        changes_made += 1
+                        print(f"  🔄 Moving item from '{category}' to '{new_category}': {item.get('email_subject', 'Unknown')[:50]}")
+                        
+                        # Create new item for the new category
+                        if new_category not in current_action_items:
+                            current_action_items[new_category] = []
+                        
+                        # Update the item's category reference and add to new category
+                        new_item = item.copy()
+                        items_to_add.append((new_category, new_item))
+            
+            # Remove items that were reclassified (in reverse order to maintain indices)
+            for i in reversed(items_to_remove):
+                items.pop(i)
+            
+            # Add items to their new categories
+            for new_category, new_item in items_to_add:
+                current_action_items[new_category].append(new_item)
+        
+        # Update the email processor with the modified action items data
+        self.email_processor.action_items_data = current_action_items
+        print(f"✅ Holistic synchronization complete: {changes_made} items moved")
     
     def _apply_holistic_modifications(self, all_email_suggestions, analysis, email_lookup):
         """Apply the holistic analysis results to modify email suggestions"""
@@ -1244,22 +1304,26 @@ class UnifiedEmailGUI:
         email_data = suggestion_data.get('email_data', {})
         thread_data = suggestion_data.get('thread_data', {})
         
-        # Remove from old category if it exists in action_items_data
-        if old_category in self.action_items_data:
-            # Find and remove the item with matching email data
-            items_to_remove = []
-            for i, item in enumerate(self.action_items_data[old_category]):
-                if (item.get('email_subject') == email_data.get('subject') and 
-                    item.get('email_sender') == email_data.get('sender_name')):
-                    items_to_remove.append(i)
-            
-            # Remove items in reverse order to maintain indices
-            for i in reversed(items_to_remove):
-                self.action_items_data[old_category].pop(i)
+        print(f"🔄 Reclassifying email '{email_data.get('subject', 'Unknown')[:50]}' from '{old_category}' to '{new_category}'")
         
-        # Add to new category
-        if new_category not in self.action_items_data:
-            self.action_items_data[new_category] = []
+        # Update both the GUI's action_items_data and the email_processor's action_items_data
+        for action_items_store in [self.action_items_data, self.email_processor.action_items_data]:
+            # Remove from old category if it exists in action_items_data
+            if old_category in action_items_store:
+                # Find and remove the item with matching email data
+                items_to_remove = []
+                for i, item in enumerate(action_items_store[old_category]):
+                    if (item.get('email_subject') == email_data.get('subject') and 
+                        item.get('email_sender') == email_data.get('sender_name')):
+                        items_to_remove.append(i)
+                
+                # Remove items in reverse order to maintain indices
+                for i in reversed(items_to_remove):
+                    action_items_store[old_category].pop(i)
+            
+            # Add to new category
+            if new_category not in action_items_store:
+                action_items_store[new_category] = []
         
         # Create appropriate data structure based on new category
         if new_category == 'fyi':
@@ -1273,14 +1337,18 @@ class UnifiedEmailGUI:
             context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
             fyi_summary = self.ai_processor.generate_fyi_summary(email_content, context)
             
+            # Create proper FYI structure matching original email processing
             fyi_item = {
-                'summary': fyi_summary,
-                'thread_data': thread_data,
+                'email_object': None,  # No actual email object for reclassified items
                 'email_subject': email_data.get('subject'),
                 'email_sender': email_data.get('sender_name'),
-                'email_date': email_data.get('received_time')
+                'email_date': email_data.get('received_time'),
+                'summary': fyi_summary,
+                'thread_data': thread_data
             }
-            self.action_items_data[new_category].append(fyi_item)
+            # Add to both data stores
+            for action_items_store in [self.action_items_data, self.email_processor.action_items_data]:
+                action_items_store[new_category].append(fyi_item)
             
         elif new_category == 'newsletter':
             # Generate newsletter summary for reclassified item
@@ -1293,14 +1361,18 @@ class UnifiedEmailGUI:
             context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
             newsletter_summary = self.ai_processor.generate_newsletter_summary(email_content, context)
             
+            # Create proper newsletter structure matching original email processing
             newsletter_item = {
-                'summary': newsletter_summary,
-                'thread_data': thread_data,
+                'email_object': None,  # No actual email object for reclassified items
                 'email_subject': email_data.get('subject'),
                 'email_sender': email_data.get('sender_name'),
-                'email_date': email_data.get('received_time')
+                'email_date': email_data.get('received_time'),
+                'summary': newsletter_summary,
+                'thread_data': thread_data
             }
-            self.action_items_data[new_category].append(newsletter_item)
+            # Add to both data stores
+            for action_items_store in [self.action_items_data, self.email_processor.action_items_data]:
+                action_items_store[new_category].append(newsletter_item)
             
         elif new_category in ['required_personal_action', 'optional_action', 'team_action']:
             # Generate action item details for reclassified item
@@ -1313,15 +1385,18 @@ class UnifiedEmailGUI:
             context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
             action_details = self.ai_processor.extract_action_item_details(email_content, context)
             
+            # Create proper action item structure matching original email processing
             action_item = {
-                'action': action_details.get('action_required', 'Review email'),
-                'thread_data': thread_data,
+                'email_object': None,  # No actual email object for reclassified items
                 'email_subject': email_data.get('subject'),
                 'email_sender': email_data.get('sender_name'),
                 'email_date': email_data.get('received_time'),
-                'action_details': action_details
+                'action_details': action_details,
+                'thread_data': thread_data
             }
-            self.action_items_data[new_category].append(action_item)
+            # Add to both data stores
+            for action_items_store in [self.action_items_data, self.email_processor.action_items_data]:
+                action_items_store[new_category].append(action_item)
             
         elif new_category == 'optional_event':
             # Generate event relevance for reclassified item
@@ -1336,7 +1411,9 @@ class UnifiedEmailGUI:
                 'email_sender': email_data.get('sender_name'),
                 'email_date': email_data.get('received_time')
             }
-            self.action_items_data[new_category].append(event_item)
+            # Add to both data stores
+            for action_items_store in [self.action_items_data, self.email_processor.action_items_data]:
+                action_items_store[new_category].append(event_item)
     
     def apply_to_outlook(self):
         # Auto-apply any pending changes before applying to Outlook
@@ -1526,7 +1603,7 @@ This will help keep your inbox focused on actionable items only."""
             self.summary_text.insert(tk.END, f"{item.get('action_required', 'Review email')}\n", "content_text")
             
             self.summary_text.insert(tk.END, "   Why: ", "content_label")
-            self.summary_text.insert(tk.END, f"{item['explanation']}\n", "content_text")
+            self.summary_text.insert(tk.END, f"{item.get('explanation', 'No explanation available')}\n", "content_text")
             
             # Task ID for completion tracking
             if item.get('task_id'):
@@ -2023,17 +2100,42 @@ This will help keep your inbox focused on actionable items only."""
             # Confirm action
             result = messagebox.askyesno("Confirm Completion", 
                                        f"Mark {len(selected_task_ids)} tasks as complete?\n\n"
-                                       "This will remove them from future summaries.")
+                                       "This will:\n"
+                                       "• Remove them from future summaries\n"
+                                       "• Move associated emails to Done folder")
             
             if result:
-                self.task_persistence.mark_tasks_completed(selected_task_ids)
-                messagebox.showinfo("Tasks Completed", 
-                                  f"✅ Marked {len(selected_task_ids)} tasks as complete!")
-                completion_window.destroy()
-                
-                # Refresh summary if it's currently displayed
-                if hasattr(self, 'summary_sections') and self.summary_sections:
-                    self.generate_summary()
+                try:
+                    # Get EntryIDs for these tasks before marking them complete
+                    entry_ids = self.task_persistence.get_entry_ids_for_tasks(selected_task_ids)
+                    
+                    # Mark tasks as completed
+                    self.task_persistence.mark_tasks_completed(selected_task_ids)
+                    
+                    # Move associated emails to Done folder
+                    email_message = ""
+                    if entry_ids and hasattr(self, 'outlook_manager') and self.outlook_manager:
+                        try:
+                            moved_count, error_count = self.outlook_manager.move_emails_to_done_folder(entry_ids)
+                            if moved_count > 0:
+                                email_message = f"\n📁 Moved {moved_count} associated email(s) to Done folder"
+                            if error_count > 0:
+                                email_message += f"\n⚠️ {error_count} email(s) could not be moved"
+                        except Exception as e:
+                            email_message = f"\n⚠️ Could not move emails to Done folder: {e}"
+                            print(f"Error moving emails to Done folder: {e}")
+                    
+                    messagebox.showinfo("Tasks Completed", 
+                                      f"✅ Marked {len(selected_task_ids)} tasks as complete!{email_message}")
+                    completion_window.destroy()
+                    
+                    # Refresh summary if it's currently displayed
+                    if hasattr(self, 'summary_sections') and self.summary_sections:
+                        self.generate_summary()
+                        
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to complete tasks: {e}")
+                    print(f"Error completing tasks {selected_task_ids}: {e}")
         
         ttk.Button(button_frame, text="Mark Selected Complete", 
                   command=mark_selected_complete).pack(side=tk.LEFT, padx=5)
@@ -2042,19 +2144,46 @@ This will help keep your inbox focused on actionable items only."""
                   command=completion_window.destroy).pack(side=tk.LEFT, padx=5)
     
     def _mark_single_task_complete(self, task_id):
-        """Mark a single task as complete and refresh the summary"""
+        """Mark a single task as complete, move associated emails to Done folder, and refresh the summary"""
         result = messagebox.askyesno("Confirm Completion", 
                                    f"Mark task {task_id} as complete?\n\n"
-                                   "This will remove it from future summaries.")
+                                   "This will:\n"
+                                   "• Remove it from future summaries\n"
+                                   "• Move associated emails to Done folder")
         
         if result:
-            self.task_persistence.mark_tasks_completed([task_id])
-            messagebox.showinfo("Task Completed", 
-                              f"✅ Task {task_id} marked as complete!")
-            
-            # Refresh summary immediately
-            if hasattr(self, 'summary_sections') and self.summary_sections:
-                self.generate_summary()
+            try:
+                # Get EntryIDs for this task before marking it complete
+                entry_ids = self.task_persistence.get_entry_ids_for_tasks([task_id])
+                
+                # Mark the task as completed
+                self.task_persistence.mark_tasks_completed([task_id])
+                
+                # Move associated emails to Done folder
+                if entry_ids and hasattr(self, 'outlook_manager') and self.outlook_manager:
+                    try:
+                        moved_count, error_count = self.outlook_manager.move_emails_to_done_folder(entry_ids)
+                        email_message = ""
+                        if moved_count > 0:
+                            email_message = f"\n📁 Moved {moved_count} associated email(s) to Done folder"
+                        if error_count > 0:
+                            email_message += f"\n⚠️ {error_count} email(s) could not be moved"
+                    except Exception as e:
+                        email_message = f"\n⚠️ Could not move emails to Done folder: {e}"
+                        print(f"Error moving emails to Done folder: {e}")
+                else:
+                    email_message = "\n📧 No associated emails to move"
+                
+                messagebox.showinfo("Task Completed", 
+                                  f"✅ Task {task_id} marked as complete!{email_message}")
+                
+                # Refresh summary immediately
+                if hasattr(self, 'summary_sections') and self.summary_sections:
+                    self.generate_summary()
+                    
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to complete task: {e}")
+                print(f"Error completing task {task_id}: {e}")
         else:
             pass  # User cancelled
     

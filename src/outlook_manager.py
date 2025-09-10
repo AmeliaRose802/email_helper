@@ -89,6 +89,10 @@ class OutlookManager:
             for category, folder_name in non_inbox_categories.items():
                 folder = self._create_folder_if_not_exists(mail_root, folder_name)
                 self.folders[category] = folder
+            
+            # Create Done folder at mail root level for completed tasks
+            done_folder = self._create_folder_if_not_exists(mail_root, "Done")
+            self.folders['done'] = done_folder
                 
         except Exception as e:
             print(f"⚠️  Warning: Could not set up Outlook folders: {e}")
@@ -444,4 +448,46 @@ class OutlookManager:
         if error_count > 0:
             print(f"   ❌ Errors encountered: {error_count} emails")
         
+        return success_count, error_count
+    
+    def move_emails_to_done_folder(self, entry_ids):
+        """Move emails with specified EntryIDs to the Done folder"""
+        if not self.namespace:
+            raise Exception("Not connected to Outlook. Call connect_to_outlook() first.")
+        
+        if not entry_ids:
+            return 0, 0
+            
+        done_folder = self.folders.get('done')
+        if not done_folder:
+            print("⚠️ Done folder not available. Cannot move emails.")
+            return 0, len(entry_ids)
+        
+        success_count = 0
+        error_count = 0
+        
+        for entry_id in entry_ids:
+            try:
+                # Get the email using its EntryID
+                email_item = self.namespace.GetItemFromID(entry_id)
+                
+                if email_item:
+                    # Move to Done folder
+                    email_item.Move(done_folder)
+                    subject = email_item.Subject[:50] if hasattr(email_item, 'Subject') else 'Unknown'
+                    print(f"✅ Moved '{subject}...' to Done folder")
+                    success_count += 1
+                else:
+                    print(f"⚠️ Email with EntryID {entry_id} not found")
+                    error_count += 1
+                    
+            except Exception as e:
+                print(f"❌ Error moving email {entry_id} to Done folder: {e}")
+                error_count += 1
+        
+        if success_count > 0:
+            print(f"📁 Moved {success_count} emails to Done folder")
+        if error_count > 0:
+            print(f"⚠️ Failed to move {error_count} emails")
+            
         return success_count, error_count

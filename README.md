@@ -124,7 +124,6 @@ your_username
 
 ### Adding New Categories
 1. Update prompts in `prompts/email_classifier_system.prompty`
-2. Add category to `ai_processor.py` → `get_available_categories()`
 3. Update documentation
 
 ### Customizing Prompts
