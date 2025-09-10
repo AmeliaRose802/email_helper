@@ -1714,7 +1714,7 @@ This will help keep your inbox focused on actionable items only."""
             self.summary_text.insert(tk.END, f"{item.get('action_required', 'Provide feedback')}\n", "content_text")
             
             self.summary_text.insert(tk.END, "   Why relevant: ", "content_label")
-            self.summary_text.insert(tk.END, f"{item['why_relevant']}\n", "content_text")
+            self.summary_text.insert(tk.END, f"{item.get('why_relevant', item.get('explanation', 'No specific reason provided'))}\n", "content_text")
             
             self.summary_text.insert(tk.END, "   Context: ", "content_label")
             self.summary_text.insert(tk.END, f"{item['explanation']}\n", "content_text")

@@ -6,7 +6,6 @@ Email Processing Engine - Main processing logic and orchestration
 from datetime import datetime
 from collections import defaultdict
 
-
 class EmailProcessor:
     def __init__(self, outlook_manager, ai_processor, email_analyzer, summary_generator):
         self.outlook_manager = outlook_manager

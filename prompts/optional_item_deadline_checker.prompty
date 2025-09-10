@@ -8,37 +8,6 @@ model:
     azure_deployment: gpt-4o-mini
     api_version: 2024-02-15-preview
   parameters:
-    max_tokens: 300
-    temperature: 0.1
-inputs:
-  context:
-    type: string
-  job_role_context:
-    type: string
-  username:
-    type: string
-  subject:
-    type: string
-  sender:
-    type: string
-  date:
-    type: string
-  body:
-    type: string
-  current_date:
-    type: string
----
-
----
-name: Optional Item Deadline Checker
-description: Analyzes email content to determine if optional items with deadlines have expired
-model:
-  api: chat
-  configuration:
-    type: azure_openai
-    azure_deployment: gpt-4o-mini
-    api_version: 2024-02-15-preview
-  parameters:
     max_tokens: 400
     temperature: 0.1
 inputs:

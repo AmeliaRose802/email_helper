@@ -66,6 +66,7 @@ Signals the action is on **another team** (classify as `fyi` unless a clear coun
 - Manager communications needing action
 - Surveys/feedback requests with deadlines
 - Core responsibilities tied to job role context where {{username}} must act
+- Emails from outdoors for all
 
 **team_action**  *(only when our team must act)*
 - Code reviews, technical discussions where our team’s input is requested

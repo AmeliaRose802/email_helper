@@ -1,27 +1,40 @@
 #!/usr/bin/env python3
 """
-Outlook Manager - H            # Categories that go into Inbox subfolders (actionable items)
-            inbox_categories = {
-                'required_personal_action': 'Required Actions (Me)',
-                'optional_action': 'Optional Actions',
-                'job_listing': 'Job Listings',
-                'work_relevant': 'Work Relevant'
-            }
-            
-            # Categories that should be outside Inbox (non-actionable/reference items)
-            non_inbox_categories = {
-                'team_action': 'Team Actions',
-                'optional_event': 'Optional Events', 
-                'fyi': 'FYI',
-                'newsletter': 'Newsletters',
-                'general_information': 'Summarized',
-                'spam_to_delete': 'ai_deleted'  # Move deleted items out of inbox
-            }nnection and folder management
+Outlook Manager - Handles Outlook connection and folder management
 """
-
 import win32com.client
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+
+
+# Email category folder mappings
+INBOX_CATEGORIES = {
+    'required_personal_action': 'Required Actions (Me)',
+    'optional_action': 'Optional Actions',
+    'job_listing': 'Job Listings',
+    'work_relevant': 'Work Relevant'
+}
+
+NON_INBOX_CATEGORIES = {
+    'team_action': 'Team Actions',
+    'optional_event': 'Optional Events', 
+    'fyi': 'FYI',
+    'newsletter': 'Newsletters',
+    'general_information': 'Summarized',
+    'spam_to_delete': 'ai_deleted'
+}
+
+CATEGORY_COLORS = {
+    'required_personal_action': 'Red Category',
+    'team_action': 'Orange Category', 
+    'optional_action': 'Yellow Category',
+    'job_listing': 'Green Category',
+    'optional_event': 'Blue Category',
+    'fyi': 'Blue Category',
+    'newsletter': 'Gray Category',
+    'spam_to_delete': 'Purple Category',
+    'general_information': 'Gray Category'
+}
 
 
 class OutlookManager:
@@ -62,31 +75,13 @@ class OutlookManager:
             inbox_folder = self.inbox
             mail_root = inbox_folder.Parent  # This gets the main Mail folder (parent of Inbox)
             
-            # Categories that should remain in Inbox (actionable items)
-            inbox_categories = {
-                'required_personal_action': 'Required Actions (Me)',
-                'optional_action': 'Optional Actions',
-                'job_listing': 'Job Listings',
-                'work_relevant': 'Work Relevant'
-            }
-            
-            # Categories that should be outside Inbox (non-actionable/reference items)
-            non_inbox_categories = {
-                'team_action': 'Team Actions',
-                'optional_event': 'Optional Events', 
-                'fyi': 'FYI',
-                'newsletter': 'Newsletters',
-                'general_information': 'Summarized',
-                'spam_to_delete': 'ai_deleted'  # Move deleted items out of inbox
-            }
-            
             # Create inbox folders (actionable items)
-            for category, folder_name in inbox_categories.items():
+            for category, folder_name in INBOX_CATEGORIES.items():
                 folder = self._create_folder_if_not_exists(inbox_folder, folder_name)
                 self.folders[category] = folder
             
             # Create non-inbox folders (reference/FYI items) at mail root level
-            for category, folder_name in non_inbox_categories.items():
+            for category, folder_name in NON_INBOX_CATEGORIES.items():
                 folder = self._create_folder_if_not_exists(mail_root, folder_name)
                 self.folders[category] = folder
             
@@ -152,20 +147,7 @@ class OutlookManager:
     def _add_category_to_email(self, email, category):
         """Add color category to email as fallback"""
         try:
-            # Outlook category colors mapping
-            category_colors = {
-                'required_personal_action': 'Red Category',
-                'team_action': 'Orange Category', 
-                'optional_action': 'Yellow Category',
-                'job_listing': 'Green Category',
-                'optional_event': 'Blue Category',
-                'fyi': 'Blue Category',
-                'newsletter': 'Gray Category',
-                'spam_to_delete': 'Purple Category',
-                'general_information': 'Gray Category'
-            }
-            
-            color_category = category_colors.get(category, 'Gray Category')
+            color_category = CATEGORY_COLORS.get(category, 'Gray Category')
             email.Categories = color_category
             email.Save()
             print(f"🏷️  Tagged '{email.Subject[:50]}...' with {color_category}")
@@ -178,7 +160,6 @@ class OutlookManager:
         if not self.inbox:
             raise Exception("Not connected to Outlook. Call connect_to_outlook() first.")
             
-        from datetime import timedelta
         cutoff_date = datetime.now() - timedelta(days=days_back)
         
         recent_emails = [
@@ -188,164 +169,98 @@ class OutlookManager:
         
         return recent_emails
     
-    def get_conversation_emails(self, conversation_id):
-        """Get all emails in a conversation using ConversationID"""
-        if not self.inbox:
-            raise Exception("Not connected to Outlook")
-            
-        try:
-            # Search all emails in inbox with the same ConversationID
-            conversation_emails = []
-            
-            # Iterate through all emails to find matching ConversationID
-            # (Restrict method syntax is problematic with ConversationID)
-            for item in self.inbox.Items:
-                try:
-                    # Only include MailItem objects (not meeting requests, etc.)
-                    if item.Class == 43:  # olMail = 43
-                        if hasattr(item, 'ConversationID') and item.ConversationID == conversation_id:
-                            conversation_emails.append(item)
-                except:
-                    # Skip items that can't be accessed
-                    continue
-            
-            # Sort by received time (oldest first)
-            conversation_emails.sort(key=lambda x: x.ReceivedTime)
-            return conversation_emails
-            
-        except Exception as e:
-            print(f"⚠️  Warning: Could not retrieve conversation emails for {conversation_id}: {e}")
-            return []
-    
     def get_emails_with_full_conversations(self, days_back=7, max_emails=100):
         """Get recent emails and include their full conversation threads"""
         if not self.inbox:
             raise Exception("Not connected to Outlook. Call connect_to_outlook() first.")
-            
-        from datetime import timedelta
         
-        # If days_back is None, don't apply any date filter
+        # Set up date filter
         if days_back is not None:
             cutoff_date = datetime.now() - timedelta(days=days_back)
+            extended_cutoff = datetime.now() - timedelta(days=30)
         else:
             cutoff_date = None
+            extended_cutoff = None
         
         try:
-            # Get recent emails as starting point - use simpler approach
-            
-            recent_emails = []
-            all_relevant_emails = []
-            
-            # Access inbox items safely with proper error handling
+            inbox_items = self.inbox.Items
+        except Exception as items_error:
+            raise Exception(f"Could not access Outlook inbox items: {str(items_error)}")
+        
+        recent_emails = []
+        all_relevant_emails = []
+        
+        # Collect emails with simplified filtering
+        for email in inbox_items:
+            if not self._is_valid_email_item(email):
+                continue
+                
             try:
-                inbox_items = self.inbox.Items
-            except Exception as items_error:
-                raise Exception(f"Could not access Outlook inbox items: {str(items_error)}")
-            
-            # Simple iteration approach that was working before
-            for email in inbox_items:
-                try:
-                    # Skip if not a mail item
-                    if not hasattr(email, 'Class') or email.Class != 43:  # olMail = 43
-                        continue
+                email_date = email.ReceivedTime.replace(tzinfo=None)
+                
+                # Add to recent if within date range
+                if cutoff_date is None or email_date >= cutoff_date:
+                    recent_emails.append(email)
+                
+                # Add to extended search for thread matching
+                if extended_cutoff is None or email_date >= extended_cutoff:
+                    all_relevant_emails.append(email)
+                
+                # Limit processing to prevent slowdown
+                if len(recent_emails) >= max_emails * 2:
+                    break
                     
-                    # Check recent emails
-                    if hasattr(email, 'ReceivedTime'):
-                        email_date = email.ReceivedTime.replace(tzinfo=None)
-                        
-                        # Apply date filter only if cutoff_date is set
-                        if cutoff_date is None or email_date >= cutoff_date:
-                            recent_emails.append(email)
-                        
-                        # Also collect for extended search (30 days or all if no cutoff)
-                        if cutoff_date is None:
-                            all_relevant_emails.append(email)
-                        else:
-                            extended_cutoff = datetime.now() - timedelta(days=30)
-                            if email_date >= extended_cutoff:
-                                all_relevant_emails.append(email)
-                    
-                    # Limit to prevent excessive processing
-                    if len(recent_emails) >= max_emails * 2:
-                        break
-                        
-                except Exception as item_error:
-                    # Skip problematic items and continue
-                    continue
-            
-            # Limit all_relevant_emails as well
-            all_relevant_emails = all_relevant_emails[:max_emails * 5]
-            
-            if not recent_emails:
-                print("⚠️  No recent emails found in the specified time range")
-                return []
+            except Exception:
+                continue
         
-        except Exception as access_error:
-            raise Exception(f"Failed to access Outlook emails: {str(access_error)}")
+        # Limit all_relevant_emails
+        all_relevant_emails = all_relevant_emails[:max_emails * 5]
         
-        # Group by conversation using all available emails
+        if not recent_emails:
+            return []
+        
+        # Group by conversation
+        return self._group_emails_by_conversation(recent_emails, all_relevant_emails, max_emails)
+    
+    def _is_valid_email_item(self, email):
+        """Check if email item is valid for processing"""
+        return hasattr(email, 'Class') and email.Class == 43  # olMail = 43
+    
+    def _group_emails_by_conversation(self, recent_emails, all_relevant_emails, max_emails):
+        """Group emails by conversation with simplified logic"""
         conversation_groups = {}
         processed_conversations = set()
         
         for email in recent_emails:
-            try:
-                # Ensure email is a mail item
-                if not hasattr(email, 'Class') or email.Class != 43:  # olMail = 43
-                    continue
-                    
-                conversation_id = email.ConversationID if hasattr(email, 'ConversationID') else f"single_{email.EntryID}"
+            if not self._is_valid_email_item(email):
+                continue
                 
-                # Skip if we've already processed this conversation
-                if conversation_id in processed_conversations:
-                    continue
-                
-                # Find all emails with same ConversationID in our broader set
-                full_conversation = []
-                if conversation_id.startswith("single_"):
-                    # This is a fallback single email
+            conversation_id = getattr(email, 'ConversationID', f"single_{email.EntryID}")
+            
+            if conversation_id in processed_conversations:
+                continue
+            
+            # Find conversation emails
+            if conversation_id.startswith("single_"):
+                full_conversation = [email]
+            else:
+                full_conversation = self._find_conversation_emails(conversation_id, all_relevant_emails)
+                if not full_conversation:
                     full_conversation = [email]
-                else:
-                    # Look for conversation matches
-                    for e in all_relevant_emails:
-                        try:
-                            if (hasattr(e, 'ConversationID') and 
-                                hasattr(e, 'Class') and 
-                                e.Class == 43 and  # Only mail items
-                                e.ConversationID == conversation_id):
-                                full_conversation.append(e)
-                        except:
-                            # Skip emails that can't be accessed
-                            continue
-                    
-                    # If no conversation emails found, treat as single email
-                    if not full_conversation:
-                        full_conversation = [email]
-                        conversation_id = f"single_{email.EntryID}"
+                    conversation_id = f"single_{email.EntryID}"
+            
+            if full_conversation:
+                full_conversation.sort(key=lambda x: x.ReceivedTime)
                 
-                if full_conversation:
-                    # Sort by date
-                    full_conversation.sort(key=lambda x: x.ReceivedTime)
-                    
-                    conversation_groups[conversation_id] = {
-                        'emails': full_conversation,
-                        'topic': getattr(email, 'ConversationTopic', None) or email.Subject,
-                        'latest_date': max(e.ReceivedTime for e in full_conversation),
-                        'recent_trigger': email  # The recent email that triggered including this conversation
-                    }
-                    processed_conversations.add(conversation_id)
-                    
-            except Exception as e:
-                # Fallback: treat as single email if conversation API fails
-                print(f"⚠️  Warning: Could not process conversation for '{email.Subject[:50]}': {e}")
-                fallback_id = f"single_{email.EntryID}"
-                conversation_groups[fallback_id] = {
-                    'emails': [email],
-                    'topic': email.Subject,
-                    'latest_date': email.ReceivedTime,
+                conversation_groups[conversation_id] = {
+                    'emails': full_conversation,
+                    'topic': getattr(email, 'ConversationTopic', None) or email.Subject,
+                    'latest_date': max(e.ReceivedTime for e in full_conversation),
                     'recent_trigger': email
                 }
+                processed_conversations.add(conversation_id)
         
-        # Sort conversations by latest activity
+        # Sort and limit results
         sorted_conversations = sorted(
             conversation_groups.items(),
             key=lambda x: x[1]['latest_date'],
@@ -353,6 +268,16 @@ class OutlookManager:
         )
         
         return sorted_conversations[:max_emails]
+    
+    def _find_conversation_emails(self, conversation_id, all_emails):
+        """Find all emails matching a conversation ID"""
+        conversation = []
+        for email in all_emails:
+            if (self._is_valid_email_item(email) and 
+                hasattr(email, 'ConversationID') and 
+                email.ConversationID == conversation_id):
+                conversation.append(email)
+        return conversation
     
     def get_email_body(self, email):
         """Get email body safely with larger context window"""
@@ -366,7 +291,7 @@ class OutlookManager:
         
         # Show folder organization info
         print("\n📂 FOLDER ORGANIZATION:")
-        print("   🎯 INBOX (Actionable): Required Actions, Optional Actions, Job Listings, Work Relevant, Spam Review")
+        print("   🎯 INBOX (Actionable): Required Actions, Optional Actions, Job Listings, Work Relevant")
         print("   📚 OUTSIDE INBOX (Reference): Team Actions, Optional Events, FYI, Newsletters")
         print()
             
@@ -381,32 +306,22 @@ class OutlookManager:
         inbox_count = 0
         non_inbox_count = 0
         
-        # Categories that go outside inbox
-        non_inbox_categories = {'team_action', 'optional_event', 'fyi', 'newsletter', 'general_information'}
-        
         for i, suggestion_data in enumerate(email_suggestions, 1):
             email = suggestion_data['email_object']
             category = suggestion_data['ai_suggestion']
             thread_data = suggestion_data.get('thread_data', {})
-            processing_notes = suggestion_data.get('processing_notes', [])
             
             # Count folder destinations (case-insensitive)
-            if category.lower() == 'spam_to_delete':
-                inbox_count += 1  # Spam folder is in inbox for review
-            elif category.lower() in non_inbox_categories:
+            if category.lower() in NON_INBOX_CATEGORIES:
                 non_inbox_count += 1
             else:
                 inbox_count += 1
             
             # Show processing details
             subject = email.Subject[:50] if hasattr(email, 'Subject') else 'Unknown'
-            print(f"   📧 {subject}...")
-            print(f"      └─ Action: {category.replace('_', ' ').title()}")
-            if processing_notes:
-                for note in processing_notes:
-                    print(f"      └─ 🧠 {note}")
+            print(f"   📧 {subject}... → {category.replace('_', ' ').title()}")
             
-            # Get all emails in thread (use new structure)
+            # Get all emails in thread
             all_emails = thread_data.get('all_emails', [email])
             thread_count = thread_data.get('thread_count', 1)
             
@@ -425,12 +340,7 @@ class OutlookManager:
                 
                 if thread_success == len(all_emails):
                     success_count += 1
-                else:
-                    pass  # Partially moved thread
             else:
-                print(f"   📧 {email.Subject[:50]}...")
-                print(f"      └─ Category: {category.replace('_', ' ').title()}")
-                
                 try:
                     if self.move_email_to_category(email, category):
                         success_count += 1

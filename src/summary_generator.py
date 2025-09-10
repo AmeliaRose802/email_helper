@@ -10,7 +10,194 @@ from jinja2 import Environment, FileSystemLoader
 
 class SummaryGenerator:
     def __init__(self):
-        pass
+        # Constants for section configuration
+        self.SECTION_KEYS = {
+            'required_personal_action': 'required_actions',
+            'team_action': 'team_actions', 
+            'optional_action': 'optional_actions',
+            'job_listing': 'job_listings',
+            'optional_event': 'optional_events',
+            'fyi': 'fyi_notices',
+            'newsletter': 'newsletters'
+        }
+        
+        # Initialize empty sections structure
+        self.EMPTY_SECTIONS = {
+            'required_actions': [],
+            'team_actions': [],
+            'optional_actions': [],
+            'job_listings': [],
+            'optional_events': [],
+            'fyi_notices': [],
+            'newsletters': []
+        }
+    
+    def _extract_entry_id_and_check_duplicates(self, item_data, processed_entry_ids):
+        """Extract entry ID from item data and check for duplicates"""
+        email_obj = item_data.get('email_object')
+        entry_id = None
+        
+        # Handle both email object and dictionary-only data
+        if email_obj and hasattr(email_obj, 'EntryID'):
+            entry_id = email_obj.EntryID
+        elif not email_obj and item_data.get('thread_data', {}).get('entry_id'):
+            entry_id = item_data['thread_data']['entry_id']
+        
+        # Check for duplicates
+        if entry_id and entry_id in processed_entry_ids:
+            return None, True  # None entry_id, is_duplicate=True
+        
+        if entry_id:
+            processed_entry_ids.add(entry_id)
+        
+        return entry_id, False  # Return entry_id, is_duplicate=False
+    
+    def _extract_email_basic_data(self, item_data):
+        """Extract subject, sender, and email object from item data with fallbacks"""
+        email_obj = item_data.get('email_object')
+        
+        # Extract subject with fallbacks
+        subject = item_data.get('email_subject')
+        if not subject and email_obj:
+            subject = getattr(email_obj, 'Subject', 'Unknown Subject')
+        elif not subject:
+            subject = 'Unknown Subject'
+            
+        # Extract sender with fallbacks
+        sender = item_data.get('email_sender')
+        if not sender and email_obj:
+            sender = getattr(email_obj, 'SenderName', 'Unknown Sender')
+        elif not sender:
+            sender = 'Unknown Sender'
+        
+        return subject, sender, email_obj
+    
+    def _extract_date_string(self, item_data, email_obj=None):
+        """Extract and format date string from item data or email object"""
+        # Try item data first
+        if 'email_date' in item_data and item_data['email_date']:
+            date = item_data['email_date']
+            if hasattr(date, 'strftime'):
+                return date.strftime('%Y-%m-%d')
+            else:
+                return str(date)[:10]
+        
+        # Fallback to email object
+        if email_obj and hasattr(email_obj, 'ReceivedTime'):
+            return email_obj.ReceivedTime.strftime('%Y-%m-%d')
+        
+        return 'Unknown'
+    
+    def _build_action_item(self, item_data, action_details, entry_id, priority=1):
+        """Build a standardized action item dictionary"""
+        subject, sender, _ = self._extract_email_basic_data(item_data)
+        
+        return {
+            'subject': subject,
+            'sender': sender,
+            'due_date': action_details.get('due_date', 'No specific deadline'),
+            'action_required': action_details.get('action_required', 'Review email'),
+            'explanation': action_details.get('explanation', 'Details in email'),
+            'links': action_details.get('links', []),
+            'priority': priority,
+            '_entry_id': entry_id
+        }
+    
+    def _process_section_items(self, action_items_data, section_name, processed_entry_ids, ai_processor=None):
+        """Generic method to process items for any section type"""
+        if section_name not in action_items_data:
+            return []
+        
+        items = []
+        for item_data in action_items_data[section_name]:
+            # Check for duplicates
+            entry_id, is_duplicate = self._extract_entry_id_and_check_duplicates(item_data, processed_entry_ids)
+            if is_duplicate:
+                continue
+            
+            # Build item based on section type
+            item = self._build_section_item(section_name, item_data, entry_id, ai_processor)
+            if item:
+                items.append(item)
+        
+        return items
+    
+    def _build_section_item(self, section_name, item_data, entry_id, ai_processor=None):
+        """Build item dictionary based on section type"""
+        subject, sender, email_obj = self._extract_email_basic_data(item_data)
+        
+        if section_name == 'required_personal_action':
+            action_details = item_data.get('action_details', {})
+            return self._build_action_item(item_data, action_details, entry_id, priority=1)
+        
+        elif section_name == 'team_action':
+            action_details = item_data.get('action_details', {})
+            item = self._build_action_item(item_data, action_details, entry_id, priority=2)
+            
+            # Add team action specific fields
+            if ai_processor:
+                completion_status, completion_note = self._check_team_action_completion(item_data, ai_processor)
+                item['completion_status'] = completion_status
+                if completion_note:
+                    item['completion_note'] = completion_note
+            
+            return item
+        
+        elif section_name == 'optional_action':
+            action_details = item_data.get('action_details', {})
+            return self._build_action_item(item_data, action_details, entry_id, priority=3)
+        
+        elif section_name == 'job_listing':
+            # Job listings only process if email_obj exists (legacy constraint)
+            if not email_obj or not hasattr(email_obj, 'EntryID'):
+                return None
+            
+            return {
+                'subject': subject,
+                'sender': sender,
+                'qualification_match': item_data.get('qualification_match', 'No qualification analysis available'),
+                'links': item_data.get('links', []),
+                'due_date': item_data.get('due_date', 'No deadline specified'),
+                '_entry_id': entry_id
+            }
+        
+        elif section_name == 'optional_event':
+            # Optional events only process if email_obj exists (legacy constraint)
+            if not email_obj or not hasattr(email_obj, 'EntryID'):
+                return None
+            
+            return {
+                'subject': subject,
+                'sender': sender,
+                'date': item_data.get('date', item_data.get('event_date', 'Unknown')),
+                'relevance': item_data.get('relevance', 'Professional development opportunity'),
+                'links': item_data.get('links', []),
+                '_entry_id': entry_id
+            }
+        
+        elif section_name == 'fyi':
+            date_str = self._extract_date_string(item_data, email_obj)
+            
+            return {
+                'subject': subject,
+                'sender': sender,
+                'date': date_str,
+                'summary': item_data.get('summary', 'No summary available'),
+                '_entry_id': entry_id
+            }
+        
+        elif section_name == 'newsletter':
+            date_str = self._extract_date_string(item_data, email_obj)
+            
+            return {
+                'subject': subject,
+                'sender': sender,
+                'date': date_str,
+                'summary': item_data.get('summary', 'No summary available'),
+                '_entry_id': entry_id
+            }
+        
+        return None
     
     def _ai_detect_duplicate_intent(self, new_item, existing_items, ai_processor=None):
         """Use AI to detect if new item is a duplicate of existing items"""
@@ -199,316 +386,13 @@ Your response:"""
     
     def build_summary_sections(self, action_items_data, ai_processor=None):
         """Build summary sections using collected AI analysis data"""
-        summary_sections = {
-            'required_actions': [],
-            'team_actions': [],
-            'optional_actions': [],
-            'job_listings': [],
-            'optional_events': [],
-            'fyi_notices': [],
-            'newsletters': []
-        }
-        
-        # Track processed emails to prevent exact duplicates
+        summary_sections = self.EMPTY_SECTIONS.copy()
         processed_entry_ids = set()
         
-        # Required personal actions - use collected action details
-        if 'required_personal_action' in action_items_data:
-            for item_data in action_items_data['required_personal_action']:
-                email_obj = item_data.get('email_object')
-                entry_id = None
-                
-                # Handle both email object and dictionary-only data
-                if email_obj and hasattr(email_obj, 'EntryID'):
-                    entry_id = email_obj.EntryID
-                    if entry_id in processed_entry_ids:
-                        continue  # Skip duplicates
-                    processed_entry_ids.add(entry_id)
-                
-                # Check for manual reclassification data (no email_object)
-                elif not email_obj and item_data.get('thread_data', {}).get('entry_id'):
-                    entry_id = item_data['thread_data']['entry_id']
-                    if entry_id in processed_entry_ids:
-                        continue  # Skip duplicates
-                    processed_entry_ids.add(entry_id)
-                
-                action_details = item_data.get('action_details', {})
-                
-                # Use enriched email data with fallbacks
-                subject = item_data.get('email_subject')
-                if not subject and email_obj:
-                    subject = getattr(email_obj, 'Subject', 'Unknown Subject')
-                elif not subject:
-                    subject = 'Unknown Subject'
-                    
-                sender = item_data.get('email_sender')
-                if not sender and email_obj:
-                    sender = getattr(email_obj, 'SenderName', 'Unknown Sender')
-                elif not sender:
-                    sender = 'Unknown Sender'
-                
-                due_date = action_details.get('due_date', 'No specific deadline')
-                action_required = action_details.get('action_required', 'Review email')
-                
-                summary_sections['required_actions'].append({
-                    'subject': subject,
-                    'sender': sender,
-                    'due_date': due_date,
-                    'action_required': action_required,
-                    'explanation': action_details.get('explanation', 'Details in email'),
-                    'links': action_details.get('links', []),
-                    'priority': 1,
-                    '_entry_id': entry_id
-                })
-        
-        # Team actions - use collected action details with completion detection
-        if 'team_action' in action_items_data:
-            for item_data in action_items_data['team_action']:
-                email_obj = item_data.get('email_object')
-                entry_id = None
-                
-                # Handle both email object and dictionary-only data
-                if email_obj and hasattr(email_obj, 'EntryID'):
-                    entry_id = email_obj.EntryID
-                    if entry_id in processed_entry_ids:
-                        continue  # Skip duplicates
-                    processed_entry_ids.add(entry_id)
-                
-                # Check for manual reclassification data (no email_object)
-                elif not email_obj and item_data.get('thread_data', {}).get('entry_id'):
-                    entry_id = item_data['thread_data']['entry_id']
-                    if entry_id in processed_entry_ids:
-                        continue  # Skip duplicates
-                    processed_entry_ids.add(entry_id)
-                
-                action_details = item_data.get('action_details', {})
-                
-                # Use enriched email data with fallbacks
-                subject = item_data.get('email_subject')
-                if not subject and email_obj:
-                    subject = getattr(email_obj, 'Subject', 'Unknown Subject')
-                elif not subject:
-                    subject = 'Unknown Subject'
-                    
-                sender = item_data.get('email_sender')
-                if not sender and email_obj:
-                    sender = getattr(email_obj, 'SenderName', 'Unknown Sender')
-                elif not sender:
-                    sender = 'Unknown Sender'
-                    
-                due_date = action_details.get('due_date', 'No specific deadline')
-                action_required = action_details.get('action_required', 'Review email')
-                
-                # Check if this team action has been completed by analyzing thread context
-                completion_status = 'active'
-                completion_note = None
-                
-                if ai_processor:
-                    completion_status, completion_note = self._check_team_action_completion(
-                        item_data, ai_processor
-                    )
-                
-                team_action_item = {
-                    'subject': subject,
-                    'sender': sender,
-                    'due_date': due_date,
-                    'explanation': action_details.get('explanation', 'Details in email'),
-                    'action_required': action_required,
-                    'links': action_details.get('links', []),
-                    'priority': 2,
-                    'completion_status': completion_status,
-                    '_entry_id': entry_id
-                }
-                
-                # Add completion details if available
-                if completion_note:
-                    team_action_item['completion_note'] = completion_note
-                
-                summary_sections['team_actions'].append(team_action_item)
-        
-        # Optional actions - use collected action details
-        if 'optional_action' in action_items_data:
-            for item_data in action_items_data['optional_action']:
-                email_obj = item_data.get('email_object')
-                entry_id = None
-                
-                # Handle both email object and dictionary-only data
-                if email_obj and hasattr(email_obj, 'EntryID'):
-                    entry_id = email_obj.EntryID
-                    if entry_id in processed_entry_ids:
-                        continue  # Skip duplicates
-                    processed_entry_ids.add(entry_id)
-                
-                # Check for manual reclassification data (no email_object)
-                elif not email_obj and item_data.get('thread_data', {}).get('entry_id'):
-                    entry_id = item_data['thread_data']['entry_id']
-                    if entry_id in processed_entry_ids:
-                        continue  # Skip duplicates
-                    processed_entry_ids.add(entry_id)
-                
-                action_details = item_data.get('action_details', {})
-                
-                # Use enriched email data with fallbacks
-                subject = item_data.get('email_subject')
-                if not subject and email_obj:
-                    subject = getattr(email_obj, 'Subject', 'Unknown Subject')
-                elif not subject:
-                    subject = 'Unknown Subject'
-                    
-                sender = item_data.get('email_sender')
-                if not sender and email_obj:
-                    sender = getattr(email_obj, 'SenderName', 'Unknown Sender')
-                elif not sender:
-                    sender = 'Unknown Sender'
-                    
-                action_required = action_details.get('action_required', 'Review email')
-                
-                summary_sections['optional_actions'].append({
-                    'subject': subject,
-                    'sender': sender,
-                    'explanation': action_details.get('explanation', 'Details in email'),
-                    'action_required': action_required,
-                    'links': action_details.get('links', []),
-                    'priority': 3,
-                    '_entry_id': entry_id
-                })
-        
-        # Job listings - use collected job data
-        if 'job_listing' in action_items_data:
-            for job_data in action_items_data['job_listing']:
-                email_obj = job_data.get('email_object')
-                if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
-                    processed_entry_ids.add(email_obj.EntryID)
-                    
-                    # Use enriched email data instead of COM object properties
-                    subject = job_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject'))
-                    sender = job_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender'))
-                    
-                    summary_sections['job_listings'].append({
-                        'subject': subject,
-                        'sender': sender,
-                        'qualification_match': job_data.get('qualification_match', 'No qualification analysis available'),
-                        'links': job_data.get('links', []),
-                        'due_date': job_data.get('due_date', 'No deadline specified'),
-                        '_entry_id': email_obj.EntryID  # Track for future deduplication
-                    })
-        
-        # Optional events - use collected event data
-        if 'optional_event' in action_items_data:
-            for event_data in action_items_data['optional_event']:
-                email_obj = event_data.get('email_object')
-                if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
-                    processed_entry_ids.add(email_obj.EntryID)
-                    
-                    # Use enriched email data instead of COM object properties
-                    subject = event_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject'))
-                    sender = event_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender'))
-                    
-                    summary_sections['optional_events'].append({
-                        'subject': subject,
-                        'sender': sender,
-                        'date': event_data.get('date', event_data.get('event_date', 'Unknown')),
-                        'relevance': event_data.get('relevance', 'Professional development opportunity'),
-                        'links': event_data.get('links', []),
-                        '_entry_id': email_obj.EntryID  # Track for future deduplication
-                    })
-        
-        # FYI notices - use collected FYI data
-        if 'fyi' in action_items_data:
-            for fyi_data in action_items_data['fyi']:
-                email_obj = fyi_data.get('email_object')
-                entry_id = None
-                
-                # Handle both email object and dictionary-only data
-                if email_obj and hasattr(email_obj, 'EntryID'):
-                    entry_id = email_obj.EntryID
-                    if entry_id in processed_entry_ids:
-                        continue  # Skip duplicates
-                    processed_entry_ids.add(entry_id)
-                
-                # Extract date
-                date_str = 'Unknown'
-                if 'email_date' in fyi_data and fyi_data['email_date']:
-                    date = fyi_data['email_date']
-                    if hasattr(date, 'strftime'):
-                        date_str = date.strftime('%Y-%m-%d')
-                    else:
-                        date_str = str(date)[:10]
-                elif email_obj and hasattr(email_obj, 'ReceivedTime'):
-                    date_str = email_obj.ReceivedTime.strftime('%Y-%m-%d')
-                
-                # Extract subject and sender
-                subject = fyi_data.get('email_subject')
-                if not subject and email_obj:
-                    subject = getattr(email_obj, 'Subject', 'Unknown Subject')
-                elif not subject:
-                    subject = 'Unknown Subject'
-                    
-                sender = fyi_data.get('email_sender')
-                if not sender and email_obj:
-                    sender = getattr(email_obj, 'SenderName', 'Unknown Sender')
-                elif not sender:
-                    sender = 'Unknown Sender'
-                
-                summary_sections['fyi_notices'].append({
-                    'subject': subject,
-                    'sender': sender,
-                    'date': date_str,
-                    'summary': fyi_data.get('summary', 'No summary available'),
-                    '_entry_id': entry_id  # Track for future deduplication (None if no email object)
-                })
-        
-        # Newsletters - use collected newsletter data
-        if 'newsletter' in action_items_data:
-            for newsletter_data in action_items_data['newsletter']:
-                email_obj = newsletter_data.get('email_object')
-                entry_id = None
-                
-                # Handle both email object and dictionary-only data
-                if email_obj and hasattr(email_obj, 'EntryID'):
-                    entry_id = email_obj.EntryID
-                    if entry_id in processed_entry_ids:
-                        continue  # Skip duplicates
-                    processed_entry_ids.add(entry_id)
-                
-                # Check for manual reclassification data (no email_object)
-                elif not email_obj and newsletter_data.get('thread_data', {}).get('entry_id'):
-                    entry_id = newsletter_data['thread_data']['entry_id']
-                    if entry_id in processed_entry_ids:
-                        continue  # Skip duplicates
-                    processed_entry_ids.add(entry_id)
-                
-                # Extract date
-                date_str = 'Unknown'
-                if 'email_date' in newsletter_data and newsletter_data['email_date']:
-                    date = newsletter_data['email_date']
-                    if hasattr(date, 'strftime'):
-                        date_str = date.strftime('%Y-%m-%d')
-                    else:
-                        date_str = str(date)[:10]
-                elif email_obj and hasattr(email_obj, 'ReceivedTime'):
-                    date_str = email_obj.ReceivedTime.strftime('%Y-%m-%d')
-                
-                # Extract subject and sender with fallbacks
-                subject = newsletter_data.get('email_subject')
-                if not subject and email_obj:
-                    subject = getattr(email_obj, 'Subject', 'Unknown Subject')
-                elif not subject:
-                    subject = 'Unknown Subject'
-                    
-                sender = newsletter_data.get('email_sender')
-                if not sender and email_obj:
-                    sender = getattr(email_obj, 'SenderName', 'Unknown Sender')
-                elif not sender:
-                    sender = 'Unknown Sender'
-                
-                summary_sections['newsletters'].append({
-                    'subject': subject,
-                    'sender': sender,
-                    'date': date_str,
-                    'summary': newsletter_data.get('summary', 'No summary available'),
-                    '_entry_id': entry_id  # Track for future deduplication (None if no email object)
-                })
+        # Process all sections using the generic handler
+        for source_key, target_key in self.SECTION_KEYS.items():
+            items = self._process_section_items(action_items_data, source_key, processed_entry_ids, ai_processor)
+            summary_sections[target_key] = items
         
         # Log processing results
         total_processed = len(processed_entry_ids)
@@ -526,18 +410,14 @@ Your response:"""
     
     def display_focused_summary(self, summary_sections):
         """Display AI-enhanced ADHD-friendly focused summary"""
-        
         # Calculate total counts for overview
         total_items = sum(len(items) for items in summary_sections.values())
         high_priority = len(summary_sections.get('required_actions', []))
         
-        print(f"📊 SUMMARY OVERVIEW")
-        print(f"Total actionable items: {total_items}")
-        print(f"High priority (required actions): {high_priority}")
-        print("=" * 50)
-        print()
+        self._print_summary_header(total_items, high_priority)
         
-        sections = [
+        # Section configuration with display properties
+        section_configs = [
             ('🔴 REQUIRED ACTION ITEMS (ME)', 'required_actions', lambda x: x['due_date'] == "No specific deadline"),
             ('👥 TEAM ACTION ITEMS', 'team_actions', None),
             ('✅ COMPLETED TEAM ACTIONS', 'completed_team_actions', None),
@@ -548,87 +428,140 @@ Your response:"""
             ('📰 NEWSLETTERS SUMMARY', 'newsletters', None)
         ]
         
-        for title, section_key, sort_key in sections:
-            items = summary_sections.get(section_key, [])
-            if not items:
-                continue
-                
-            # Include count in the title
-            count = len(items)
-            title_with_count = f"{title} ({count})"
-            print(f"{title_with_count}\n{'-' * len(title_with_count)}")
+        for title, section_key, sort_key in section_configs:
+            self._display_section(summary_sections, title, section_key, sort_key)
+    
+    def _print_summary_header(self, total_items, high_priority):
+        """Print summary overview header"""
+        print(f"📊 SUMMARY OVERVIEW")
+        print(f"Total actionable items: {total_items}")
+        print(f"High priority (required actions): {high_priority}")
+        print("=" * 50)
+        print()
+    
+    def _display_section(self, summary_sections, title, section_key, sort_key):
+        """Display a single summary section"""
+        items = summary_sections.get(section_key, [])
+        if not items:
+            return
             
-            if sort_key:
-                items = sorted(items, key=sort_key)
-            
-            # Special handling for FYI and Newsletter sections
-            if section_key == 'fyi_notices':
-                # FYI notices display as simple bullet points
-                for item in items:
-                    self._display_item(None, item, section_key)
-            elif section_key == 'newsletters':
-                # Newsletter section displays as paragraph summaries
-                if len(items) > 1:
-                    # Combine multiple newsletters into a comprehensive summary
-                    print("Combined newsletter highlights:")
-                    for i, item in enumerate(items, 1):
-                        print(f"{i}. {item['summary']}")
-                else:
-                    # Single newsletter
-                    for item in items:
-                        self._display_item(None, item, section_key)
-            else:
-                # Regular sections with numbered items (including completed_team_actions)
-                for i, item in enumerate(items, 1):
-                    self._display_item(i, item, section_key)
-                    print()
+        # Print section header
+        count = len(items)
+        title_with_count = f"{title} ({count})"
+        print(f"{title_with_count}\n{'-' * len(title_with_count)}")
+        
+        if sort_key:
+            items = sorted(items, key=sort_key)
+        
+        # Handle special section types
+        if section_key == 'fyi_notices':
+            self._display_fyi_items(items)
+        elif section_key == 'newsletters':
+            self._display_newsletter_items(items)
+        else:
+            self._display_regular_items(items, section_key)
+        
+        print()  # Add spacing after each section
+    
+    def _display_fyi_items(self, items):
+        """Display FYI items as bullet points"""
+        for item in items:
+            self._display_item(None, item, 'fyi_notices')
+    
+    def _display_newsletter_items(self, items):
+        """Display newsletter items with special formatting"""
+        if len(items) > 1:
+            # Combine multiple newsletters
+            print("Combined newsletter highlights:")
+            for i, item in enumerate(items, 1):
+                print(f"{i}. {item['summary']}")
+        else:
+            # Single newsletter
+            for item in items:
+                self._display_item(None, item, 'newsletters')
+    
+    def _display_regular_items(self, items, section_key):
+        """Display regular numbered items"""
+        for i, item in enumerate(items, 1):
+            self._display_item(i, item, section_key)
     
     def _display_item(self, index, item, section_type):
         """Display individual item based on section type"""
         if section_type == 'fyi_notices':
-            # FYI notices show as bullet points only
             print(f"{item['summary']} ({item['sender']})")
         elif section_type == 'newsletters':
-            # Newsletters show as paragraph summaries
             print(f"**{item['subject']}** ({item['sender']}, {item['date']})")
             print(f"{item['summary']}")
         else:
-            # Regular items display as before
-            print(f"{index}. **{item['subject']}**")
-            print(f"   From: {item['sender']}")
+            self._display_regular_item(index, item, section_type)
+    
+    def _display_regular_item(self, index, item, section_type):
+        """Display a regular numbered item with details"""
+        print(f"{index}. **{item['subject']}**")
+        print(f"   From: {item['sender']}")
+        
+        # Display section-specific information
+        if section_type in ['required_actions', 'team_actions', 'completed_team_actions']:
+            self._display_action_details(item, section_type)
+        elif section_type == 'optional_actions':
+            self._display_optional_action_details(item)
+        elif section_type == 'job_listings':
+            self._display_job_details(item)
+        elif section_type == 'optional_events':
+            self._display_event_details(item)
+        
+        # Display links if available
+        self._display_links(item, section_type)
+    
+    def _display_action_details(self, item, section_type):
+        """Display details for action items"""
+        print(f"   Due: {item['due_date']}")
+        print(f"   Action: {item.get('action_required', 'Review email')}")
+        print(f"   Why: {item['explanation']}")
+        
+        # Show completion status for team actions
+        if section_type in ['team_actions', 'completed_team_actions']:
+            completion_status = item.get('completion_status', 'active')
+            if completion_status == 'completed':
+                print(f"   ✅ Status: COMPLETED")
+                completion_note = item.get('completion_note', '')
+                if completion_note:
+                    print(f"   📝 Note: {completion_note}")
+            else:
+                print(f"   ⏳ Status: Active")
+    
+    def _display_optional_action_details(self, item):
+        """Display details for optional actions"""
+        print(f"   What: {item.get('action_required', 'Provide feedback')}")
+        print(f"   Why relevant: {item.get('why_relevant', 'No specific reason provided')}")
+        print(f"   Context: {item['explanation']}")
+    
+    def _display_job_details(self, item):
+        """Display details for job listings"""
+        print(f"   Match: {item['qualification_match']}")
+        print(f"   Due: {item['due_date']}")
+    
+    def _display_event_details(self, item):
+        """Display details for optional events"""
+        print(f"   Date: {item['date']}")
+        print(f"   Why relevant: {item['relevance']}")
+    
+    def _display_links(self, item, section_type):
+        """Display relevant links for items"""
+        if not item.get('links'):
+            return
             
-            if section_type in ['required_actions', 'team_actions', 'completed_team_actions']:
-                print(f"   Due: {item['due_date']}")
-                print(f"   Action: {item.get('action_required', 'Review email')}")
-                print(f"   Why: {item['explanation']}")
-                
-                # Show completion status for team actions
-                if section_type in ['team_actions', 'completed_team_actions']:
-                    completion_status = item.get('completion_status', 'active')
-                    if completion_status == 'completed':
-                        print(f"   ✅ Status: COMPLETED")
-                        completion_note = item.get('completion_note', '')
-                        if completion_note:
-                            print(f"   📝 Note: {completion_note}")
-                    else:
-                        print(f"   ⏳ Status: Active")
-                        
-            elif section_type == 'optional_actions':
-                print(f"   What: {item.get('action_required', 'Provide feedback')}")
-                print(f"   Why relevant: {item['why_relevant']}")
-                print(f"   Context: {item['explanation']}")
-            elif section_type == 'job_listings':
-                print(f"   Match: {item['qualification_match']}")
-                print(f"   Due: {item['due_date']}")
-            elif section_type == 'optional_events':
-                print(f"   Date: {item['date']}")
-                print(f"   Why relevant: {item['relevance']}")
-            
-            # Display links
-            if item.get('links'):
-                link_type = 'Apply' if section_type == 'job_listings' else 'Register' if section_type == 'optional_events' else 'Link'
-                for link in item['links'][:2]:
-                    print(f"   {link_type}: {link}")
+        link_type = self._get_link_type(section_type)
+        for link in item['links'][:2]:  # Limit to first 2 links
+            print(f"   {link_type}: {link}")
+    
+    def _get_link_type(self, section_type):
+        """Get appropriate link type label based on section"""
+        link_types = {
+            'job_listings': 'Apply',
+            'optional_events': 'Register'
+        }
+        return link_types.get(section_type, 'Link')
     
     def save_focused_summary(self, summary_sections, timestamp):
         """Save focused summary to HTML file and open in browser"""

@@ -17,19 +17,19 @@ class AIProcessor:
         project_root = os.path.dirname(script_dir)
         self.prompts_dir = os.path.join(project_root, 'prompts')
         self.user_data_dir = os.path.join(project_root, 'user_specific_data')
-        runtime_data_dir = os.path.join(project_root, 'runtime_data', 'user_feedback')
+        self.runtime_data_dir = os.path.join(project_root, 'runtime_data', 'user_feedback')
         
         self.job_summary_file = os.path.join(self.user_data_dir, 'job_summery.md')
         self.job_skills_file = os.path.join(self.user_data_dir, 'job_skill_summery.md')
         self.job_role_context_file = os.path.join(self.user_data_dir, 'job_role_context.md')
         
-        os.makedirs(runtime_data_dir, exist_ok=True)
-        self.learning_file = os.path.join(runtime_data_dir, 'ai_learning_feedback.csv')
+        os.makedirs(self.runtime_data_dir, exist_ok=True)
+        self.learning_file = os.path.join(self.runtime_data_dir, 'ai_learning_feedback.csv')
         
         runtime_base_dir = os.path.join(project_root, 'runtime_data')
         self.accuracy_tracker = AccuracyTracker(runtime_base_dir)
         self.session_tracker = SessionTracker(self.accuracy_tracker)
-        self.data_recorder = DataRecorder(runtime_data_dir)
+        self.data_recorder = DataRecorder(self.runtime_data_dir)
     
     def get_username(self):
         username_file = os.path.join(self.user_data_dir, 'username.txt')

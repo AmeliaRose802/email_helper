@@ -2,6 +2,15 @@
 
 Fixes:
 
+- The unified GUI file is a total amonimation of a megaclass. We need to clean it up ASAP.
+  - Remove unused functions
+  - Static text should mostly be read from files. Create templates under the templates directory rather then inline text
+  - Do not break the UI. Test frequently
+  - Refactor UI into multiple components according to python best practices. Stick the components under a new components directory
+
+
+- Fix moving email to done after marking it as complete. THe system still does not seem to be assocating entity id's with emails
+
 - Make sorting by category actually work. Clicking columns does not work
 - Display summery and holistic insights in a more clear way rather then in tiny text
 
@@ -16,13 +25,7 @@ Improvements:
   - FYI and newsletter summaries should also include link to the full email
   - The review tab should include a link to the email for each item
 
-- ✅ **When user marks task as complete, move associated email to a done folder (outside the inbox) in outlook** - **COMPLETED**: Implemented comprehensive task completion with email movement functionality:
-   - ✅ Created Done folder automatically outside the inbox at mail root level
-   - ✅ Enhanced task structure to record list of EntryIDs for emails associated with each task using `_entry_ids` field
-   - ✅ Updated deduplication logic to merge EntryIDs when duplicate tasks are detected 
-   - ✅ Added `move_emails_to_done_folder()` method to OutlookManager to move emails by EntryID
-   - ✅ Enhanced both single task and bulk task completion to move associated emails to Done folder automatically
-   - ✅ Cleared existing task storage to implement clean solution without backward compatibility concerns
+
   
 - Include the date(s) email was sent in task listing
    -Keep in mind an task may have multiple assocated emails
@@ -56,6 +59,14 @@ Not all errors matter equally. Missing a Required Action is worse than misclassi
 - Use some heruistic to retreve labeled examples similar to the current email from the modification suggestions. Then inject these examples into the prompt for few shot prompting.
 
 # DONE TASKS
+
+- ✅ **When user marks task as complete, move associated email to a done folder (outside the inbox) in outlook** - **COMPLETED**: Implemented comprehensive task completion with email movement functionality:
+   - ✅ Created Done folder automatically outside the inbox at mail root level
+   - ✅ Enhanced task structure to record list of EntryIDs for emails associated with each task using `_entry_ids` field
+   - ✅ Updated deduplication logic to merge EntryIDs when duplicate tasks are detected 
+   - ✅ Added `move_emails_to_done_folder()` method to OutlookManager to move emails by EntryID
+   - ✅ Enhanced both single task and bulk task completion to move associated emails to Done folder automatically
+   - ✅ Cleared existing task storage to implement clean solution without backward compatibility concerns
 
 - ✅ **Reclassified items display fix** - **COMPLETED**: Fixed critical issue where manually reclassified emails (required personal actions, team actions, newsletters) weren't appearing in summaries. Root cause was that reclassified items had incomplete metadata structure compared to original email processing. **SOLUTION IMPLEMENTED**:
    - ✅ Updated `_update_action_items_for_reclassification()` to create complete data structures matching original email processing
