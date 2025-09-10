@@ -348,26 +348,46 @@ Your response:"""
         if 'fyi' in action_items_data:
             for fyi_data in action_items_data['fyi']:
                 email_obj = fyi_data.get('email_object')
-                if email_obj and hasattr(email_obj, 'EntryID') and email_obj.EntryID not in processed_entry_ids:
-                    processed_entry_ids.add(email_obj.EntryID)
+                entry_id = None
+                
+                # Handle both email object and dictionary-only data
+                if email_obj and hasattr(email_obj, 'EntryID'):
+                    entry_id = email_obj.EntryID
+                    if entry_id in processed_entry_ids:
+                        continue  # Skip duplicates
+                    processed_entry_ids.add(entry_id)
+                
+                # Extract date
+                date_str = 'Unknown'
+                if 'email_date' in fyi_data and fyi_data['email_date']:
+                    date = fyi_data['email_date']
+                    if hasattr(date, 'strftime'):
+                        date_str = date.strftime('%Y-%m-%d')
+                    else:
+                        date_str = str(date)[:10]
+                elif email_obj and hasattr(email_obj, 'ReceivedTime'):
+                    date_str = email_obj.ReceivedTime.strftime('%Y-%m-%d')
+                
+                # Extract subject and sender
+                subject = fyi_data.get('email_subject')
+                if not subject and email_obj:
+                    subject = getattr(email_obj, 'Subject', 'Unknown Subject')
+                elif not subject:
+                    subject = 'Unknown Subject'
                     
-                    date_str = 'Unknown'
-                    if 'email_date' in fyi_data and fyi_data['email_date']:
-                        date = fyi_data['email_date']
-                        if hasattr(date, 'strftime'):
-                            date_str = date.strftime('%Y-%m-%d')
-                        else:
-                            date_str = str(date)[:10]
-                    elif hasattr(email_obj, 'ReceivedTime'):
-                        date_str = email_obj.ReceivedTime.strftime('%Y-%m-%d')
-                    
-                    summary_sections['fyi_notices'].append({
-                        'subject': fyi_data.get('email_subject', getattr(email_obj, 'Subject', 'Unknown Subject')),
-                        'sender': fyi_data.get('email_sender', getattr(email_obj, 'SenderName', 'Unknown Sender')),
-                        'date': date_str,
-                        'summary': fyi_data.get('summary', 'No summary available'),
-                        '_entry_id': email_obj.EntryID  # Track for future deduplication
-                    })
+                sender = fyi_data.get('email_sender')
+                if not sender and email_obj:
+                    sender = getattr(email_obj, 'SenderName', 'Unknown Sender')
+                elif not sender:
+                    sender = 'Unknown Sender'
+                
+                summary_sections['fyi_notices'].append({
+                    'subject': subject,
+                    'sender': sender,
+                    'date': date_str,
+                    'summary': fyi_data.get('summary', 'No summary available'),
+                    '_entry_id': entry_id  # Track for future deduplication (None if no email object)
+                })
         
         # Newsletters - use collected newsletter data
         if 'newsletter' in action_items_data:

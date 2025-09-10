@@ -116,13 +116,15 @@ class OutlookManager:
     
     def _move_to_folder_or_categorize(self, email, category):
         """Handle normal folder moves or categorization fallback"""
-        if category not in self.folders or not self.folders[category]:
+        # Normalize category to lowercase for folder lookup
+        normalized_category = category.lower()
+        if normalized_category not in self.folders or not self.folders[normalized_category]:
             # Fallback: just add category to email if folder not available
-            self._add_category_to_email(email, category)
+            self._add_category_to_email(email, normalized_category)
             return True
             
         try:
-            target_folder = self.folders[category]
+            target_folder = self.folders[normalized_category]
             email.Move(target_folder)
             
             # Log where the email was moved for user awareness
@@ -133,7 +135,7 @@ class OutlookManager:
         except Exception as e:
             print(f"⚠️  Could not move email: {e}")
             # Fallback: add category instead
-            self._add_category_to_email(email, category)
+            self._add_category_to_email(email, normalized_category)
             return False
     
     def _is_inbox_subfolder(self, folder):
@@ -153,6 +155,8 @@ class OutlookManager:
                 'optional_action': 'Yellow Category',
                 'job_listing': 'Green Category',
                 'optional_event': 'Blue Category',
+                'fyi': 'Blue Category',
+                'newsletter': 'Gray Category',
                 'spam_to_delete': 'Purple Category',
                 'general_information': 'Gray Category'
             }
@@ -382,10 +386,10 @@ class OutlookManager:
             thread_data = suggestion_data.get('thread_data', {})
             processing_notes = suggestion_data.get('processing_notes', [])
             
-            # Count folder destinations
-            if category == 'spam_to_delete':
+            # Count folder destinations (case-insensitive)
+            if category.lower() == 'spam_to_delete':
                 inbox_count += 1  # Spam folder is in inbox for review
-            elif category in non_inbox_categories:
+            elif category.lower() in non_inbox_categories:
                 non_inbox_count += 1
             else:
                 inbox_count += 1

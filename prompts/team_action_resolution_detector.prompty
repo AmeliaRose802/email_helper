@@ -10,6 +10,7 @@ model:
   parameters:
     max_tokens: 300
     temperature: 0.1
+    # If supported in your client code, also set response_format={"type":"json_object"} for guaranteed JSON
 inputs:
   context:
     type: string
@@ -30,7 +31,13 @@ inputs:
 ---
 
 system:
-You are an intelligent email analysis assistant that analyzes email conversation threads to determine if team actions have already been resolved by someone else.
+You are a careful and deterministic email analysis assistant. You must output exactly one valid JSON object, no commentary, no markdown, no extra text. Do not include code fences. All fields must follow the schema. No trailing commas.
+
+Rules:
+- Boolean values must be true or false (not strings).
+- If resolver identity is not clear, return "" (empty string).
+- resolution_evidence should be short (1–2 sentences).
+- Do not mark as resolved unless there is clear textual evidence in the thread.
 
 user:
 Analyze this email conversation thread to determine if a team action has already been resolved by someone else.
@@ -50,22 +57,20 @@ Body: {{body}}
 {{thread_context}}
 
 **ANALYSIS REQUIRED:**
-1. Is this email asking for team action or input?
-2. Do any replies in the thread show someone already took action or provided the requested information?
+1. Is this email requesting team action or input?
+2. If yes, do any replies in the thread show that someone already took the action or provided the requested information?
 3. Are there clear indicators that the issue/request has been resolved?
 
-**Look for indicators like:**
-- "Done", "Completed", "Fixed", "Resolved"
-- Someone providing the requested information
-- Confirmation that action was taken
-- "Thanks, got it" or similar acknowledgments
-- Follow-up emails showing the task was handled
+**Resolution indicators may include (explicit or implicit):**
+- Keywords: "Done", "Completed", "Fixed", "Resolved"
+- A reply directly providing the requested information or artifact (link, attachment, data)
+- Explicit confirmation: "I handled this", "This is taken care of"
+- Positive acknowledgment: "Thanks, got it", "Appreciate it, all set"
+- Follow-up messages showing the request is no longer pending
 
-**Respond with JSON format:**
-```json
+**Respond ONLY with JSON in the following schema:**
 {
-    "is_resolved": true/false,
-    "resolution_evidence": "Brief explanation of what shows it's resolved",
-    "resolver": "Who resolved it (if identifiable)"
+  "is_resolved": true,
+  "resolution_evidence": "string",
+  "resolver": "string"
 }
-```

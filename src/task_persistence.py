@@ -167,7 +167,10 @@ class TaskPersistence:
                 # Check if this task is already in outstanding (avoid duplicates)
                 task_id = self._generate_task_id(task)
                 if not any(existing.get('task_id') == task_id for existing in comprehensive_summary[section_key]):
-                    comprehensive_summary[section_key].append(task)
+                    # Add task_id to the current task for UI completion buttons
+                    task_with_id = task.copy()
+                    task_with_id['task_id'] = task_id
+                    comprehensive_summary[section_key].append(task_with_id)
         
         # Sort by priority and due date
         self._sort_tasks_by_priority(comprehensive_summary)

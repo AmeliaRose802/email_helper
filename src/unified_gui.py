@@ -1350,8 +1350,9 @@ class UnifiedEmailGUI:
         inbox_categories = {'required_personal_action', 'optional_action', 'job_listing', 'work_relevant'}
         non_inbox_categories = {'team_action', 'optional_event', 'fyi', 'newsletter', 'general_information', 'spam_to_delete'}
         
-        inbox_count = sum(1 for s in self.email_suggestions if s['ai_suggestion'] in inbox_categories)
-        non_inbox_count = sum(1 for s in self.email_suggestions if s['ai_suggestion'] in non_inbox_categories)
+        # Make counting case-insensitive to handle FYI vs fyi
+        inbox_count = sum(1 for s in self.email_suggestions if s['ai_suggestion'].lower() in inbox_categories)
+        non_inbox_count = sum(1 for s in self.email_suggestions if s['ai_suggestion'].lower() in non_inbox_categories)
         
         def confirmation_callback(email_count):
             message = f"""Apply categorization to {email_count} emails in Outlook?
@@ -1486,7 +1487,11 @@ This will help keep your inbox focused on actionable items only."""
             
             self.summary_text.insert(tk.END, "\n", "content_text")
         
-        self.summary_text.config(state=tk.DISABLED)
+        # Configure text widget to prevent editing but allow tag clicks
+        self.summary_text.config(state=tk.NORMAL)
+        self.summary_text.bind("<Key>", lambda e: "break")  # Prevent typing
+        # Note: No longer need click handler since we're using embedded Button widgets
+        
         # Scroll to top for better user experience
         self.summary_text.see("1.0")
     
@@ -1527,6 +1532,29 @@ This will help keep your inbox focused on actionable items only."""
             if item.get('task_id'):
                 self.summary_text.insert(tk.END, "   Task ID: ", "content_label")
                 self.summary_text.insert(tk.END, f"{item['task_id']}\n", "item_meta")
+            
+            # Inline completion button
+            if item.get('task_id'):
+                self.summary_text.insert(tk.END, "   ", "content_text")
+                
+                # Create an actual Button widget embedded in the text widget
+                complete_button = tk.Button(
+                    self.summary_text,
+                    text="✅ Mark Done",
+                    command=lambda task_id=item['task_id']: self._mark_single_task_complete(task_id),
+                    bg="#4CAF50",
+                    fg="white",
+                    font=("Arial", 8, "bold"),
+                    relief="raised",
+                    padx=5,
+                    pady=2,
+                    cursor="hand2"
+                )
+                
+                # Insert the button widget directly into the text widget
+                self.summary_text.window_create(tk.END, window=complete_button)
+                
+                self.summary_text.insert(tk.END, "\n", "content_text")
             
             # Links
             if item.get('links'):
@@ -1619,6 +1647,29 @@ This will help keep your inbox focused on actionable items only."""
                 self.summary_text.insert(tk.END, "   Task ID: ", "content_label")
                 self.summary_text.insert(tk.END, f"{item['task_id']}\n", "item_meta")
             
+            # Inline completion button
+            if item.get('task_id'):
+                self.summary_text.insert(tk.END, "   ", "content_text")
+                
+                # Create an actual Button widget embedded in the text widget
+                complete_button = tk.Button(
+                    self.summary_text,
+                    text="✅ Mark Done",
+                    command=lambda task_id=item['task_id']: self._mark_single_task_complete(task_id),
+                    bg="#4CAF50",
+                    fg="white",
+                    font=("Arial", 8, "bold"),
+                    relief="raised",
+                    padx=5,
+                    pady=2,
+                    cursor="hand2"
+                )
+                
+                # Insert the button widget directly into the text widget
+                self.summary_text.window_create(tk.END, window=complete_button)
+                
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
             # Links
             if item.get('links'):
                 self.summary_text.insert(tk.END, "   Links: ", "content_label")
@@ -1674,6 +1725,29 @@ This will help keep your inbox focused on actionable items only."""
             if item.get('task_id'):
                 self.summary_text.insert(tk.END, "   Task ID: ", "content_label")
                 self.summary_text.insert(tk.END, f"{item['task_id']}\n", "item_meta")
+            
+            # Inline completion button
+            if item.get('task_id'):
+                self.summary_text.insert(tk.END, "   ", "content_text")
+                
+                # Create an actual Button widget embedded in the text widget
+                complete_button = tk.Button(
+                    self.summary_text,
+                    text="✅ Mark Done",
+                    command=lambda task_id=item['task_id']: self._mark_single_task_complete(task_id),
+                    bg="#4CAF50",
+                    fg="white",
+                    font=("Arial", 8, "bold"),
+                    relief="raised",
+                    padx=5,
+                    pady=2,
+                    cursor="hand2"
+                )
+                
+                # Insert the button widget directly into the text widget
+                self.summary_text.window_create(tk.END, window=complete_button)
+                
+                self.summary_text.insert(tk.END, "\n", "content_text")
             
             # Links
             if item.get('links'):
@@ -1788,7 +1862,8 @@ This will help keep your inbox focused on actionable items only."""
             # Clear summary
             self.summary_text.config(state=tk.NORMAL)
             self.summary_text.delete(1.0, tk.END)
-            self.summary_text.config(state=tk.DISABLED)
+            # Keep summary text in NORMAL state to allow button clicks
+            self.summary_text.bind("<Key>", lambda e: "break")  # Prevent typing
             
             # Re-enable the start processing button and disable cancel button
             self.start_processing_btn.config(state=tk.NORMAL)
@@ -1965,6 +2040,23 @@ This will help keep your inbox focused on actionable items only."""
         
         ttk.Button(button_frame, text="Cancel", 
                   command=completion_window.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def _mark_single_task_complete(self, task_id):
+        """Mark a single task as complete and refresh the summary"""
+        result = messagebox.askyesno("Confirm Completion", 
+                                   f"Mark task {task_id} as complete?\n\n"
+                                   "This will remove it from future summaries.")
+        
+        if result:
+            self.task_persistence.mark_tasks_completed([task_id])
+            messagebox.showinfo("Task Completed", 
+                              f"✅ Task {task_id} marked as complete!")
+            
+            # Refresh summary immediately
+            if hasattr(self, 'summary_sections') and self.summary_sections:
+                self.generate_summary()
+        else:
+            pass  # User cancelled
     
     def cleanup_old_tasks(self):
         """Clean up old completed tasks"""

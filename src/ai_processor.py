@@ -169,7 +169,10 @@ Learning History: {len(learning_data)} previous decisions"""
             print("="*80)
             raise RuntimeError(f"AI email classification failed for: {email_content.get('subject', 'Unknown')}")
             
-        return result.strip().lower() if result else "general_information"
+        # Clean result - strip markdown formatting and whitespace, convert to lowercase
+        cleaned_result = result.strip()
+        cleaned_result = cleaned_result.replace('**', '').replace('*', '')  # Remove markdown asterisks
+        return cleaned_result.lower() if cleaned_result else "general_information"
     
     def classify_email_improved(self, email_content, learning_data):
         """Test the improved classification prompt"""
@@ -182,7 +185,10 @@ Learning History: {len(learning_data)} previous decisions"""
         if not result or result in ["AI processing unavailable", "AI processing failed"]:
             return "general_information"
             
-        return result.strip().lower() if result else "general_information"
+        # Clean result - strip markdown formatting and whitespace, convert to lowercase
+        cleaned_result = result.strip()
+        cleaned_result = cleaned_result.replace('**', '').replace('*', '')  # Remove markdown asterisks
+        return cleaned_result.lower() if cleaned_result else "general_information"
     
     def detect_resolved_team_action(self, email_content, thread_context=""):
         """Detect if a team action has already been addressed by someone else in the conversation thread"""
@@ -299,6 +305,15 @@ Learning History: {len(learning_data)} previous decisions"""
                 return analysis, "Holistic analysis completed successfully"
                 
             except json.JSONDecodeError as e:
+                # Try to repair common JSON issues
+                repaired_result = self._repair_json_response(result)
+                if repaired_result:
+                    try:
+                        analysis = json.loads(repaired_result)
+                        return analysis, f"Analysis completed with JSON repair applied: {str(e)}"
+                    except json.JSONDecodeError:
+                        pass
+                
                 # Return basic structure if JSON parsing fails
                 return {
                     "truly_relevant_actions": [],
@@ -309,6 +324,49 @@ Learning History: {len(learning_data)} previous decisions"""
                 
         except Exception as e:
             return None, f"Holistic analysis error: {str(e)}"
+    
+    def _repair_json_response(self, json_str):
+        """Attempt to repair common JSON parsing issues"""
+        try:
+            # Remove any trailing incomplete content after last complete structure
+            json_str = json_str.strip()
+            
+            # Find the last complete closing brace
+            last_brace = json_str.rfind('}')
+            if last_brace > 0:
+                json_str = json_str[:last_brace + 1]
+            
+            # Try to fix unterminated strings by adding closing quotes
+            lines = json_str.split('\n')
+            repaired_lines = []
+            
+            for line in lines:
+                # Check if line has unmatched quotes
+                quote_count = line.count('"')
+                # Skip lines that are comments or contain escaped quotes
+                if '//' not in line and '\\' not in line and quote_count % 2 == 1:
+                    # Find the last quote and see if it needs closing
+                    if line.rstrip().endswith(',') and line.count(':') > 0:
+                        # Likely a value that needs closing quote before comma
+                        line = line.rstrip(',') + '",'
+                    elif line.rstrip() and not line.rstrip().endswith('"'):
+                        # Add closing quote at end
+                        line = line.rstrip() + '"'
+                
+                repaired_lines.append(line)
+            
+            repaired_json = '\n'.join(repaired_lines)
+            
+            # Ensure proper JSON structure
+            if not repaired_json.strip().startswith('{'):
+                return None
+            if not repaired_json.strip().endswith('}'):
+                repaired_json = repaired_json.rstrip() + '}'
+            
+            return repaired_json
+            
+        except Exception:
+            return None
     
     def _build_inbox_context_summary(self, all_email_data):
         """Build a comprehensive summary of all emails for holistic analysis"""
