@@ -95,7 +95,7 @@ class TaskPersistence:
         try:
             with open(self.tasks_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                return data.get('tasks', {
+                tasks = data.get('tasks', {
                     'required_actions': [],
                     'team_actions': [],
                     'completed_team_actions': [],
@@ -103,6 +103,32 @@ class TaskPersistence:
                     'job_listings': [],
                     'optional_events': []
                 })
+                
+                # Validate and clean task data
+                cleaned_tasks = {}
+                for section_key, task_list in tasks.items():
+                    cleaned_tasks[section_key] = []
+                    if not isinstance(task_list, list):
+                        print(f"Warning: {section_key} is not a list, skipping")
+                        continue
+                    
+                    for task in task_list:
+                        if isinstance(task, dict):
+                            # Ensure required fields exist
+                            if 'task_id' not in task:
+                                print(f"Warning: Task missing task_id: {task}")
+                                continue
+                            # Ensure sender field exists (fallback to email_sender if needed)
+                            if 'sender' not in task and 'email_sender' in task:
+                                task['sender'] = task['email_sender']
+                            elif 'sender' not in task:
+                                task['sender'] = 'Unknown'
+                            cleaned_tasks[section_key].append(task)
+                        else:
+                            print(f"Warning: Invalid task format (not a dict): {task}")
+                
+                return cleaned_tasks
+                
         except Exception as e:
             print(f"⚠️ Error loading outstanding tasks: {e}")
             return {

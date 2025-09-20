@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from datetime import datetime
@@ -1597,7 +1598,7 @@ This will help keep your inbox focused on actionable items only."""
             
             # Action details
             self.summary_text.insert(tk.END, "   Due: ", "content_label")
-            self.summary_text.insert(tk.END, f"{item['due_date']}\n", "content_text")
+            self.summary_text.insert(tk.END, f"{item.get('due_date', 'No specific deadline')}\n", "content_text")
             
             self.summary_text.insert(tk.END, "   Action: ", "content_label")
             self.summary_text.insert(tk.END, f"{item.get('action_required', 'Review email')}\n", "content_text")
@@ -1796,7 +1797,7 @@ This will help keep your inbox focused on actionable items only."""
             self.summary_text.insert(tk.END, f"{item['qualification_match']}\n", "content_text")
             
             self.summary_text.insert(tk.END, "   Due: ", "content_label")
-            self.summary_text.insert(tk.END, f"{item['due_date']}\n", "content_text")
+            self.summary_text.insert(tk.END, f"{item.get('due_date', 'No specific deadline')}\n", "content_text")
             
             # Task ID for completion tracking
             if item.get('task_id'):
@@ -2002,7 +2003,7 @@ This will help keep your inbox focused on actionable items only."""
                 stats_content += f"  Action: {task.get('action_required', 'Review email')}\n"
                 stats_content += f"  Task ID: {task.get('task_id', 'N/A')}\n\n"
         
-        stats_content += f"""
+        stats_content += """
 💡 TASK MANAGEMENT TIPS:
 • Use 'Mark Tasks Complete' to remove finished tasks
 • Old tasks (>7 days) may need attention or removal
@@ -2035,13 +2036,20 @@ This will help keep your inbox focused on actionable items only."""
         for section_key, tasks in outstanding_tasks.items():
             for task in tasks:
                 if task.get('task_id'):
-                    all_tasks.append({
-                        'id': task['task_id'],
-                        'subject': task.get('subject', 'No subject'),
-                        'sender': task.get('sender', 'Unknown'),
-                        'section': section_key.replace('_', ' ').title(),
-                        'days_old': self._calculate_task_age(task)
-                    })
+                    try:
+                        # Safe task data extraction with better error handling
+                        task_entry = {
+                            'id': task['task_id'],
+                            'subject': task.get('subject', 'No subject'),
+                            'sender': task.get('sender', task.get('email_sender', 'Unknown')),
+                            'section': section_key.replace('_', ' ').title(),
+                            'days_old': self._calculate_task_age(task)
+                        }
+                        all_tasks.append(task_entry)
+                    except Exception as e:
+                        print(f"Warning: Error processing task {task.get('task_id', 'unknown')}: {e}")
+                        # Continue with next task instead of failing completely
+                        continue
         
         if not all_tasks:
             messagebox.showinfo("No Tasks", "No outstanding tasks found.")
@@ -2142,7 +2150,7 @@ This will help keep your inbox focused on actionable items only."""
         
         ttk.Button(button_frame, text="Cancel", 
                   command=completion_window.destroy).pack(side=tk.LEFT, padx=5)
-    
+
     def _mark_single_task_complete(self, task_id):
         """Mark a single task as complete, move associated emails to Done folder, and refresh the summary"""
         result = messagebox.askyesno("Confirm Completion", 
@@ -2182,8 +2190,9 @@ This will help keep your inbox focused on actionable items only."""
                     self.generate_summary()
                     
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to complete task: {e}")
-                print(f"Error completing task {task_id}: {e}")
+                error_msg = f"Failed to complete task: {e}"
+                print(f"Full error details - Task ID: {task_id}, Error type: {type(e).__name__}, Error: {e}")
+                messagebox.showerror("Error", error_msg)
         else:
             pass  # User cancelled
     

@@ -1,7 +1,7 @@
 """Data recording and persistence for AI learning"""
 
 import os
-from .utils import save_to_csv, normalize_data_for_storage, get_timestamp, format_datetime_for_storage
+from utils import save_to_csv, normalize_data_for_storage, get_timestamp, format_datetime_for_storage
 
 
 class DataRecorder:

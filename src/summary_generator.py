@@ -515,7 +515,7 @@ Your response:"""
     
     def _display_action_details(self, item, section_type):
         """Display details for action items"""
-        print(f"   Due: {item['due_date']}")
+        print(f"   Due: {item.get('due_date', 'No specific deadline')}")
         print(f"   Action: {item.get('action_required', 'Review email')}")
         print(f"   Why: {item['explanation']}")
         
@@ -539,7 +539,7 @@ Your response:"""
     def _display_job_details(self, item):
         """Display details for job listings"""
         print(f"   Match: {item['qualification_match']}")
-        print(f"   Due: {item['due_date']}")
+        print(f"   Due: {item.get('due_date', 'No specific deadline')}")
     
     def _display_event_details(self, item):
         """Display details for optional events"""
