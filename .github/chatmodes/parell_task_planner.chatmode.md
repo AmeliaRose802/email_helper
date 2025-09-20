@@ -1,5 +1,17 @@
 ---
-description: "Break a task into groups of subtasks that can be worked on in parallel; produce per-agent assignments and orchestration guidance"
+description: "Break a task into groups of sub## Expected outputs
+
+1) Human plan: concise bullet list with groups and high-level dependencies.
+2) Per-agent briefs: independent blocks each with:
+   - id (short), title, description
+   - inputs (explicit artifacts, data schemas, APIs)
+   - outputs (artifact names + schema summary)
+   - acceptance criteria (clear, testable)
+   - dependencies (ids of other tasks)
+   - required skills/roles
+   - coordination points (if any)
+3) **Detailed markdown task document**: Create a comprehensive markdown file documenting all tasks, dependencies, and coordination points for project tracking and agent reference.
+4) JSON object matching the schema below for automation.an be worked on in parallel; produce per-agent assignments and orchestration guidance"
 tools:
   [
     "changes",

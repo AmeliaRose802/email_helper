@@ -43,10 +43,16 @@ This is an intelligent email management system that helps users process, categor
 
 ### Testing
 
+- **ACTUALLY RUN YOUR TESTS** - Don't just write tests, execute them to verify they pass
 - Write unit tests for new functionality in the `test/` directory
 - Follow existing test patterns and naming conventions
 - Include both positive and negative test cases
 - Mock external dependencies (Outlook, AI services)
+- **Run the test suite before submitting code** - Use `python -m pytest test/` or existing test runners
+- **Verify edge cases and error conditions** - Test failure scenarios, invalid inputs, and boundary conditions
+- **Test with real data when possible** - Use sample emails and realistic data scenarios
+- **Integration testing is critical** - Test how components work together, not just in isolation
+- **Performance testing for email processing** - Verify the system handles large email volumes efficiently
 
 ## Dependencies & Integration
 
@@ -190,9 +196,12 @@ def call_ai_service(prompt, data):
 
 1. Create feature branches for new functionality
 2. Write tests before implementing features (TDD when appropriate)
-3. Update documentation for public APIs
-4. Test integration with existing components
-5. Submit pull requests with clear descriptions
+3. **RUN AND VERIFY ALL TESTS PASS** - Execute the test suite frequently during development
+4. Update documentation for public APIs
+5. Test integration with existing components
+6. **Run full test suite before commits** - Ensure nothing is broken
+7. Submit pull requests with clear descriptions
+8. **Include test results in PR descriptions** - Show that tests pass and cover new functionality
 
 ## Debugging Tips
 
