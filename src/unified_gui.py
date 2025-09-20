@@ -17,6 +17,8 @@ from email_analyzer import EmailAnalyzer
 from summary_generator import SummaryGenerator
 from email_processor import EmailProcessor
 from task_persistence import TaskPersistence
+from accuracy_tracker import AccuracyTracker
+from components.accuracy_charts import AccuracyChartsComponent
 
 
 class UnifiedEmailGUI:
@@ -33,6 +35,11 @@ class UnifiedEmailGUI:
             self.summary_generator
         )
         self.task_persistence = TaskPersistence()  # Add task persistence
+        
+        # Initialize accuracy tracking
+        runtime_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'runtime_data')
+        self.accuracy_tracker = AccuracyTracker(runtime_data_dir)
+        self.accuracy_charts = None  # Will be initialized when tab is created
         
         # Data storage
         self.email_suggestions = []
@@ -72,14 +79,20 @@ class UnifiedEmailGUI:
         self.notebook.add(self.summary_frame, text="3. Summary & Results")
         self.create_summary_tab()
         
+        # Tab 4: Accuracy Dashboard
+        self.accuracy_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.accuracy_frame, text="4. Accuracy Dashboard")
+        self.create_accuracy_dashboard_tab()
+        
         # Create status bar
         self.status_var = tk.StringVar(value="Ready")
         status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=(0, 5))
         
-        # Initially disable tabs 2 and 3
+        # Initially disable tabs 2, 3, and 4
         self.notebook.tab(1, state="disabled")
         self.notebook.tab(2, state="disabled")
+        self.notebook.tab(3, state="disabled")
     
     def create_processing_tab(self):
         # Email count selection
@@ -849,6 +862,9 @@ class UnifiedEmailGUI:
         self.notebook.tab(1, state="normal")
         self.load_processed_emails()
         self.notebook.select(1)
+        
+        # Enable accuracy dashboard tab
+        self.enable_accuracy_dashboard()
         
         # Automatically select and display the first email for faster review
         self.root.after(100, self._auto_select_first_email)
@@ -2212,6 +2228,134 @@ This will help keep your inbox focused on actionable items only."""
             return (datetime.now() - first_seen).days
         except:
             return 0
+    
+    def create_accuracy_dashboard_tab(self):
+        """Create the accuracy dashboard tab with visualization charts"""
+        try:
+            # Initialize charts component
+            self.accuracy_charts = AccuracyChartsComponent(self.accuracy_frame, self.accuracy_tracker)
+            
+            # Main container with scrollable content
+            main_canvas = tk.Canvas(self.accuracy_frame)
+            scrollbar = ttk.Scrollbar(self.accuracy_frame, orient="vertical", command=main_canvas.yview)
+            scrollable_frame = ttk.Frame(main_canvas)
+            
+            scrollable_frame.bind(
+                "<Configure>",
+                lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all"))
+            )
+            
+            main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+            main_canvas.configure(yscrollcommand=scrollbar.set)
+            
+            # Title and controls
+            title_frame = ttk.Frame(scrollable_frame)
+            title_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+            
+            ttk.Label(title_frame, text="📊 Accuracy Dashboard", 
+                     font=('Arial', 16, 'bold')).pack(side=tk.LEFT)
+            
+            # Refresh button and granularity controls
+            controls_frame = ttk.Frame(title_frame)
+            controls_frame.pack(side=tk.RIGHT)
+            
+            self.granularity_var = tk.StringVar(value="daily")
+            ttk.Label(controls_frame, text="Granularity:").pack(side=tk.LEFT, padx=(0, 5))
+            granularity_combo = ttk.Combobox(controls_frame, textvariable=self.granularity_var,
+                                           values=["daily", "weekly", "monthly"], 
+                                           state="readonly", width=8)
+            granularity_combo.pack(side=tk.LEFT, padx=(0, 10))
+            granularity_combo.bind("<<ComboboxSelected>>", self.refresh_accuracy_charts)
+            
+            ttk.Button(controls_frame, text="🔄 Refresh", 
+                      command=self.refresh_accuracy_charts).pack(side=tk.LEFT)
+            
+            # Summary metrics section
+            summary_frame = ttk.LabelFrame(scrollable_frame, text="📊 Key Metrics", padding=10)
+            summary_frame.pack(fill=tk.X, padx=10, pady=5)
+            
+            # Configure grid weights for summary frame
+            for i in range(2):
+                summary_frame.columnconfigure(i, weight=1)
+            
+            self.summary_gauges_frame = summary_frame
+            
+            # Charts section - create notebook for different chart views
+            charts_notebook = ttk.Notebook(scrollable_frame)
+            charts_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+            
+            # Trend Chart Tab
+            trend_frame = ttk.Frame(charts_notebook)
+            charts_notebook.add(trend_frame, text="📈 Accuracy Trend")
+            self.trend_chart_frame = trend_frame
+            
+            # Category Performance Tab
+            category_frame = ttk.Frame(charts_notebook)
+            charts_notebook.add(category_frame, text="📊 Category Performance")
+            self.category_chart_frame = category_frame
+            
+            # Session Comparison Tab
+            session_frame = ttk.Frame(charts_notebook)
+            charts_notebook.add(session_frame, text="🔄 Session Comparison")
+            self.session_chart_frame = session_frame
+            
+            # Pack the canvas and scrollbar
+            main_canvas.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+            
+            # Load initial charts
+            self.load_accuracy_charts()
+            
+        except Exception as e:
+            print(f"Error creating accuracy dashboard: {e}")
+            # Create error display
+            error_frame = ttk.Frame(self.accuracy_frame)
+            error_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            ttk.Label(error_frame, text=f"Error loading dashboard: {e}", 
+                     foreground='red', font=('Arial', 12)).pack()
+    
+    def load_accuracy_charts(self):
+        """Load all accuracy charts with current data"""
+        try:
+            if not self.accuracy_charts:
+                return
+            
+            granularity = self.granularity_var.get() if hasattr(self, 'granularity_var') else 'daily'
+            
+            # Clear existing charts
+            for frame in [self.trend_chart_frame, self.category_chart_frame, 
+                         self.session_chart_frame]:
+                for widget in frame.winfo_children():
+                    widget.destroy()
+            
+            # Create summary gauges
+            self.accuracy_charts.create_summary_gauges(self.summary_gauges_frame)
+            
+            # Create trend chart
+            self.accuracy_charts.create_trend_chart(self.trend_chart_frame, granularity)
+            
+            # Create category performance chart
+            self.accuracy_charts.create_category_performance_chart(self.category_chart_frame)
+            
+            # Create session comparison chart
+            self.accuracy_charts.create_session_comparison_chart(self.session_chart_frame)
+            
+        except Exception as e:
+            print(f"Error loading accuracy charts: {e}")
+    
+    def refresh_accuracy_charts(self, event=None):
+        """Refresh accuracy charts with latest data"""
+        try:
+            self.load_accuracy_charts()
+        except Exception as e:
+            print(f"Error refreshing charts: {e}")
+    
+    def enable_accuracy_dashboard(self):
+        """Enable the accuracy dashboard tab"""
+        try:
+            self.notebook.tab(3, state="normal")
+        except Exception as e:
+            print(f"Error enabling accuracy dashboard: {e}")
     
     def run(self):
         self.root.mainloop()

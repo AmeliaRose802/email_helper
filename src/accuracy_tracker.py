@@ -127,3 +127,165 @@ class AccuracyTracker:
             'frequently_incorrect': df['old_suggestion'].value_counts().to_dict(),
             'total_corrections': len(df)
         }
+    
+    def get_time_series_data(self, granularity='daily', days_back=30):
+        """Get time series accuracy data for trend charts"""
+        if not os.path.exists(self.accuracy_file):
+            return []
+            
+        df = pd.read_csv(self.accuracy_file)
+        if df.empty:
+            return []
+            
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        recent_df = df[df['timestamp'] >= cutoff_date]
+        
+        if recent_df.empty:
+            return []
+        
+        # Group by granularity
+        if granularity == 'daily':
+            recent_df['date'] = recent_df['timestamp'].dt.date
+            grouped = recent_df.groupby('date').agg({
+                'accuracy_rate': 'mean',
+                'total_emails_processed': 'sum'
+            }).reset_index()
+        elif granularity == 'weekly':
+            recent_df['week'] = recent_df['timestamp'].dt.to_period('W')
+            grouped = recent_df.groupby('week').agg({
+                'accuracy_rate': 'mean',
+                'total_emails_processed': 'sum'
+            }).reset_index()
+            grouped['date'] = grouped['week'].dt.start_time.dt.date
+        else:  # monthly
+            recent_df['month'] = recent_df['timestamp'].dt.to_period('M')
+            grouped = recent_df.groupby('month').agg({
+                'accuracy_rate': 'mean',
+                'total_emails_processed': 'sum'
+            }).reset_index()
+            grouped['date'] = grouped['month'].dt.start_time.dt.date
+        
+        return [{
+            'date': row['date'],
+            'accuracy': round(row['accuracy_rate'], 2),
+            'emails_processed': int(row['total_emails_processed'])
+        } for _, row in grouped.iterrows()]
+    
+    def get_category_performance_summary(self, days_back=30):
+        """Get category-wise performance summary for bar charts"""
+        if not os.path.exists(self.accuracy_file):
+            return []
+            
+        df = pd.read_csv(self.accuracy_file)
+        if df.empty:
+            return []
+            
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        recent_df = df[df['timestamp'] >= cutoff_date]
+        
+        if recent_df.empty:
+            return []
+        
+        category_data = {}
+        total_emails_by_category = {}
+        
+        for _, row in recent_df.iterrows():
+            try:
+                modifications = json.loads(row['modifications_by_category'])
+                emails_in_session = row['total_emails_processed']
+                
+                # Estimate emails per category (simplified approach)
+                if modifications:
+                    avg_per_category = emails_in_session / len(modifications)
+                    for category, corrections in modifications.items():
+                        if category not in category_data:
+                            category_data[category] = {'corrections': 0, 'total_emails': 0}
+                        category_data[category]['corrections'] += corrections
+                        category_data[category]['total_emails'] += avg_per_category
+                        
+            except (json.JSONDecodeError, TypeError):
+                continue
+        
+        result = []
+        for category, data in category_data.items():
+            if data['total_emails'] > 0:
+                accuracy = max(0, (data['total_emails'] - data['corrections']) / data['total_emails'] * 100)
+                result.append({
+                    'category': category.replace('_', ' ').title(),
+                    'accuracy': round(accuracy, 1),
+                    'corrections': int(data['corrections']),
+                    'total_emails': int(data['total_emails'])
+                })
+        
+        return sorted(result, key=lambda x: x['accuracy'], reverse=True)
+    
+    def get_session_comparison_data(self, session_count=10):
+        """Get recent session data for comparison charts"""
+        if not os.path.exists(self.accuracy_file):
+            return []
+            
+        df = pd.read_csv(self.accuracy_file)
+        if df.empty:
+            return []
+            
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df = df.sort_values('timestamp', ascending=False)
+        recent_sessions = df.head(session_count)
+        
+        result = []
+        for _, row in recent_sessions.iterrows():
+            result.append({
+                'session_id': row['run_id'],
+                'date': row['timestamp'].strftime('%Y-%m-%d %H:%M'),
+                'accuracy': round(row['accuracy_rate'], 1),
+                'emails_processed': int(row['total_emails_processed']),
+                'corrections': int(row['emails_modified'])
+            })
+        
+        return list(reversed(result))  # Chronological order
+    
+    def get_dashboard_metrics(self):
+        """Get key metrics for summary dashboard widgets"""
+        if not os.path.exists(self.accuracy_file):
+            return {
+                'overall_accuracy': 0,
+                'seven_day_average': 0,
+                'total_sessions': 0,
+                'total_emails': 0,
+                'trend_indicator': 'stable'
+            }
+            
+        df = pd.read_csv(self.accuracy_file)
+        if df.empty:
+            return {
+                'overall_accuracy': 0,
+                'seven_day_average': 0,
+                'total_sessions': 0,
+                'total_emails': 0,
+                'trend_indicator': 'stable'
+            }
+            
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        
+        # Overall metrics
+        overall_accuracy = round(df['accuracy_rate'].mean(), 1)
+        total_sessions = len(df)
+        total_emails = int(df['total_emails_processed'].sum())
+        
+        # 7-day average
+        cutoff_date = datetime.now() - timedelta(days=7)
+        recent_df = df[df['timestamp'] >= cutoff_date]
+        seven_day_average = round(recent_df['accuracy_rate'].mean(), 1) if not recent_df.empty else overall_accuracy
+        
+        # Trend indicator
+        trend_indicator = self._calculate_improvement_trend(df)
+        
+        return {
+            'overall_accuracy': overall_accuracy,
+            'seven_day_average': seven_day_average,
+            'total_sessions': total_sessions,
+            'total_emails': total_emails,
+            'trend_indicator': trend_indicator
+        }
