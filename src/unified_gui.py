@@ -17,6 +17,7 @@ from email_analyzer import EmailAnalyzer
 from summary_generator import SummaryGenerator
 from email_processor import EmailProcessor
 from task_persistence import TaskPersistence
+from accuracy_tracker import AccuracyTracker
 
 
 class UnifiedEmailGUI:
@@ -33,6 +34,7 @@ class UnifiedEmailGUI:
             self.summary_generator
         )
         self.task_persistence = TaskPersistence()  # Add task persistence
+        self.accuracy_tracker = AccuracyTracker('runtime_data')  # Add accuracy tracking
         
         # Data storage
         self.email_suggestions = []
@@ -72,14 +74,20 @@ class UnifiedEmailGUI:
         self.notebook.add(self.summary_frame, text="3. Summary & Results")
         self.create_summary_tab()
         
+        # Tab 4: Accuracy Dashboard
+        self.accuracy_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.accuracy_frame, text="4. Accuracy Dashboard")
+        self.create_accuracy_tab()
+        
         # Create status bar
         self.status_var = tk.StringVar(value="Ready")
         status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=(0, 5))
         
-        # Initially disable tabs 2 and 3
+        # Initially disable tabs 2, 3, and 4
         self.notebook.tab(1, state="disabled")
         self.notebook.tab(2, state="disabled")
+        self.notebook.tab(3, state="disabled")
     
     def create_processing_tab(self):
         # Email count selection
@@ -370,6 +378,207 @@ class UnifiedEmailGUI:
                 except Exception as e:
                     messagebox.showwarning("Error Opening Link", f"Could not open URL: {url}\n\nError: {str(e)}")
                 break
+    
+    def create_accuracy_tab(self):
+        """Create the accuracy dashboard tab with metrics, controls, and layout structure"""
+        main_frame = ttk.Frame(self.accuracy_frame, padding="15")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Header Section - Metrics Summary
+        header_frame = ttk.LabelFrame(main_frame, text="Accuracy Overview", padding="10")
+        header_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        # Create a grid layout for metrics
+        metrics_frame = ttk.Frame(header_frame)
+        metrics_frame.pack(fill=tk.X)
+        
+        # Overall accuracy metric
+        self.overall_accuracy_label = ttk.Label(metrics_frame, text="Overall Accuracy: --", 
+                                               font=("Segoe UI", 12, "bold"))
+        self.overall_accuracy_label.grid(row=0, column=0, padx=10, pady=5, sticky=tk.W)
+        
+        # Total emails processed
+        self.total_emails_label = ttk.Label(metrics_frame, text="Total Emails: --")
+        self.total_emails_label.grid(row=0, column=1, padx=10, pady=5, sticky=tk.W)
+        
+        # Improvement trend
+        self.trend_label = ttk.Label(metrics_frame, text="Trend: --")
+        self.trend_label.grid(row=0, column=2, padx=10, pady=5, sticky=tk.W)
+        
+        # Controls Section - Date Range and Filters
+        controls_frame = ttk.LabelFrame(main_frame, text="Dashboard Controls", padding="10")
+        controls_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        control_grid = ttk.Frame(controls_frame)
+        control_grid.pack(fill=tk.X)
+        
+        # Date range selection
+        ttk.Label(control_grid, text="Time Period:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+        self.date_range_var = tk.StringVar(value="30")
+        date_range_combo = ttk.Combobox(control_grid, textvariable=self.date_range_var, 
+                                       values=["7", "30", "60", "90"], width=10, state="readonly")
+        date_range_combo.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
+        
+        # Category filter (placeholder)
+        ttk.Label(control_grid, text="Category Filter:").grid(row=0, column=2, padx=5, pady=5, sticky=tk.W)
+        self.category_filter_var = tk.StringVar(value="All Categories")
+        category_filter_combo = ttk.Combobox(control_grid, textvariable=self.category_filter_var, 
+                                           values=["All Categories", "Required Action", "Team Action", "FYI"], 
+                                           width=15, state="readonly")
+        category_filter_combo.grid(row=0, column=3, padx=5, pady=5, sticky=tk.W)
+        
+        # Refresh button
+        refresh_btn = ttk.Button(control_grid, text="Refresh Data", command=self.refresh_accuracy_data)
+        refresh_btn.grid(row=0, column=4, padx=10, pady=5)
+        
+        # Chart Area - Placeholder for Group 3 Visualization
+        chart_frame = ttk.LabelFrame(main_frame, text="Accuracy Trends Chart", padding="10")
+        chart_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+        
+        # Placeholder for chart (will be filled by Group 3)
+        self.chart_placeholder = ttk.Label(chart_frame, 
+                                         text="📊 Chart visualization will be added by Group 3\n\n" +
+                                              "This area will display:\n" +
+                                              "• Accuracy trends over time\n" +
+                                              "• Category-wise accuracy breakdown\n" +
+                                              "• Performance metrics visualization",
+                                         font=("Segoe UI", 10),
+                                         foreground="#666666",
+                                         background="#f8f9fa",
+                                         relief=tk.SUNKEN)
+        self.chart_placeholder.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Details Section - Category Breakdown and Export
+        details_frame = ttk.LabelFrame(main_frame, text="Detailed Analysis", padding="10")
+        details_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Create a notebook for details tabs
+        details_notebook = ttk.Notebook(details_frame)
+        details_notebook.pack(fill=tk.BOTH, expand=True)
+        
+        # Category breakdown tab
+        category_frame = ttk.Frame(details_notebook)
+        details_notebook.add(category_frame, text="Category Breakdown")
+        
+        self.category_text = scrolledtext.ScrolledText(category_frame, height=8, wrap=tk.WORD, 
+                                                      state=tk.DISABLED, font=('Segoe UI', 9))
+        self.category_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Export and actions tab
+        actions_frame = ttk.Frame(details_notebook)
+        details_notebook.add(actions_frame, text="Export & Actions")
+        
+        actions_grid = ttk.Frame(actions_frame)
+        actions_grid.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(actions_grid, text="Export Report", 
+                  command=self.export_accuracy_report).pack(side=tk.LEFT, padx=5)
+        ttk.Button(actions_grid, text="Show Detailed Stats", 
+                  command=self.show_detailed_accuracy_stats).pack(side=tk.LEFT, padx=5)
+        
+        # Configure initial state
+        self.refresh_accuracy_data()
+    
+    def refresh_accuracy_data(self):
+        """Refresh accuracy dashboard data using AccuracyTracker"""
+        try:
+            days_back = int(self.date_range_var.get())
+            trends = self.accuracy_tracker.get_accuracy_trends(days_back)
+            
+            if trends:
+                # Update header metrics
+                self.overall_accuracy_label.config(text=f"Overall Accuracy: {trends['average_accuracy']:.1f}%")
+                self.total_emails_label.config(text=f"Total Emails: {trends['total_emails_processed']}")
+                
+                # Set trend with emoji
+                trend_emoji = {"improving": "📈", "declining": "📉", "stable": "➡️"}
+                trend_text = f"Trend: {trend_emoji.get(trends['improvement_trend'], '➡️')} {trends['improvement_trend'].title()}"
+                self.trend_label.config(text=trend_text)
+                
+                # Update category breakdown
+                self.update_category_breakdown(trends)
+                
+            else:
+                # No data available
+                self.overall_accuracy_label.config(text="Overall Accuracy: No data")
+                self.total_emails_label.config(text="Total Emails: 0")
+                self.trend_label.config(text="Trend: No data")
+                
+                # Clear category breakdown
+                self.category_text.config(state=tk.NORMAL)
+                self.category_text.delete(1.0, tk.END)
+                self.category_text.insert(1.0, "No accuracy data available yet.\n\nProcess some emails to start tracking accuracy metrics.")
+                self.category_text.config(state=tk.DISABLED)
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to refresh accuracy data: {str(e)}")
+    
+    def update_category_breakdown(self, trends):
+        """Update the category breakdown display"""
+        self.category_text.config(state=tk.NORMAL)
+        self.category_text.delete(1.0, tk.END)
+        
+        content = f"Accuracy Analysis for Last {self.date_range_var.get()} Days\n"
+        content += "=" * 50 + "\n\n"
+        
+        content += f"📊 Summary:\n"
+        content += f"  • Total Runs: {trends['total_runs']}\n"
+        content += f"  • Emails Processed: {trends['total_emails_processed']}\n"
+        content += f"  • Total Corrections: {trends['total_modifications']}\n"
+        content += f"  • Average Accuracy: {trends['average_accuracy']:.1f}%\n"
+        content += f"  • Latest Accuracy: {trends['latest_accuracy']:.1f}%\n\n"
+        
+        if trends['most_corrected_categories']:
+            content += "🔍 Most Frequently Corrected Categories:\n"
+            for category, count in list(trends['most_corrected_categories'].items())[:5]:
+                content += f"  • {category.replace('_', ' ').title()}: {count} corrections\n"
+        else:
+            content += "✅ No category corrections recorded\n"
+        
+        self.category_text.insert(1.0, content)
+        self.category_text.config(state=tk.DISABLED)
+    
+    def export_accuracy_report(self):
+        """Export accuracy report (placeholder for future implementation)"""
+        messagebox.showinfo("Export Feature", "Export functionality will be implemented in a future update.")
+    
+    def show_detailed_accuracy_stats(self):
+        """Show detailed accuracy statistics in a popup window"""
+        try:
+            days_back = int(self.date_range_var.get())
+            trends = self.accuracy_tracker.get_accuracy_trends(days_back)
+            
+            if not trends:
+                messagebox.showinfo("No Data", "No accuracy data available for the selected time period.")
+                return
+            
+            # Create popup window
+            stats_window = tk.Toplevel(self.root)
+            stats_window.title("Detailed Accuracy Statistics")
+            stats_window.geometry("600x400")
+            stats_window.transient(self.root)
+            
+            # Use existing display method
+            import io
+            import sys
+            
+            # Capture the display output
+            old_stdout = sys.stdout
+            sys.stdout = captured_output = io.StringIO()
+            
+            self.accuracy_tracker.display_accuracy_report(days_back)
+            
+            sys.stdout = old_stdout
+            output = captured_output.getvalue()
+            
+            # Display in text widget
+            text_widget = scrolledtext.ScrolledText(stats_window, wrap=tk.WORD, font=('Courier', 10))
+            text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            text_widget.insert(1.0, output)
+            text_widget.config(state=tk.DISABLED)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to show detailed stats: {str(e)}")
     
     def get_category_display_names(self):
         return [
@@ -847,6 +1056,7 @@ class UnifiedEmailGUI:
     
     def on_processing_complete(self):
         self.notebook.tab(1, state="normal")
+        self.notebook.tab(3, state="normal")  # Enable accuracy dashboard after processing
         self.load_processed_emails()
         self.notebook.select(1)
         
@@ -1947,9 +2157,10 @@ This will help keep your inbox focused on actionable items only."""
             self.start_processing_btn.config(state=tk.NORMAL)
             self.cancel_processing_btn.config(state=tk.DISABLED)
             
-            # Disable tabs 2 and 3
+            # Disable tabs 2, 3, and 4
             self.notebook.tab(1, state="disabled")
             self.notebook.tab(2, state="disabled")
+            self.notebook.tab(3, state="disabled")
             
             # Switch to processing tab
             self.notebook.select(0)
