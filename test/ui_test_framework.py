@@ -198,7 +198,7 @@ class UITestFramework:
             tabs = self.gui.notebook.tabs()
             
             # Verify expected tabs exist (actual tab names from unified_gui.py)
-            expected_tabs = ["1. Process Emails", "2. Review & Edit", "3. Summary & Results"]
+            expected_tabs = ["1. Process Emails", "2. Review & Edit", "3. Summary & Results", "4. Accuracy Dashboard"]
             tab_texts = [self.gui.notebook.tab(tab, "text") for tab in tabs]
             
             for expected_tab in expected_tabs:
