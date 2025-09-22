@@ -123,8 +123,9 @@ your_username
 ## 🛠️ Development
 
 ### Adding New Categories
+
 1. Update prompts in `prompts/email_classifier_system.prompty`
-3. Update documentation
+2. Update documentation
 
 ### Customizing Prompts
 All AI prompts are in the `prompts/` directory using Microsoft Prompty format. Edit these files to customize the AI behavior for your specific needs.

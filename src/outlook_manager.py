@@ -1,7 +1,35 @@
 #!/usr/bin/env python3
+"""Outlook Manager for Email Helper - Microsoft Outlook COM Integration.
+
+This module provides comprehensive Microsoft Outlook integration using the
+COM interface, handling email retrieval, folder management, categorization,
+and email operations throughout the email helper application.
+
+The OutlookManager class manages:
+- Outlook application connection and initialization
+- Email folder creation and organization
+- Email retrieval with filtering and sorting
+- Email categorization and color coding
+- Email movement between folders
+- Folder structure management and cleanup
+
+Key Features:
+- Robust COM interface handling with error recovery
+- Automatic folder creation and organization
+- Email categorization with color coding system
+- Batch email operations for efficiency
+- Cross-folder email movement and organization
+- Integration with task completion workflows
+
+Category Mappings:
+- INBOX_CATEGORIES: Categories that remain in the inbox
+- NON_INBOX_CATEGORIES: Categories moved to organized folders
+- CATEGORY_COLORS: Visual color coding for different categories
+
+This module follows the project's Outlook integration patterns and provides
+comprehensive error handling for robust operation with the Outlook COM interface.
 """
-Outlook Manager - Handles Outlook connection and folder management
-"""
+
 import win32com.client
 import os
 from datetime import datetime, timedelta

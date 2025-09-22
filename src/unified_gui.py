@@ -1,5 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Unified GUI for Email Helper - Main Application Interface.
+
+This module provides the primary graphical user interface for the Email Helper
+application, integrating all components into a cohesive user experience for
+email management, AI processing, and task tracking.
+
+The UnifiedEmailGUI class serves as the main application window and orchestrates
+interactions between:
+- Email loading and display from Outlook
+- AI-powered email classification and analysis  
+- Task creation, management, and completion tracking
+- Summary generation and formatted display
+- User feedback collection for accuracy improvements
+- Settings and configuration management
+
+Key Features:
+- Tabbed interface for different workflow stages
+- Real-time processing with progress indicators
+- Integrated task management with Outlook email movement
+- Comprehensive summary generation with multiple output formats
+- User correction and feedback system for AI improvement
+- Persistent task storage across sessions
+
+This module follows the project's GUI patterns and integrates with all core
+backend components while maintaining a responsive user experience.
+"""
+
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from datetime import datetime
@@ -20,6 +47,32 @@ from task_persistence import TaskPersistence
 
 
 class UnifiedEmailGUI:
+    """Unified GUI application for email management and AI processing.
+    
+    This class provides a comprehensive graphical user interface for the email helper
+    system, integrating email processing, AI analysis, task management, and user
+    interaction components into a single unified application window.
+    
+    The GUI handles:
+    - Email loading and display from Outlook
+    - AI-powered email classification and analysis
+    - Task creation and management
+    - Summary generation and display
+    - User feedback collection and accuracy tracking
+    
+    Attributes:
+        outlook_manager (OutlookManager): Handles Outlook COM integration
+        ai_processor (AIProcessor): Manages AI processing and Azure OpenAI calls
+        email_analyzer (EmailAnalyzer): Analyzes and categorizes emails
+        summary_generator (SummaryGenerator): Generates formatted summaries
+        email_processor (EmailProcessor): Orchestrates email processing workflow
+        task_persistence (TaskPersistence): Manages task storage and lifecycle
+        email_suggestions (list): Storage for email categorization suggestions
+        action_items_data (dict): Current batch action items organized by category
+        summary_sections (dict): Generated summary sections for display
+        processing_cancelled (bool): Flag for cancelling long-running operations
+    """
+    
     def __init__(self):
         # Initialize components
         self.outlook_manager = OutlookManager()

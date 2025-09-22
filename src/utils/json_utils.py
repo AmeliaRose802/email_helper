@@ -1,4 +1,23 @@
-"""JSON parsing and cleaning utilities"""
+"""JSON Processing Utilities for Email Helper.
+
+This module provides robust JSON parsing, cleaning, and repair utilities
+designed to handle AI-generated JSON responses and other potentially
+malformed JSON data throughout the email helper application.
+
+Key Functions:
+- clean_json_response: Removes markdown formatting from JSON strings
+- repair_json_response: Attempts to fix common JSON parsing errors
+- parse_json_with_fallback: Comprehensive JSON parsing with error recovery
+
+These utilities are critical for:
+- Processing AI responses that may contain markdown formatting
+- Handling malformed JSON from external sources
+- Providing graceful fallback behavior when JSON parsing fails
+- Ensuring robust data processing in production environments
+
+The repair functions implement intelligent error recovery strategies
+to maximize successful JSON parsing while maintaining data integrity.
+"""
 
 import json
 import re
