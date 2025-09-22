@@ -24,7 +24,9 @@ class SessionTracker:
         })
     
     def finalize_session(self, success_count=None, error_count=None, categories_used=None):
+        print(f"🔍 FINALIZE SESSION: total_emails={self.session_total_emails}, modifications={len(self.session_modifications)}")
         if self.session_total_emails == 0:
+            print("⚠️ Early return: session_total_emails is 0")
             return
             
         modifications_count = len(self.session_modifications)
