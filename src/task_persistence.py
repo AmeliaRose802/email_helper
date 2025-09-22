@@ -33,26 +33,36 @@ class TaskPersistence:
         # Load existing tasks
         existing_tasks = self.load_outstanding_tasks()
         
-        # Process current batch tasks
+        # Process current batch tasks - including FYI and newsletter items for persistence
         current_tasks = {
             'required_actions': [],
             'team_actions': [],
             'completed_team_actions': [],
             'optional_actions': [],
             'job_listings': [],
-            'optional_events': []
+            'optional_events': [],
+            'fyi_notices': [],
+            'newsletters': []
         }
         
-        # Extract actionable tasks from summary sections
-        for section_key in ['required_actions', 'team_actions', 'completed_team_actions', 'optional_actions', 'job_listings', 'optional_events']:
+        # Extract all tasks from summary sections, including FYI and newsletters for persistence
+        for section_key in ['required_actions', 'team_actions', 'completed_team_actions', 'optional_actions', 'job_listings', 'optional_events', 'fyi_notices', 'newsletters']:
             if section_key in summary_sections:
                 for task in summary_sections[section_key]:
                     # Add batch metadata
                     task_with_metadata = task.copy()
+                    
+                    # Use existing task_id if present, otherwise generate one
+                    existing_task_id = task.get('task_id')
+                    if existing_task_id:
+                        generated_task_id = existing_task_id
+                    else:
+                        generated_task_id = self._generate_task_id(task)
+                    
                     task_with_metadata.update({
                         'batch_timestamp': batch_timestamp,
                         'first_seen': batch_timestamp,
-                        'task_id': self._generate_task_id(task),
+                        'task_id': generated_task_id,
                         'status': 'outstanding',
                         'batch_count': 1
                     })
@@ -89,7 +99,9 @@ class TaskPersistence:
                 'completed_team_actions': [],
                 'optional_actions': [],
                 'job_listings': [],
-                'optional_events': []
+                'optional_events': [],
+                'fyi_notices': [],
+                'newsletters': []
             }
         
         try:
@@ -101,8 +113,15 @@ class TaskPersistence:
                     'completed_team_actions': [],
                     'optional_actions': [],
                     'job_listings': [],
-                    'optional_events': []
+                    'optional_events': [],
+                    'fyi_notices': [],
+                    'newsletters': []
                 })
+                
+                # Ensure all sections exist (for backward compatibility)
+                for section in ['required_actions', 'team_actions', 'completed_team_actions', 'optional_actions', 'job_listings', 'optional_events', 'fyi_notices', 'newsletters']:
+                    if section not in tasks:
+                        tasks[section] = []
                 
                 # Validate and clean task data
                 cleaned_tasks = {}
@@ -203,12 +222,12 @@ class TaskPersistence:
             'optional_actions': [],
             'job_listings': [],
             'optional_events': [],
-            'fyi_notices': current_summary_sections.get('fyi_notices', []),
-            'newsletters': current_summary_sections.get('newsletters', [])
+            'fyi_notices': [],
+            'newsletters': []
         }
         
-        # Merge actionable tasks (current + outstanding)
-        for section_key in ['required_actions', 'team_actions', 'completed_team_actions', 'optional_actions', 'job_listings', 'optional_events']:
+        # Merge all task types (current + outstanding) including FYI and newsletters
+        for section_key in ['required_actions', 'team_actions', 'completed_team_actions', 'optional_actions', 'job_listings', 'optional_events', 'fyi_notices', 'newsletters']:
             # Add outstanding tasks first (older, potentially higher priority)
             comprehensive_summary[section_key].extend(outstanding_tasks.get(section_key, []))
             
@@ -365,6 +384,65 @@ class TaskPersistence:
                     x.get('priority', 99),    # Higher priority first
                     x.get('due_date', 'zzz')  # Earlier due dates first
                 ), reverse=False)
+    
+    def clear_fyi_items(self) -> int:
+        """Clear all FYI items from persistent storage"""
+        outstanding_tasks = self.load_outstanding_tasks()
+        cleared_count = len(outstanding_tasks.get('fyi_notices', []))
+        
+        if cleared_count > 0:
+            outstanding_tasks['fyi_notices'] = []
+            
+            # Save updated tasks
+            batch_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self._save_tasks_to_file(self.tasks_file, {
+                'last_updated': batch_timestamp,
+                'tasks': outstanding_tasks
+            })
+            
+            print(f"🗑️ Cleared {cleared_count} FYI items from persistent storage")
+        
+        return cleared_count
+    
+    def clear_newsletter_items(self) -> int:
+        """Clear all newsletter items from persistent storage"""
+        outstanding_tasks = self.load_outstanding_tasks()
+        cleared_count = len(outstanding_tasks.get('newsletters', []))
+        
+        if cleared_count > 0:
+            outstanding_tasks['newsletters'] = []
+            
+            # Save updated tasks
+            batch_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self._save_tasks_to_file(self.tasks_file, {
+                'last_updated': batch_timestamp,
+                'tasks': outstanding_tasks
+            })
+            
+            print(f"🗑️ Cleared {cleared_count} newsletter items from persistent storage")
+        
+        return cleared_count
+    
+    def clear_both_fyi_and_newsletters(self) -> tuple:
+        """Clear both FYI and newsletter items from persistent storage"""
+        outstanding_tasks = self.load_outstanding_tasks()
+        fyi_count = len(outstanding_tasks.get('fyi_notices', []))
+        newsletter_count = len(outstanding_tasks.get('newsletters', []))
+        
+        if fyi_count > 0 or newsletter_count > 0:
+            outstanding_tasks['fyi_notices'] = []
+            outstanding_tasks['newsletters'] = []
+            
+            # Save updated tasks
+            batch_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self._save_tasks_to_file(self.tasks_file, {
+                'last_updated': batch_timestamp,
+                'tasks': outstanding_tasks
+            })
+            
+            print(f"🗑️ Cleared {fyi_count} FYI items and {newsletter_count} newsletter items from persistent storage")
+        
+        return fyi_count, newsletter_count
     
     def _save_tasks_to_file(self, filepath: str, data: Any) -> None:
         """Save data to JSON file"""

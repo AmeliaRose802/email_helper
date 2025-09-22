@@ -534,7 +534,7 @@ Your response:"""
         """Display details for optional actions"""
         print(f"   What: {item.get('action_required', 'Provide feedback')}")
         print(f"   Why relevant: {item.get('why_relevant', 'No specific reason provided')}")
-        print(f"   Context: {item['explanation']}")
+        print(f"   Context: {item.get('explanation', 'No context available')}")
     
     def _display_job_details(self, item):
         """Display details for job listings"""
