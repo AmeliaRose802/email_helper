@@ -1,12 +1,65 @@
 #!/usr/bin/env python3
-"""
-Email Processing Engine - Main processing logic and orchestration
+"""Email Processing Engine for Email Helper - Main Processing Logic and Orchestration.
+
+This module provides the core email processing pipeline that orchestrates
+all components of the email helper system. It manages the complete workflow
+from email retrieval through AI analysis to summary generation and storage.
+
+The EmailProcessor class coordinates:
+- Email loading and preprocessing from Outlook
+- AI-powered email classification and analysis
+- Content analysis and metadata extraction
+- Action item organization and categorization
+- Summary generation and formatting
+- User interaction and feedback collection
+- Result storage and persistence
+
+Key Features:
+- Complete email processing pipeline orchestration
+- Multi-stage AI analysis with error handling
+- Action item extraction and organization
+- User feedback integration for accuracy improvement
+- Batch processing capabilities for efficiency
+- Comprehensive error handling and recovery
+- Integration with all core system components
+
+This module serves as the central processing hub that coordinates
+all other components to provide the complete email management workflow.
 """
 
 from datetime import datetime
 from collections import defaultdict
 
 class EmailProcessor:
+    """Email processing pipeline orchestrator and workflow manager.
+    
+    This class provides the central processing engine for the email helper
+    system, coordinating all components to deliver the complete email
+    management workflow from raw email retrieval to organized summaries.
+    
+    The processor manages:
+    - Email loading and filtering from Outlook
+    - AI-powered classification and analysis
+    - Content extraction and metadata processing
+    - Action item organization and categorization
+    - Summary generation and formatting
+    - User feedback collection and integration
+    - Result persistence and storage
+    
+    Attributes:
+        outlook_manager (OutlookManager): Handles Outlook email operations
+        ai_processor (AIProcessor): Manages AI classification and analysis
+        email_analyzer (EmailAnalyzer): Analyzes email content and metadata
+        summary_generator (SummaryGenerator): Creates formatted summaries
+        action_items_data (dict): Organized action items by category
+        email_suggestions (list): Email categorization suggestions
+        
+    Example:
+        >>> processor = EmailProcessor(outlook_mgr, ai_proc, analyzer, generator)
+        >>> results = processor.process_emails(max_emails=50)
+        >>> print(f"Processed {len(results)} emails")
+    """
+    
     def __init__(self, outlook_manager, ai_processor, email_analyzer, summary_generator):
         self.outlook_manager = outlook_manager
         self.ai_processor = ai_processor
