@@ -1,22 +1,101 @@
-"""Data recording and persistence for AI learning"""
+"""Data Recording and Persistence for Email Helper - AI Learning and Feedback Collection.
+
+This module provides comprehensive data recording capabilities for collecting
+AI learning feedback, user corrections, and processing analytics to support
+continuous improvement of the email classification system.
+
+The DataRecorder class manages:
+- AI learning feedback collection and storage
+- User modification tracking and persistence
+- Batch processing result recording
+- Holistic analysis result storage
+- Accepted suggestion tracking for fine-tuning
+- CSV-based data persistence for analysis
+
+Key Features:
+- Structured feedback collection for AI improvement
+- User correction tracking for accuracy analysis
+- Batch processing analytics and monitoring
+- Comprehensive data normalization for storage
+- Integration with accuracy tracking systems
+- Support for machine learning improvement workflows
+
+Data Storage:
+- Learning feedback: User corrections and AI performance data
+- Modifications: Detailed tracking of user changes
+- Processing results: Batch operation outcomes and metrics
+- Analytics: Performance trends and improvement indicators
+
+This module supports the continuous learning cycle of the AI system
+through comprehensive data collection and persistence.
+"""
 
 import os
 from utils import save_to_csv, normalize_data_for_storage, get_timestamp, format_datetime_for_storage
 
 
 class DataRecorder:
+    """Data recording engine for AI learning feedback and analytics collection.
+    
+    This class provides comprehensive data recording capabilities for the
+    email helper system, collecting user feedback, corrections, and processing
+    analytics to support continuous improvement of AI classification accuracy.
+    
+    The recorder manages:
+    - AI learning feedback collection and persistence
+    - User modification tracking and analysis
+    - Batch processing result recording
+    - Holistic analysis data storage
+    - Accepted suggestion tracking for model improvement
+    - CSV-based data storage and retrieval
+    
+    Attributes:
+        runtime_data_dir (str): Directory for runtime data storage
+        learning_file (str): Path to AI learning feedback CSV file
+        modification_file (str): Path to user modifications CSV file
+        
+    Example:
+        >>> recorder = DataRecorder('/path/to/runtime_data')
+        >>> recorder.record_learning_feedback(feedback_entries)
+        >>> recorder.record_batch_processing(50, 2, ['urgent', 'fyi'])
+    """
+    
     def __init__(self, runtime_data_dir):
         self.runtime_data_dir = runtime_data_dir
         self.learning_file = os.path.join(runtime_data_dir, 'ai_learning_feedback.csv')
         self.modification_file = os.path.join(runtime_data_dir, 'suggestion_modifications.csv')
     
     def record_learning_feedback(self, feedback_entries):
-        """Save learning feedback to improve AI over time"""
+        """Save learning feedback to improve AI classification over time.
+        
+        Records user corrections, classification feedback, and accuracy data
+        to support machine learning improvement workflows and model fine-tuning.
+        
+        Args:
+            feedback_entries (list): List of feedback dictionaries containing
+                user corrections, original classifications, and metadata.
+                
+        Example:
+            >>> feedback = [{'original': 'spam', 'corrected': 'urgent', ...}]
+            >>> recorder.record_learning_feedback(feedback)
+        """
         processed_entries = normalize_data_for_storage(feedback_entries)
         save_to_csv(processed_entries, self.learning_file)
     
     def record_batch_processing(self, success_count, error_count, categories_used):
-        """Record batch processing results for learning"""
+        """Record batch processing results for performance analysis and learning.
+        
+        Tracks batch processing outcomes, success rates, and category usage
+        patterns to support system monitoring and improvement analytics.
+        
+        Args:
+            success_count (int): Number of successfully processed emails
+            error_count (int): Number of emails that failed processing
+            categories_used (list): List of categories used in this batch
+            
+        Example:
+            >>> recorder.record_batch_processing(48, 2, ['urgent', 'fyi', 'team'])
+        """
         batch_entry = [{
             'timestamp': get_timestamp(),
             'action': 'batch_categorization',

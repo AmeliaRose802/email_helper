@@ -1,6 +1,28 @@
 #!/usr/bin/env python3
-"""
-Task Persistence - Manages persistent storage of outstanding tasks across batches
+"""Task Persistence for Email Helper - Task Storage and Lifecycle Management.
+
+This module provides comprehensive task persistence functionality, managing
+the storage, retrieval, and lifecycle of tasks across email processing
+sessions. It ensures outstanding tasks remain visible until completed.
+
+The TaskPersistence class handles:
+- Persistent storage of outstanding tasks across sessions
+- Task completion tracking and state management
+- Email-to-task association management using EntryIDs
+- Task deduplication and merging logic
+- JSON-based storage with backup and recovery
+- Task lifecycle management from creation to completion
+
+Key Features:
+- Cross-session task persistence in JSON format
+- Automatic task deduplication based on content similarity
+- Email association tracking using Outlook EntryIDs
+- Bulk task operations for efficient processing
+- Task completion with email movement integration
+- Comprehensive task metadata preservation
+
+This module integrates with the Outlook manager and GUI components
+to provide seamless task management functionality.
 """
 
 import json
@@ -10,8 +32,39 @@ from typing import Dict, List, Any
 
 
 class TaskPersistence:
+    """Task persistence manager for cross-session task storage and lifecycle management.
+    
+    This class provides comprehensive task persistence functionality, ensuring
+    that outstanding tasks remain visible and trackable across email processing
+    sessions until they are explicitly completed by the user.
+    
+    The persistence manager handles:
+    - JSON-based task storage with automatic backup
+    - Task deduplication and intelligent merging
+    - Email-to-task association using Outlook EntryIDs
+    - Task lifecycle from creation through completion
+    - Bulk task operations for efficient processing
+    - Cross-session state management
+    
+    Attributes:
+        storage_dir (str): Directory path for task storage files
+        tasks_file (str): Path to outstanding tasks JSON file
+        completed_file (str): Path to completed tasks JSON file
+        
+    Example:
+        >>> persistence = TaskPersistence()
+        >>> persistence.save_outstanding_tasks(summary_sections)
+        >>> outstanding = persistence.load_outstanding_tasks()
+        >>> print(f"Found {len(outstanding['required_actions'])} outstanding tasks")
+    """
+    
     def __init__(self, storage_dir: str = None):
-        """Initialize task persistence with storage directory"""
+        """Initialize task persistence with storage directory.
+        
+        Args:
+            storage_dir (str, optional): Directory for task storage. 
+                Defaults to 'runtime_data/tasks' relative to project root.
+        """
         if storage_dir is None:
             # Default to runtime_data/tasks
             current_dir = os.path.dirname(os.path.abspath(__file__))
