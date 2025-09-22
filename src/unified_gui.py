@@ -18,10 +18,14 @@ from summary_generator import SummaryGenerator
 from email_processor import EmailProcessor
 from task_persistence import TaskPersistence
 
+# Import new modular components and services
+from components import ProgressComponent
+from services import NotificationService, UIService, EmailService
+
 
 class UnifiedEmailGUI:
     def __init__(self):
-        # Initialize components
+        # Initialize backend components
         self.outlook_manager = OutlookManager()
         self.ai_processor = AIProcessor()
         self.email_analyzer = EmailAnalyzer(self.ai_processor)
@@ -34,7 +38,19 @@ class UnifiedEmailGUI:
         )
         self.task_persistence = TaskPersistence()  # Add task persistence
         
-        # Data storage
+        # Initialize services
+        self.notification_service = NotificationService()
+        self.ui_service = UIService()
+        self.email_service = EmailService(
+            self.outlook_manager,
+            self.ai_processor,
+            self.email_analyzer,
+            self.summary_generator,
+            self.email_processor,
+            self.task_persistence
+        )
+        
+        # Data storage (keeping for backwards compatibility during transition)
         self.email_suggestions = []
         self.action_items_data = {}
         self.summary_sections = {}
@@ -77,10 +93,15 @@ class UnifiedEmailGUI:
         self.notebook.add(self.accuracy_frame, text="4. Accuracy Dashboard")
         self.create_accuracy_tab()
         
-        # Create status bar
-        self.status_var = tk.StringVar(value="Ready")
-        status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
+        # Create status bar using ProgressComponent
+        status_bar = self.progress_component.create_status_bar(self.root)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=(0, 5))
+        
+        # Register status callback with notification service
+        self.notification_service.register_status_callback(self.progress_component.set_status)
+        
+        # Keep reference for backwards compatibility during transition
+        self.status_var = self.progress_component.get_status_var()
         
         # Initially disable tabs 1, 3 (enable summary tab immediately for task viewing)
         self.notebook.tab(1, state="disabled")  # Review & Edit tab - requires email processing
@@ -119,15 +140,23 @@ class UnifiedEmailGUI:
                                       command=self.open_accuracy_dashboard)
         self.accuracy_btn.pack(side=tk.LEFT, padx=5)
         
-        # Progress section
-        self.progress_var = tk.DoubleVar()
-        self.progress_bar = ttk.Progressbar(self.processing_frame, variable=self.progress_var, 
-                                          maximum=100)
-        self.progress_bar.pack(pady=10, fill=tk.X, padx=20)
+        # Progress section - using ProgressComponent
+        progress_config = {
+            'show_text_log': True,
+            'progress_height': 15,
+            'max_progress': 100
+        }
+        self.progress_component = ProgressComponent(self.processing_frame, progress_config)
+        progress_widget = self.progress_component.initialize()
+        progress_widget.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
-        self.progress_text = scrolledtext.ScrolledText(self.processing_frame, height=15, 
-                                                      state=tk.DISABLED, wrap=tk.WORD)
-        self.progress_text.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        # Register progress component with UI service
+        self.ui_service.register_component('progress', self.progress_component)
+        
+        # Keep references for backwards compatibility during transition
+        self.progress_var = self.progress_component.get_progress_var()
+        self.progress_bar = self.progress_component.progress_bar
+        self.progress_text = self.progress_component.progress_text
     
     def create_editing_tab(self):
         # Main container
