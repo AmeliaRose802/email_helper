@@ -3,11 +3,14 @@
 Thread Review Tab Component - Accordion-style thread grouping for email review
 """
 
-import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox
+# Standard library imports
 import re
 import webbrowser
 from datetime import datetime
+
+# Third-party imports
+import tkinter as tk
+from tkinter import ttk, scrolledtext, messagebox
 
 
 class ThreadReviewTab:

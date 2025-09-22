@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+# Standard library imports
+import os
+import re
+import sys
+import threading
+import webbrowser
+from datetime import datetime
+
+# Third-party imports
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
-from datetime import datetime
-import threading
-import os
-import webbrowser
-import sys
-import re
 
+# Local imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from outlook_manager import OutlookManager
 from ai_processor import AIProcessor
 from email_analyzer import EmailAnalyzer
-from summary_generator import SummaryGenerator
 from email_processor import EmailProcessor
+from outlook_manager import OutlookManager
+from summary_generator import SummaryGenerator
 from task_persistence import TaskPersistence
 
 

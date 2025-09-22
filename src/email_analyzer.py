@@ -2,6 +2,8 @@
 """
 Email Analyzer - Handles email analysis (job matching, date extraction, links, etc.)
 """
+
+# Standard library imports
 import re
 import urllib.parse as urlparse
 from datetime import datetime, timedelta
