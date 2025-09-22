@@ -9,6 +9,7 @@
 ## 🚀 Recent Improvements
 
 ### Email Classification Accuracy Enhancement
+
 **Status:** ✅ COMPLETED
 
 - Analyzed 108 user corrections to improve AI accuracy
@@ -17,11 +18,13 @@
 - Expected 15-20% overall accuracy improvement
 
 **Key Improvements:**
+
 - Better personal vs team action distinction
 - Enhanced spam filtering for generic communications
 - Improved decision tree with real-world calibration
 
 ### Task Persistence and Tracking
+
 **Status:** ✅ COMPLETED
 
 - Outstanding tasks now persist across email batches
@@ -30,6 +33,7 @@
 - Holistic inbox analysis for better context awareness
 
 ### Deduplication Enhancements
+
 **Status:** ✅ COMPLETED
 
 - Entry ID-based deduplication (each email appears once)

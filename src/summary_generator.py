@@ -1,6 +1,28 @@
 #!/usr/bin/env python3
-"""
-Summary Generator - Handles summary creation, display, and file output
+"""Summary Generator for Email Helper - Summary Creation and Display Management.
+
+This module handles the generation, formatting, and output of email summaries
+across multiple formats including GUI display, HTML files, and structured
+text output. It provides comprehensive summary management capabilities.
+
+The SummaryGenerator class manages:
+- Summary section organization and formatting
+- Multi-format output generation (GUI, HTML, text)
+- Template-based summary rendering using Jinja2
+- Section persistence and state management
+- Cross-session summary continuity
+- User-friendly formatting and presentation
+
+Key Features:
+- Configurable summary sections with standardized structure
+- Template-based HTML generation with consistent styling
+- Persistent summary state across application sessions
+- Multiple output formats for different use cases
+- Section-specific formatting and organization
+- Integration with task persistence for outstanding items
+
+This module integrates with the GUI components and task management
+system to provide a unified summary experience.
 """
 
 from datetime import datetime
@@ -9,6 +31,31 @@ from jinja2 import Environment, FileSystemLoader
 
 
 class SummaryGenerator:
+    """Summary generation and formatting engine for email processing results.
+    
+    This class handles the creation, organization, and formatting of email
+    summaries across multiple output formats. It manages summary sections,
+    applies templates, and ensures consistent presentation of results.
+    
+    The generator provides:
+    - Structured summary section management
+    - Template-based HTML output generation
+    - Cross-session summary persistence
+    - Multiple output format support
+    - Section-specific formatting and styling
+    - Integration with task management systems
+    
+    Attributes:
+        SECTION_KEYS (dict): Mapping of category names to section identifiers
+        EMPTY_SECTIONS (dict): Default empty structure for summary sections
+        
+    Example:
+        >>> generator = SummaryGenerator()
+        >>> sections = generator.organize_summary_sections(action_items)
+        >>> html_output = generator.generate_html_summary(sections)
+        >>> print(len(html_output))  # Size of generated HTML
+    """
+    
     def __init__(self):
         # Constants for section configuration
         self.SECTION_KEYS = {

@@ -27,31 +27,36 @@ This will create template files in `user_specific_data/` directory.
 Edit the following files with your specific information:
 
 #### `user_specific_data/username.txt`
+
 - Your email username (used for @mentions and direct email detection)
 
 #### `user_specific_data/job_role_context.md`
+
 - Your job title and primary responsibilities
 - Technical areas you work on
 - Keywords relevant to your work domain
 - Special roles or duties
 
 #### `user_specific_data/classification_rules.md`
+
 - Customize email classification categories
 - Adjust priority rules based on your work
 - Modify the logic for what constitutes urgent vs optional
 
 #### `user_specific_data/job_summery.md`
+
 - High-level overview of your role
 - Focus areas and key responsibilities
 
 #### `user_specific_data/job_skill_summery.md`
+
 - Technical skills and experience
 - Programming languages, tools, frameworks
 - Domain expertise
 
 ### 3. Security Considerations
 
-⚠️ **IMPORTANT**: The user_specific_data/ directory is added to .gitignore automatically to prevent accidentally committing personal job information to version control.
+⚠️ **IMPORTANT**: The `user_specific_data/` directory is added to `.gitignore` automatically to prevent accidentally committing personal job information to version control.
 
 ## How It Works
 

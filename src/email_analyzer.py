@@ -1,18 +1,83 @@
 #!/usr/bin/env python3
+"""Email Analyzer for Email Helper - Content Analysis and Processing.
+
+This module provides comprehensive email content analysis capabilities,
+including intelligent text processing, date extraction, link parsing,
+and context-aware email classification support.
+
+The EmailAnalyzer class handles:
+- Due date extraction from email content using natural language processing
+- Link extraction and categorization from email bodies
+- Job posting detection and analysis
+- Content analysis for AI classification support
+- Text preprocessing and cleaning for downstream processing
+
+Key Features:
+- Intelligent due date extraction with relative date support
+- Robust URL parsing and link categorization
+- Job listing detection and metadata extraction
+- Content preprocessing for AI analysis
+- Support for various email formats and content types
+
+This module integrates with the AI processor to provide enhanced
+context for email classification and task extraction.
 """
-Email Analyzer - Handles email analysis (job matching, date extraction, links, etc.)
-"""
+
 import re
 import urllib.parse as urlparse
 from datetime import datetime, timedelta
 
 
 class EmailAnalyzer:
+    """Email content analyzer for intelligent processing and classification support.
+    
+    This class provides comprehensive email analysis capabilities, including
+    content parsing, date extraction, link analysis, and preprocessing for
+    AI classification. It serves as a helper component for the AI processor.
+    
+    The analyzer handles:
+    - Intelligent due date extraction from natural language
+    - URL parsing and link categorization
+    - Job posting detection and analysis
+    - Content preprocessing for AI models
+    - Text cleaning and normalization
+    
+    Attributes:
+        ai_processor (AIProcessor, optional): Reference to AI processor for
+            enhanced analysis capabilities.
+    
+    Example:
+        >>> analyzer = EmailAnalyzer(ai_processor)
+        >>> due_date = analyzer.extract_due_date_intelligent("Please respond by tomorrow")
+        >>> print(due_date)
+        'December 16, 2024'
+    """
+    
     def __init__(self, ai_processor=None):
         self.ai_processor = ai_processor
     
     def extract_due_date_intelligent(self, text):
-        """Intelligent due date extraction"""
+        """Extract due dates from email text using intelligent pattern matching.
+        
+        This method analyzes email content to identify due dates, deadlines,
+        and time-sensitive information using both relative date expressions
+        (like "tomorrow", "next week") and absolute date patterns.
+        
+        Args:
+            text (str): Email content to analyze for due dates.
+            
+        Returns:
+            str: Formatted due date string or None if no date found.
+                 Relative dates are converted to absolute dates.
+                 Uncertain dates are prefixed with "~".
+                 
+        Example:
+            >>> analyzer = EmailAnalyzer()
+            >>> date = analyzer.extract_due_date_intelligent("Please respond by tomorrow")
+            >>> print(date)  # "December 16, 2024"
+            >>> date2 = analyzer.extract_due_date_intelligent("Due next week")
+            >>> print(date2)  # "~December 23, 2024"
+        """
         text_lower = text.lower()
         
         # Simple relative dates
