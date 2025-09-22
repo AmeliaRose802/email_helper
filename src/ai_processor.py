@@ -144,6 +144,52 @@ Learning History: {len(learning_data)} previous decisions"""
         # Clean result and return lowercase
         return clean_ai_response(result).lower() or "general_information"
     
+    def classify_email_with_explanation(self, email_content, learning_data):
+        """Enhanced email classification that returns both category and explanation"""
+        context = f"""{self.get_standard_context()}
+Learning History: {len(learning_data)} previous decisions"""
+        
+        inputs = self._create_email_inputs(email_content, context)
+        result = self.execute_prompty('email_classifier_with_explanation.prompty', inputs)
+        
+        if not result or result in ["AI processing unavailable", "AI processing failed"]:
+            # Fallback to basic classification for backward compatibility
+            category = self.classify_email(email_content, learning_data)
+            return {
+                'category': category,
+                'explanation': f"AI explanation unavailable. Classified as {category} using basic rules."
+            }
+        
+        # Try to parse as JSON
+        fallback_data = {
+            'category': 'fyi',
+            'explanation': 'AI classification failed, defaulting to FYI for safety.'
+        }
+        
+        try:
+            # Clean and parse the JSON response
+            cleaned_result = clean_ai_response(result)
+            parsed = parse_json_with_fallback(cleaned_result, fallback_data)
+            
+            # Validate required fields
+            if not isinstance(parsed, dict) or 'category' not in parsed:
+                print(f"⚠️ Invalid classification format: {cleaned_result[:100]}")
+                return fallback_data
+            
+            # Clean category and provide default explanation if missing
+            category = clean_ai_response(parsed.get('category', 'fyi')).lower()
+            explanation = parsed.get('explanation', f'Classified as {category} based on email content.')
+            
+            return {
+                'category': category,
+                'explanation': explanation
+            }
+            
+        except Exception as e:
+            print(f"⚠️ Error parsing classification response: {e}")
+            print(f"   Raw result: {result[:200]}...")
+            return fallback_data
+    
 
     
     def detect_resolved_team_action(self, email_content, thread_context=""):

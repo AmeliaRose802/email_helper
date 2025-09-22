@@ -1,15 +1,32 @@
 ---
-name: Email Classifier System
-description: Intelligent email classifier that categorizes emails into specific action types
-version: 1.2
-tags: [email, classification, azure, adhd-friendly]
+name: Email Classifier with Explanations
+description: Enhanced email classifier that provides both category and explanation for## Calibration Examples (few-shot)
+- Subject: "Request: Network Team to open firewall for svc-X"
+  Body: "We've asked **Network Team** to open ports 8443/9443. They'll confirm once done."
+  → {"category": "fyi", "explanation": "Action is owned by Network Team, not our team. We're just being informed of the request status."}
+
+- Subject: "Compute Fabric: please review PR #1289 by EOD"
+  Body: "@Compute-Fabric reviewers: need your approval to unblock rollout."
+  → {"category": "team_action", "explanation": "Explicit request for our team to review and approve a PR with a deadline."}
+
+- Subject: "Dependency outage in ContosoAuth"
+  Body: "Owner: **ContosoAuth**. We'll monitor. No action for Compute Fabric."
+  → {"category": "fyi", "explanation": "Outage is owned by ContosoAuth team with no action required from us."}
+
+- Subject: "IMDS regression in our service (P1)"
+  Body: "Owner: Compute Fabric. On-call to investigate and mitigate."
+  → {"category": "team_action", "explanation": "P1 incident owned by our team requiring immediate action from on-call."}
+
+user:standing
+version: 2.0
+tags: [email, classification, azure, adhd-friendly, explanations]
 model:
   api: chat
   configuration:
     type: azure_openai
   parameters:
     temperature: 0.1
-    max_tokens: 200
+    max_tokens: 300
 inputs:
   context:
     type: string
@@ -121,10 +138,15 @@ Signals the action is on **another team** (classify as `fyi` unless a clear coun
 **Tie-breaker:** When action ownership is unclear, choose `fyi` instead of `team_action`.
 
 ## Output Format
-Return ONLY one of:
-required_personal_action, team_action, optional_action, job_listing, optional_event, work_relevant, fyi, newsletter, spam_to_delete
+Return a JSON object with exactly this structure:
+{
+  "category": "one_of_the_categories_listed_below",
+  "explanation": "brief_reason_for_this_categorization"
+}
 
-Do not output anything else.
+Valid categories: required_personal_action, team_action, optional_action, job_listing, optional_event, work_relevant, fyi, newsletter, spam_to_delete
+
+The explanation should be 1-2 sentences explaining why this specific category was chosen based on the classification rules above.
 
 ## Calibration Examples (few-shot)
 - Subject: “Request: Network Team to open firewall for svc-X”
@@ -157,4 +179,4 @@ Date: {{date}}
 Body:
 {{body}}
 
-Classify this email into exactly one category based on the rules above.
+Return a JSON object with the category and explanation for this email classification.

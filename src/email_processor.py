@@ -85,8 +85,10 @@ class EmailProcessor:
             if ai_summary:
                 print(f"📋 AI Summary: {ai_summary}")
             
-            # Classify the email
-            suggestion = self.ai_processor.classify_email(email_content, learning_data)
+            # Classify the email with explanation
+            classification_result = self.ai_processor.classify_email_with_explanation(email_content, learning_data)
+            suggestion = classification_result['category']
+            explanation = classification_result['explanation']
             
             # CRASH HARD if AI classification failed
             if suggestion in ["AI processing unavailable", "AI processing failed", "general_information"]:
@@ -104,15 +106,19 @@ class EmailProcessor:
                     print(f"... (truncated, full length: {len(email_content['body'])} chars)")
                 print(f"\n--- AI CLASSIFICATION RESULT ---")
                 print(f"Suggestion: '{suggestion}'")
+                print(f"Explanation: '{explanation}'")
                 print("="*80)
                 raise RuntimeError(f"AI classification failed for email: {email_content['subject']}")
             
             print(f"🤖 AI Classification: {suggestion.replace('_', ' ').title()}")
+            print(f"   📝 Reasoning: {explanation}")
+            print(f"   ⏳ Detailed processing deferred until after review")
             
-            # Store email suggestion with full conversation context
+            # Store email suggestion with full conversation context and explanation
             email_suggestion = {
                 'email_object': representative_email,
                 'ai_suggestion': suggestion,
+                'explanation': explanation,  # Store the AI explanation
                 'thread_data': {
                     'conversation_id': conversation_id,
                     'thread_count': thread_count,
@@ -125,15 +131,51 @@ class EmailProcessor:
             
             self.email_suggestions.append(email_suggestion)
             
-            # Process based on category
-            self._process_email_by_category(representative_email, email_suggestion['thread_data'], suggestion)
-            
+            # Store in categories but skip expensive processing for now
             categories[suggestion].append(representative_email)
         
         # Show categorization summary
         self.summary_generator.show_categorization_preview(categories)
         
+        print(f"\n💡 Initial classification complete! Review and reclassify as needed.")
+        print(f"   Detailed AI analysis will be performed when you apply changes to Outlook.")
+        print(f"   This saves processing time and avoids wasted work on reclassified emails.")
+        
         return self.email_suggestions
+    
+    def process_detailed_analysis(self, finalized_suggestions):
+        """
+        Perform detailed AI analysis only after user has completed reclassification.
+        This avoids wasting AI calls on emails that will be reclassified.
+        """
+        print("\n🔍 Processing detailed analysis for finalized classifications...")
+        
+        # Reset action items data for fresh processing
+        self._reset_data_storage()
+        
+        # Group suggestions by category for efficient batch processing
+        by_category = {}
+        for suggestion in finalized_suggestions:
+            category = suggestion.get('ai_suggestion', 'fyi')
+            if category not in by_category:
+                by_category[category] = []
+            by_category[category].append(suggestion)
+        
+        # Process each category with appropriate detail level
+        for category, suggestions in by_category.items():
+            print(f"📋 Processing {len(suggestions)} {category.replace('_', ' ')} items...")
+            
+            for suggestion in suggestions:
+                email_object = suggestion.get('email_object')
+                thread_data = suggestion.get('thread_data', {})
+                explanation = suggestion.get('explanation', f"Classified as {category}")
+                
+                if email_object:
+                    # Now perform the detailed processing
+                    self._process_email_by_category(email_object, thread_data, category, explanation)
+        
+        print("✅ Detailed analysis completed")
+        return self.action_items_data
     
     def _build_thread_context(self, emails, representative_email):
         """Build context summary from conversation thread"""
@@ -187,7 +229,7 @@ class EmailProcessor:
             'body': self.outlook_manager.get_email_body(email)
         }
     
-    def _process_email_by_category(self, email, email_data, suggestion):
+    def _process_email_by_category(self, email, email_data, suggestion, explanation=None):
         """Process email based on its AI-suggested category"""
         # Check for duplicates using EntryID
         entry_id = getattr(email, 'EntryID', None)
@@ -257,6 +299,7 @@ class EmailProcessor:
                 'email_sender': email.SenderName,
                 'email_date': email.ReceivedTime,
                 'action_details': action_details,
+                'explanation': explanation or f"Classified as {suggestion.replace('_', ' ')} based on email content.",
                 'thread_data': email_data
             })
         
@@ -279,6 +322,7 @@ class EmailProcessor:
                 'qualification_match': qualification_match,
                 'due_date': metadata['due_date'],
                 'links': metadata['links'],
+                'explanation': explanation or f"Classified as job listing based on email content.",
                 'thread_data': email_data
             }
             self.action_items_data['job_listing'].append(job_data)
@@ -302,6 +346,7 @@ class EmailProcessor:
                 'date': metadata['due_date'],
                 'relevance': relevance,
                 'links': metadata['links'],
+                'explanation': explanation or f"Classified as optional event based on email content.",
                 'thread_data': email_data
             }
             self.action_items_data['optional_event'].append(event_data)
@@ -333,6 +378,7 @@ class EmailProcessor:
                     'email_sender': email.SenderName,
                     'email_date': email.ReceivedTime,
                     'summary': fyi_summary,
+                    'explanation': explanation or f"Classified as FYI based on email content.",
                     'thread_data': email_data
                 }
                 self.action_items_data['fyi'].append(fyi_data)
@@ -353,6 +399,7 @@ class EmailProcessor:
                     'email_sender': email.SenderName,
                     'email_date': email.ReceivedTime,
                     'summary': newsletter_summary,
+                    'explanation': explanation or f"Classified as newsletter based on email content.",
                     'thread_data': email_data
                 }
                 self.action_items_data['newsletter'].append(newsletter_data)

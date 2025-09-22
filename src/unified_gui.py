@@ -1301,120 +1301,39 @@ class UnifiedEmailGUI:
         self.ai_processor.record_suggestion_modification(email_info, old_category, new_category, user_explanation)
     
     def _update_action_items_for_reclassification(self, suggestion_data, old_category, new_category):
-        """Update action_items_data when an email is reclassified"""
+        """Update email suggestions when an email is reclassified (lightweight, deferred processing)"""
         email_data = suggestion_data.get('email_data', {})
-        thread_data = suggestion_data.get('thread_data', {})
         
         print(f"🔄 Reclassifying email '{email_data.get('subject', 'Unknown')[:50]}' from '{old_category}' to '{new_category}'")
         
-        # Update both the GUI's action_items_data and the email_processor's action_items_data
-        for action_items_store in [self.action_items_data, self.email_processor.action_items_data]:
-            # Remove from old category if it exists in action_items_data
-            if old_category in action_items_store:
-                # Find and remove the item with matching email data
-                items_to_remove = []
-                for i, item in enumerate(action_items_store[old_category]):
-                    if (item.get('email_subject') == email_data.get('subject') and 
-                        item.get('email_sender') == email_data.get('sender_name')):
-                        items_to_remove.append(i)
+        # Just update the suggestion data - detailed processing will happen later
+        # Find and update the corresponding email suggestion
+        for suggestion in self.email_suggestions:
+            suggestion_email_data = suggestion.get('thread_data', {})
+            if (suggestion_email_data.get('topic', '') == email_data.get('subject', '') or
+                suggestion.get('email_object', {}) and 
+                getattr(suggestion['email_object'], 'Subject', '') == email_data.get('subject', '')):
                 
-                # Remove items in reverse order to maintain indices
-                for i in reversed(items_to_remove):
-                    action_items_store[old_category].pop(i)
-            
-            # Add to new category
-            if new_category not in action_items_store:
-                action_items_store[new_category] = []
+                # Update the AI suggestion to the new category
+                suggestion['ai_suggestion'] = new_category
+                suggestion['explanation'] = f"Manually reclassified as {new_category.replace('_', ' ')} from {old_category.replace('_', ' ')}."
+                
+                print(f"✅ Updated suggestion data for deferred processing")
+                break
         
-        # Create appropriate data structure based on new category
-        if new_category == 'fyi':
-            # Generate FYI summary for reclassified item
-            email_content = {
-                'subject': email_data.get('subject', 'Unknown'),
-                'sender': email_data.get('sender_name', 'Unknown'),
-                'body': email_data.get('body', ''),
-                'received_time': email_data.get('received_time')
-            }
-            context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
-            fyi_summary = self.ai_processor.generate_fyi_summary(email_content, context)
+        # Clear old action items data - it will be regenerated during deferred processing
+        # This prevents inconsistent state between review and final processing
+        if old_category in self.action_items_data:
+            # Find and remove the item with matching email data
+            items_to_remove = []
+            for i, item in enumerate(self.action_items_data[old_category]):
+                if (item.get('email_subject') == email_data.get('subject') and 
+                    item.get('email_sender') == email_data.get('sender_name')):
+                    items_to_remove.append(i)
             
-            # Create proper FYI structure matching original email processing
-            fyi_item = {
-                'email_object': None,  # No actual email object for reclassified items
-                'email_subject': email_data.get('subject'),
-                'email_sender': email_data.get('sender_name'),
-                'email_date': email_data.get('received_time'),
-                'summary': fyi_summary,
-                'thread_data': thread_data
-            }
-            # Add to both data stores
-            for action_items_store in [self.action_items_data, self.email_processor.action_items_data]:
-                action_items_store[new_category].append(fyi_item)
-            
-        elif new_category == 'newsletter':
-            # Generate newsletter summary for reclassified item
-            email_content = {
-                'subject': email_data.get('subject', 'Unknown'),
-                'sender': email_data.get('sender_name', 'Unknown'),
-                'body': email_data.get('body', ''),
-                'received_time': email_data.get('received_time')
-            }
-            context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
-            newsletter_summary = self.ai_processor.generate_newsletter_summary(email_content, context)
-            
-            # Create proper newsletter structure matching original email processing
-            newsletter_item = {
-                'email_object': None,  # No actual email object for reclassified items
-                'email_subject': email_data.get('subject'),
-                'email_sender': email_data.get('sender_name'),
-                'email_date': email_data.get('received_time'),
-                'summary': newsletter_summary,
-                'thread_data': thread_data
-            }
-            # Add to both data stores
-            for action_items_store in [self.action_items_data, self.email_processor.action_items_data]:
-                action_items_store[new_category].append(newsletter_item)
-            
-        elif new_category in ['required_personal_action', 'optional_action', 'team_action']:
-            # Generate action item details for reclassified item
-            email_content = {
-                'subject': email_data.get('subject', 'Unknown'),
-                'sender': email_data.get('sender_name', 'Unknown'),
-                'body': email_data.get('body', ''),
-                'received_time': email_data.get('received_time')
-            }
-            context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
-            action_details = self.ai_processor.extract_action_item_details(email_content, context)
-            
-            # Create proper action item structure matching original email processing
-            action_item = {
-                'email_object': None,  # No actual email object for reclassified items
-                'email_subject': email_data.get('subject'),
-                'email_sender': email_data.get('sender_name'),
-                'email_date': email_data.get('received_time'),
-                'action_details': action_details,
-                'thread_data': thread_data
-            }
-            # Add to both data stores
-            for action_items_store in [self.action_items_data, self.email_processor.action_items_data]:
-                action_items_store[new_category].append(action_item)
-            
-        elif new_category == 'optional_event':
-            # Generate event relevance for reclassified item
-            relevance = self.ai_processor.assess_event_relevance(
-                email_data.get('subject', ''), email_data.get('body', ''), 
-                self.ai_processor.get_job_context())
-            
-            event_item = {
-                'relevance': relevance,
-                'thread_data': thread_data,
-                'email_subject': email_data.get('subject'),
-                'email_sender': email_data.get('sender_name'),
-                'email_date': email_data.get('received_time')
-            }
-            # Add to both data stores
-            for action_items_store in [self.action_items_data, self.email_processor.action_items_data]:
-                action_items_store[new_category].append(event_item)
+            # Remove items in reverse order to maintain indices
+            for i in reversed(items_to_remove):
+                self.action_items_data[old_category].pop(i)
     
     def apply_to_outlook(self):
         # Auto-apply any pending changes before applying to Outlook
@@ -1422,6 +1341,16 @@ class UnifiedEmailGUI:
         
         if not self.email_suggestions:
             messagebox.showwarning("No Data", "No email suggestions to apply.")
+            return
+        
+        # NOW perform detailed AI analysis on finalized classifications
+        print("\n🚀 Starting detailed processing of finalized email classifications...")
+        try:
+            self.action_items_data = self.email_processor.process_detailed_analysis(self.email_suggestions)
+            print("✅ Detailed processing completed successfully")
+        except Exception as e:
+            print(f"❌ Error during detailed processing: {e}")
+            messagebox.showerror("Processing Error", f"Failed to complete detailed analysis: {e}")
             return
         
         # Calculate folder distribution for user preview
@@ -1470,6 +1399,18 @@ This will help keep your inbox focused on actionable items only."""
     
     def generate_summary(self):
         self.generate_summary_btn.config(state=tk.DISABLED)
+        
+        # Ensure detailed processing is completed before generating summary
+        if self.email_suggestions and not self.action_items_data.get('required_personal_action') and not self.action_items_data.get('fyi'):
+            print("\n🔍 Performing detailed processing for summary generation...")
+            try:
+                self.action_items_data = self.email_processor.process_detailed_analysis(self.email_suggestions)
+                print("✅ Detailed processing completed for summary")
+            except Exception as e:
+                print(f"❌ Error during detailed processing: {e}")
+                messagebox.showerror("Processing Error", f"Failed to complete detailed analysis: {e}")
+                self.generate_summary_btn.config(state=tk.NORMAL)
+                return
         
         # Generate summary sections from current batch
         current_batch_sections = self.summary_generator.build_summary_sections(self.action_items_data)
@@ -1718,7 +1659,7 @@ This will help keep your inbox focused on actionable items only."""
             self.summary_text.insert(tk.END, f"{item.get('why_relevant', item.get('explanation', 'No specific reason provided'))}\n", "content_text")
             
             self.summary_text.insert(tk.END, "   Context: ", "content_label")
-            self.summary_text.insert(tk.END, f"{item['explanation']}\n", "content_text")
+            self.summary_text.insert(tk.END, f"{item.get('explanation', 'No explanation provided')}\n", "content_text")
             
             # Task ID for completion tracking
             if item.get('task_id'):
