@@ -19,7 +19,7 @@ from email_processor import EmailProcessor
 from task_persistence import TaskPersistence
 
 # Import new modular components and services
-from components import ProgressComponent
+from components import ProgressComponent, EmailTreeComponent
 from services import NotificationService, UIService, EmailService
 
 
@@ -166,35 +166,42 @@ class UnifiedEmailGUI:
         main_frame.columnconfigure(1, weight=1)
         main_frame.rowconfigure(1, weight=1)
         
-        # Create email list
+        # Create email list using EmailTreeComponent
         tree_frame = ttk.Frame(main_frame)
         tree_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
         tree_frame.columnconfigure(0, weight=1)
         tree_frame.rowconfigure(0, weight=1)
         
-        columns = ('Subject', 'From', 'Category', 'AI Summary', 'Date')
-        self.email_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', height=12)
+        # Configure email tree component
+        email_tree_config = {
+            'columns': ('Subject', 'From', 'Category', 'AI Summary', 'Date'),
+            'height': 12,
+            'column_widths': {
+                'Subject': 250,
+                'From': 150,
+                'Category': 150,
+                'AI Summary': 300,
+                'Date': 100
+            },
+            'sortable': True
+        }
         
-        # Initialize sorting state
-        self.sort_column = None
-        self.sort_reverse = False
+        self.email_tree_component = EmailTreeComponent(tree_frame, email_tree_config)
+        email_tree_widget = self.email_tree_component.initialize()
+        email_tree_widget.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Configure columns with sorting
-        for col in columns:
-            self.email_tree.heading(col, text=col, command=lambda c=col: self.sort_by_column(c))
-            
-        self.email_tree.column('Subject', width=250)
-        self.email_tree.column('From', width=150)
-        self.email_tree.column('Category', width=150)
-        self.email_tree.column('AI Summary', width=300)
-        self.email_tree.column('Date', width=100)
+        # Register email tree component with UI service
+        self.ui_service.register_component('email_tree', self.email_tree_component)
         
-        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.email_tree.yview)
-        self.email_tree.configure(yscrollcommand=scrollbar.set)
+        # Register event handlers for email tree
+        self.email_tree_component.register_callback('email_selected', self._on_email_tree_selection)
+        self.email_tree_component.register_callback('selection_cleared', self._on_email_tree_selection_cleared)
+        self.email_tree_component.register_callback('tree_sorted', self._on_email_tree_sorted)
         
-        self.email_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        self.email_tree.bind('<<TreeviewSelect>>', self.on_email_select)
+        # Keep references for backwards compatibility during transition
+        self.email_tree = self.email_tree_component.tree
+        self.sort_column = self.email_tree_component.sort_column
+        self.sort_reverse = self.email_tree_component.sort_reverse
         
         # Details panel
         details_frame = ttk.LabelFrame(main_frame, text="Email Details", padding="10")
@@ -1392,23 +1399,37 @@ class UnifiedEmailGUI:
     
     def _auto_select_first_email(self):
         """Automatically select the first email when review pane opens"""
-        children = self.email_tree.get_children()
-        if children:
-            # Select the first item
-            first_item = children[0]
-            self.email_tree.selection_set(first_item)
-            self.email_tree.focus(first_item)
-            # Display its details
-            self.display_email_details(0)
+        if hasattr(self, 'email_tree_component'):
+            # Use the component's method
+            self.email_tree_component.select_first_email()
+        else:
+            # Fallback for backwards compatibility
+            children = self.email_tree.get_children()
+            if children:
+                # Select the first item
+                first_item = children[0]
+                self.email_tree.selection_set(first_item)
+                self.email_tree.focus(first_item)
+                # Display its details
+                self.display_email_details(0)
         
     def load_processed_emails(self):
-        """Load processed emails into the tree view"""
-        self.refresh_email_tree()
+        """Load processed emails into the tree view using EmailTreeComponent"""
+        if hasattr(self, 'email_tree_component'):
+            self.email_tree_component.update_data({'emails': self.email_suggestions})
+        else:
+            # Fallback for backwards compatibility
+            self.refresh_email_tree()
     
     def sort_by_column(self, col):
         """Sort the email tree by the specified column"""
-        if not hasattr(self, 'email_suggestions') or not self.email_suggestions:
-            return
+        if hasattr(self, 'email_tree_component'):
+            # Delegate to the component
+            self.email_tree_component.sort_by_column(col)
+        else:
+            # Fallback for backwards compatibility - keep existing logic
+            if not hasattr(self, 'email_suggestions') or not self.email_suggestions:
+                return
         
         # Toggle sort direction if clicking the same column
         if self.sort_column == col:
@@ -1473,60 +1494,65 @@ class UnifiedEmailGUI:
     
     def refresh_email_tree(self):
         """Refresh the email tree view with current email_suggestions order"""
-        # Clear existing items
-        for item in self.email_tree.get_children():
-            self.email_tree.delete(item)
-        
-        # Repopulate with sorted data
-        for i, suggestion_data in enumerate(self.email_suggestions):
-            email_data = suggestion_data.get('email_data', {})
-            suggestion = suggestion_data['ai_suggestion']
-            initial_classification = suggestion_data.get('initial_classification', suggestion)
-            processing_notes = suggestion_data.get('processing_notes', [])
-            ai_summary = suggestion_data.get('ai_summary', 'No summary')
-            thread_data = suggestion_data.get('thread_data', {})
-            thread_count = thread_data.get('thread_count', 1)
+        if hasattr(self, 'email_tree_component'):
+            # Use the component's refresh method
+            self.email_tree_component.update_data({'emails': self.email_suggestions})
+        else:
+            # Fallback for backwards compatibility - original implementation
+            # Clear existing items
+            for item in self.email_tree.get_children():
+                self.email_tree.delete(item)
             
-            # Add processing note indicator to summary if reclassified
-            if processing_notes:
-                ai_summary = f"🔄 {ai_summary} | {'; '.join(processing_notes[:1])}"  # Show first note
-            
-            # Handle thread data
-            if thread_count > 1:
-                participants = thread_data.get('participants', [email_data.get('sender_name', 'Unknown')])
-                subject = f"🧵 {thread_data.get('topic', email_data.get('subject', 'Unknown'))} ({thread_count} emails)"
-                sender = f"{len(participants)} participants"
-            else:
-                subject = email_data.get('subject', 'Unknown Subject')
-                sender = email_data.get('sender_name', email_data.get('sender', 'Unknown Sender'))
-            
-            # Format date
-            received_time = email_data.get('received_time', 'Unknown Date')
-            if hasattr(received_time, 'strftime'):
-                date_str = received_time.strftime('%m-%d %H:%M')
-            else:
-                date_str = str(received_time)[:10] if received_time != 'Unknown Date' else 'Unknown'
-            
-            # Show both original and final classification if different
-            category = suggestion.replace('_', ' ').title()
-            if initial_classification != suggestion:
-                category = f"{category} (was {initial_classification.replace('_', ' ').title()})"
-            
-            # Add priority indicator for holistic insights
-            holistic_priority = suggestion_data.get('holistic_priority', None)
-            if holistic_priority == 'high':
-                subject = f"🔴 {subject}"
-            elif holistic_priority == 'medium':
-                subject = f"🟡 {subject}"
-            
-            # Truncate long text for better display (but preserve thread indicators)
-            if not subject.startswith('🧵'):  # Don't truncate thread subjects
-                subject = subject[:47] + "..." if len(subject) > 50 else subject
-            if not sender.endswith('participants'):  # Don't truncate participant counts
-                sender = sender[:22] + "..." if len(sender) > 25 else sender
-            ai_summary = ai_summary[:47] + "..." if len(ai_summary) > 50 else ai_summary
-            
-            self.email_tree.insert('', 'end', values=(subject, sender, category, ai_summary, date_str))
+            # Repopulate with sorted data
+            for i, suggestion_data in enumerate(self.email_suggestions):
+                email_data = suggestion_data.get('email_data', {})
+                suggestion = suggestion_data['ai_suggestion']
+                initial_classification = suggestion_data.get('initial_classification', suggestion)
+                processing_notes = suggestion_data.get('processing_notes', [])
+                ai_summary = suggestion_data.get('ai_summary', 'No summary')
+                thread_data = suggestion_data.get('thread_data', {})
+                thread_count = thread_data.get('thread_count', 1)
+                
+                # Add processing note indicator to summary if reclassified
+                if processing_notes:
+                    ai_summary = f"🔄 {ai_summary} | {'; '.join(processing_notes[:1])}"  # Show first note
+                
+                # Handle thread data
+                if thread_count > 1:
+                    participants = thread_data.get('participants', [email_data.get('sender_name', 'Unknown')])
+                    subject = f"🧵 {thread_data.get('topic', email_data.get('subject', 'Unknown'))} ({thread_count} emails)"
+                    sender = f"{len(participants)} participants"
+                else:
+                    subject = email_data.get('subject', 'Unknown Subject')
+                    sender = email_data.get('sender_name', email_data.get('sender', 'Unknown Sender'))
+                
+                # Format date
+                received_time = email_data.get('received_time', 'Unknown Date')
+                if hasattr(received_time, 'strftime'):
+                    date_str = received_time.strftime('%m-%d %H:%M')
+                else:
+                    date_str = str(received_time)[:10] if received_time != 'Unknown Date' else 'Unknown'
+                
+                # Show both original and final classification if different
+                category = suggestion.replace('_', ' ').title()
+                if initial_classification != suggestion:
+                    category = f"{category} (was {initial_classification.replace('_', ' ').title()})"
+                
+                # Add priority indicator for holistic insights
+                holistic_priority = suggestion_data.get('holistic_priority', None)
+                if holistic_priority == 'high':
+                    subject = f"🔴 {subject}"
+                elif holistic_priority == 'medium':
+                    subject = f"🟡 {subject}"
+                
+                # Truncate long text for better display (but preserve thread indicators)
+                if not subject.startswith('🧵'):  # Don't truncate thread subjects
+                    subject = subject[:47] + "..." if len(subject) > 50 else subject
+                if not sender.endswith('participants'):  # Don't truncate participant counts
+                    sender = sender[:22] + "..." if len(sender) > 25 else sender
+                ai_summary = ai_summary[:47] + "..." if len(ai_summary) > 50 else ai_summary
+                
+                self.email_tree.insert('', 'end', values=(subject, sender, category, ai_summary, date_str))
 
     def on_email_select(self, event):
         # Auto-apply any pending changes before switching
@@ -2557,8 +2583,12 @@ This will help keep your inbox focused on actionable items only."""
             self.progress_text.config(state=tk.DISABLED)
             
             # Clear email tree
-            for item in self.email_tree.get_children():
-                self.email_tree.delete(item)
+            if hasattr(self, 'email_tree_component'):
+                self.email_tree_component.clear_tree()
+            else:
+                # Fallback for backwards compatibility
+                for item in self.email_tree.get_children():
+                    self.email_tree.delete(item)
             
             # Clear summary
             self.summary_text.config(state=tk.NORMAL)
@@ -2871,6 +2901,32 @@ This will help keep your inbox focused on actionable items only."""
         except Exception as e:
             self.status_var.set(f"Error loading tasks: {str(e)}")
             messagebox.showerror("Error", f"Failed to load outstanding tasks:\n{str(e)}")
+    
+    def _on_email_tree_selection(self, event_data: Dict[str, Any]) -> None:
+        """Handle email tree selection event from EmailTreeComponent."""
+        if event_data and 'index' in event_data:
+            # Auto-apply any pending changes before switching
+            self._auto_apply_pending_changes()
+            
+            # Display email details
+            index = event_data['index']
+            if index < len(self.email_suggestions):
+                self.display_email_details(index)
+                
+    def _on_email_tree_selection_cleared(self, event_data: Any) -> None:
+        """Handle email tree selection cleared event."""
+        # Could clear details panel here if needed
+        pass
+        
+    def _on_email_tree_sorted(self, event_data: Dict[str, Any]) -> None:
+        """Handle email tree sorted event from EmailTreeComponent."""
+        if event_data and 'email_suggestions' in event_data:
+            # Update the main email_suggestions list to match the sorted order
+            self.email_suggestions = event_data['email_suggestions']
+            
+            # Update sorting state for backwards compatibility
+            self.sort_column = event_data.get('column')
+            self.sort_reverse = event_data.get('reverse', False)
     
     def run(self):
         self.root.mainloop()
