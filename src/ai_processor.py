@@ -1,3 +1,31 @@
+"""AI Processor for Email Helper - Azure OpenAI Integration.
+
+This module provides the core AI processing functionality for the Email Helper
+application, handling integration with Azure OpenAI services for email
+classification, analysis, and content generation.
+
+The AIProcessor class manages:
+- Azure OpenAI client configuration and authentication
+- Prompty template loading and processing
+- Email classification using AI models
+- Task extraction and categorization
+- User context integration (job role, skills, etc.)
+- Accuracy tracking and learning feedback collection
+- Session management for processing workflows
+
+Key Components:
+- Prompty file parsing and template management
+- User-specific data loading (job context, skills, role)
+- AI response processing with error handling and fallbacks
+- Classification accuracy tracking and improvement
+- Holistic email analysis across multiple emails
+- Learning feedback collection for model improvement
+
+This module follows the project's AI integration patterns and provides
+comprehensive error handling for robust operation when AI services
+may be unavailable or return malformed responses.
+"""
+
 import os
 import json
 from datetime import datetime
@@ -12,6 +40,39 @@ from utils import (
 
 
 class AIProcessor:
+    """AI processing engine for email classification and analysis.
+    
+    This class handles all AI-related operations for the email helper system,
+    including Azure OpenAI integration, prompt management, email classification,
+    and accuracy tracking. It serves as the central hub for AI functionality.
+    
+    The processor manages:
+    - Azure OpenAI client configuration and authentication
+    - Prompty template loading and processing
+    - User context integration (job role, skills, preferences)
+    - Email classification and task extraction
+    - Accuracy tracking and learning feedback
+    - Session management for batch processing
+    
+    Attributes:
+        prompts_dir (str): Directory path for prompty template files
+        user_data_dir (str): Directory path for user-specific configuration
+        runtime_data_dir (str): Directory path for runtime data and feedback
+        job_summary_file (str): Path to user's job context file
+        job_skills_file (str): Path to user's skills profile file
+        job_role_context_file (str): Path to user's role context file
+        learning_file (str): Path to AI learning feedback CSV
+        accuracy_tracker (AccuracyTracker): Tracks classification accuracy
+        session_tracker (SessionTracker): Manages processing sessions
+        data_recorder (DataRecorder): Records processing data and feedback
+    
+    Example:
+        >>> processor = AIProcessor()
+        >>> result = processor.classify_email(email_data, config)
+        >>> print(result['category'])
+        'required_personal_action'
+    """
+    
     def __init__(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(script_dir)
@@ -32,6 +93,20 @@ class AIProcessor:
         self.data_recorder = DataRecorder(self.runtime_data_dir)
     
     def get_username(self):
+        """Get the user's username from configuration file.
+        
+        Reads the username from the user_specific_data/username.txt file,
+        which is used for personalized email classification and determining
+        when emails are directly addressed to the user.
+        
+        Returns:
+            str: The user's username/email alias, or "user" if not configured.
+        
+        Example:
+            >>> processor = AIProcessor()
+            >>> username = processor.get_username()
+            >>> print(f"Processing emails for: {username}")
+        """
         username_file = os.path.join(self.user_data_dir, 'username.txt')
         if os.path.exists(username_file):
             with open(username_file, 'r', encoding='utf-8') as f:
@@ -39,6 +114,25 @@ class AIProcessor:
         return "user"
     
     def parse_prompty_file(self, file_path):
+        """Parse a prompty template file and extract the content.
+        
+        Prompty files use YAML frontmatter followed by the actual prompt content.
+        This method parses the file format and returns the usable prompt text.
+        
+        Args:
+            file_path (str): Path to the .prompty file to parse.
+            
+        Returns:
+            str: The parsed prompt content without YAML frontmatter.
+            
+        Raises:
+            ValueError: If the prompty file has malformed YAML frontmatter.
+            
+        Example:
+            >>> processor = AIProcessor()
+            >>> prompt = processor.parse_prompty_file('prompts/classifier.prompty')
+            >>> print(prompt[:100])  # Show first 100 characters
+        """
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
         

@@ -1,11 +1,14 @@
-# TODO
+# Task List and Development Roadmap
 
-Fixes:
+## Priority Fixes
+
+### Critical Runtime Issues
 
 - Switch to using the GraphQL API using the Service principle ID: 953f9302-0b10-4bd0-985b-36dc8d58d143
 
 - Fix runtime errors:
 
+```
 Traceback (most recent call last):
   File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\tkinter\__init__.py", line 1968, in __call__
     return self.func(*args)
@@ -20,10 +23,13 @@ Traceback (most recent call last):
     self.summary_text.insert(tk.END, f"{item['explanation']}\n", "content_text")
                                         ~~~~^^^^^^^^^^^^^^^
 KeyError: 'explanation'
+```
 
-- The unified GUI file is a total amonimation of a megaclass. We need to clean it up ASAP.
+### Architecture Improvements
+
+- The unified GUI file is a total abomination of a megaclass. We need to clean it up ASAP.
   - Remove unused functions
-  - Static text should mostly be read from files. Create templates under the templates directory rather then inline text
+  - Static text should mostly be read from files. Create templates under the templates directory rather than inline text
   - Do not break the UI. Test frequently
   - Refactor UI into multiple components according to python best practices. Stick the components under a new components directory
 
@@ -33,18 +39,22 @@ KeyError: 'explanation'
 
 - Implement comprehensive testing for the UI using UI orchestration tools that can verify behavior works as expected.
 
-- DONE: FYI and newsletter items and job listings no longer appear in the summery tab. Make sure they appear in the summery.
+## ✅ Completed Features
+
+### FYI and Newsletter Management
+
+- **DONE: FYI and newsletter items and job listings no longer appear in the summary tab. Make sure they appear in the summary.**
 
 - ✅ **Add a button to dismiss the FYI's and newsletters and clear the section. Until dismissed, they should remain** - **COMPLETED**: Implemented comprehensive dismiss functionality for FYI and newsletter items:
-   - ✅ Added "🗑️ Clear All FYI Items" button in FYI notices section
-   - ✅ Added "🗑️ Clear All Newsletters" button in newsletter section  
-   - ✅ Both buttons appear only when items are present
-   - ✅ Confirmation dialogs prevent accidental clearing
-   - ✅ Items persist between sessions until explicitly dismissed
-   - ✅ Automatic summary refresh after dismissing items
-   - ✅ Backend persistence methods: `clear_fyi_items()` and `clear_newsletter_items()`
-   - ✅ UI integration with styled buttons matching section themes
-   - ✅ User feedback with success/error messages
+  - ✅ Added "🗑️ Clear All FYI Items" button in FYI notices section
+  - ✅ Added "🗑️ Clear All Newsletters" button in newsletter section  
+  - ✅ Both buttons appear only when items are present
+  - ✅ Confirmation dialogs prevent accidental clearing
+  - ✅ Items persist between sessions until explicitly dismissed
+  - ✅ Automatic summary refresh after dismissing items
+  - ✅ Backend persistence methods: `clear_fyi_items()` and `clear_newsletter_items()`
+  - ✅ UI integration with styled buttons matching section themes
+  - ✅ User feedback with success/error messages
 
 - ✅ **Add a button to clear all of the FYI items** - **COMPLETED**: This functionality is included in the dismiss button implementation above. The "🗑️ Clear All FYI Items" button provides exactly this functionality with proper confirmation dialogs and persistence management.
 
