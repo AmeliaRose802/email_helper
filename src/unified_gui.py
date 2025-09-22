@@ -19,7 +19,7 @@ from email_processor import EmailProcessor
 from task_persistence import TaskPersistence
 
 # Import new modular components and services
-from components import ProgressComponent, EmailTreeComponent
+from components import ProgressComponent, EmailTreeComponent, ActionPanelComponent
 from services import NotificationService, UIService, EmailService
 
 
@@ -122,23 +122,23 @@ class UnifiedEmailGUI:
         self.custom_count_entry = ttk.Entry(email_count_frame, width=10)
         self.custom_count_entry.pack(side=tk.LEFT, padx=(10, 0))
         
-        # Processing controls
-        control_frame = ttk.Frame(self.processing_frame)
-        control_frame.pack(pady=20)
+        # Processing controls using ActionPanelComponent
+        self.processing_panel = ActionPanelComponent.create_processing_panel(
+            self.processing_frame,
+            start_command=self.start_email_processing,
+            cancel_command=self.cancel_processing,
+            dashboard_command=self.open_accuracy_dashboard
+        )
+        processing_controls = self.processing_panel.initialize()
+        processing_controls.pack(pady=20)
         
-        self.start_processing_btn = ttk.Button(control_frame, text="Start Processing", 
-                                              command=self.start_email_processing)
-        self.start_processing_btn.pack(side=tk.LEFT, padx=5)
+        # Register processing panel with UI service
+        self.ui_service.register_component('processing_panel', self.processing_panel)
         
-        self.cancel_processing_btn = ttk.Button(control_frame, text="Cancel", 
-                                               command=self.cancel_processing, 
-                                               state=tk.DISABLED)
-        self.cancel_processing_btn.pack(side=tk.LEFT, padx=5)
-        
-        # Accuracy Dashboard access button
-        self.accuracy_btn = ttk.Button(control_frame, text="📊 Accuracy Dashboard", 
-                                      command=self.open_accuracy_dashboard)
-        self.accuracy_btn.pack(side=tk.LEFT, padx=5)
+        # Keep references for backwards compatibility during transition
+        self.start_processing_btn = self.processing_panel.get_button('start_processing')
+        self.cancel_processing_btn = self.processing_panel.get_button('cancel_processing')
+        self.accuracy_btn = self.processing_panel.get_button('accuracy_dashboard')
         
         # Progress section - using ProgressComponent
         progress_config = {
@@ -243,15 +243,17 @@ class UnifiedEmailGUI:
         self.current_email_index = None
         self.original_category = None
         
-        # Controls
-        button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=2, column=0, columnspan=3, pady=(15, 0))
+        # Controls using ActionPanelComponent
+        self.editing_panel = ActionPanelComponent.create_editing_panel(
+            main_frame,
+            apply_outlook_command=self.apply_to_outlook,
+            generate_summary_command=self.proceed_to_summary
+        )
+        editing_controls = self.editing_panel.initialize()
+        editing_controls.grid(row=2, column=0, columnspan=3, pady=(15, 0))
         
-        ttk.Button(button_frame, text="Apply to Outlook", 
-                  command=self.apply_to_outlook).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Button(button_frame, text="Generate Summary", 
-                  command=self.proceed_to_summary).pack(side=tk.LEFT, padx=5)
+        # Register editing panel with UI service
+        self.ui_service.register_component('editing_panel', self.editing_panel)
     
     def create_summary_tab(self):
         main_frame = ttk.Frame(self.summary_frame, padding="15")
@@ -419,13 +421,17 @@ class UnifiedEmailGUI:
                  font=("Segoe UI", 16, "bold"), foreground="#007acc").pack(side=tk.LEFT)
         
         # Control buttons
-        button_frame = ttk.Frame(title_frame)
-        button_frame.pack(side=tk.RIGHT)
+        # Action buttons using ActionPanelComponent
+        self.accuracy_panel = ActionPanelComponent.create_accuracy_panel(
+            title_frame,
+            refresh_command=self.refresh_accuracy_data,
+            export_command=self.export_accuracy_data
+        )
+        accuracy_controls = self.accuracy_panel.initialize()
+        accuracy_controls.pack(side=tk.RIGHT)
         
-        ttk.Button(button_frame, text="🔄 Refresh", 
-                  command=self.refresh_accuracy_data).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="📤 Export CSV", 
-                  command=self.export_accuracy_data).pack(side=tk.LEFT, padx=5)
+        # Register accuracy panel with UI service
+        self.ui_service.register_component('accuracy_panel', self.accuracy_panel)
         
         # Create notebook for different views
         self.accuracy_notebook = ttk.Notebook(main_frame)
@@ -950,8 +956,13 @@ class UnifiedEmailGUI:
         
         # Reset processing state
         self.processing_cancelled = False
-        self.start_processing_btn.config(state=tk.DISABLED)
-        self.cancel_processing_btn.config(state=tk.NORMAL)
+        if hasattr(self, 'processing_panel'):
+            self.processing_panel.disable_button('start_processing')
+            self.processing_panel.enable_button('cancel_processing')
+        else:
+            # Fallback for backwards compatibility
+            self.start_processing_btn.config(state=tk.DISABLED)
+            self.cancel_processing_btn.config(state=tk.NORMAL)
         self.progress_var.set(0)
         self.progress_text.config(state=tk.NORMAL)
         self.progress_text.delete(1.0, tk.END)
@@ -1386,7 +1397,11 @@ class UnifiedEmailGUI:
         self.processing_cancelled = True
     
     def reset_processing_ui(self):
-        self.cancel_processing_btn.config(state=tk.DISABLED)
+        if hasattr(self, 'processing_panel'):
+            self.processing_panel.disable_button('cancel_processing')
+        else:
+            # Fallback for backwards compatibility
+            self.cancel_processing_btn.config(state=tk.DISABLED)
     
     def on_processing_complete(self):
         self.notebook.tab(1, state="normal")
@@ -2597,8 +2612,13 @@ This will help keep your inbox focused on actionable items only."""
             self.summary_text.bind("<Key>", lambda e: "break")  # Prevent typing
             
             # Re-enable the start processing button and disable cancel button
-            self.start_processing_btn.config(state=tk.NORMAL)
-            self.cancel_processing_btn.config(state=tk.DISABLED)
+            if hasattr(self, 'processing_panel'):
+                self.processing_panel.enable_button('start_processing')
+                self.processing_panel.disable_button('cancel_processing')
+            else:
+                # Fallback for backwards compatibility
+                self.start_processing_btn.config(state=tk.NORMAL)
+                self.cancel_processing_btn.config(state=tk.DISABLED)
             
             # Disable only the review tab - keep summary tab available for outstanding tasks
             self.notebook.tab(1, state="disabled")

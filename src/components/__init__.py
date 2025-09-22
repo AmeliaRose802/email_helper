@@ -11,9 +11,11 @@ from .base_component import BaseComponent
 # Individual GUI components
 from .progress_component import ProgressComponent
 from .email_tree_component import EmailTreeComponent
+from .action_panel_component import ActionPanelComponent
 
 __all__ = [
     'BaseComponent',
     'ProgressComponent',
-    'EmailTreeComponent'
+    'EmailTreeComponent',
+    'ActionPanelComponent'
 ]
