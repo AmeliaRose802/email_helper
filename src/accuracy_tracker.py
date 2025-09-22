@@ -1,3 +1,36 @@
+"""Accuracy Tracker for Email Helper - Classification Accuracy Monitoring and Analytics.
+
+This module provides comprehensive accuracy tracking and analytics for the
+email classification system, monitoring AI performance, user corrections,
+and classification trends over time to support continuous improvement.
+
+The AccuracyTracker class manages:
+- Session-based accuracy calculation and tracking
+- User modification recording and analysis
+- Performance trend analysis over time
+- Category-specific accuracy metrics
+- Learning feedback collection for AI improvement
+- Historical performance data storage and retrieval
+
+Key Features:
+- Real-time accuracy calculation for processing sessions
+- Detailed tracking of user corrections and modifications
+- Category-specific performance analytics
+- Trend analysis for continuous improvement
+- CSV-based data storage for analysis and reporting
+- Integration with user feedback collection systems
+
+Analytics Capabilities:
+- Overall accuracy rate calculation
+- Category-specific performance metrics
+- Temporal trend analysis
+- User correction pattern identification
+- Performance improvement tracking
+
+This module supports the learning and improvement cycle of the
+AI classification system through comprehensive data collection.
+"""
+
 import os
 import pandas as pd
 from datetime import datetime, timedelta
@@ -6,6 +39,31 @@ import numpy as np
 
 
 class AccuracyTracker:
+    """Accuracy tracking and analytics engine for email classification performance.
+    
+    This class provides comprehensive tracking of AI classification accuracy,
+    user corrections, and performance analytics to support continuous
+    improvement of the email helper system's classification capabilities.
+    
+    The tracker manages:
+    - Session-based accuracy calculation and recording
+    - User modification tracking and analysis
+    - Performance trend monitoring over time
+    - Category-specific accuracy metrics
+    - Historical data storage and retrieval
+    - Analytics and reporting capabilities
+    
+    Attributes:
+        user_feedback_dir (str): Directory for storing feedback and accuracy data
+        accuracy_file (str): Path to accuracy tracking CSV file
+        modifications_file (str): Path to user modifications CSV file
+        
+    Example:
+        >>> tracker = AccuracyTracker('/path/to/runtime_data')
+        >>> accuracy = tracker.calculate_accuracy_for_session(100, modifications)
+        >>> print(f"Session accuracy: {accuracy}%")
+    """
+    
     def __init__(self, runtime_data_dir):
         self.user_feedback_dir = os.path.join(runtime_data_dir, 'user_feedback')
         self.accuracy_file = os.path.join(self.user_feedback_dir, 'accuracy_tracking.csv')

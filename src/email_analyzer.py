@@ -48,7 +48,9 @@ class EmailAnalyzer:
     
     Example:
         >>> analyzer = EmailAnalyzer(ai_processor)
-        >>> due_date = analyzer.extract_due_date_intelligent("Please respond by tomorrow")
+        >>> due_date = analyzer.extract_due_date_intelligent(
+        ...     "Please respond by tomorrow"
+        ... )
         >>> print(due_date)
         'December 16, 2024'
     """
