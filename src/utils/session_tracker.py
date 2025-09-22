@@ -1,7 +1,7 @@
 """Session tracking for accuracy and modifications"""
 
 from datetime import datetime
-from .date_utils import get_timestamp, get_run_id
+from .date_utils import get_run_id
 
 
 class SessionTracker:

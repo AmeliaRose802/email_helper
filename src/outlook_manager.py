@@ -3,7 +3,6 @@
 Outlook Manager - Handles Outlook connection and folder management
 """
 import win32com.client
-import os
 from datetime import datetime, timedelta
 
 

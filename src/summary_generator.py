@@ -3,7 +3,6 @@
 Summary Generator - Handles summary creation, display, and file output
 """
 
-from datetime import datetime
 import os
 from jinja2 import Environment, FileSystemLoader
 

@@ -179,12 +179,6 @@ class UnifiedEmailGUI:
                                           values=self.get_category_display_names(), 
                                           state="readonly")
         self.category_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
-        ttk.Label(details_frame, text="Category:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.category_var = tk.StringVar()
-        self.category_combo = ttk.Combobox(details_frame, textvariable=self.category_var, 
-                                          values=self.get_category_display_names(), 
-                                          state="readonly")
-        self.category_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
         self.category_combo.bind('<<ComboboxSelected>>', self.on_category_change)
         
         # Add info label about auto-apply
