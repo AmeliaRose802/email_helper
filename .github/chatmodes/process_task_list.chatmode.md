@@ -318,7 +318,7 @@ If issues cannot be created:
 ## Expected outputs
 
 1. **Issue creation summary**: List of created issues with URLs, IDs, and target feature branches
-2. **Feature branch mapping**: Overview of which tasks target which feature branches  
+2. **Feature branch mapping**: Overview of which tasks target which feature branches
 3. **Dependency map**: Visual or text representation of issue relationships with branch coordination
 4. **Assignment confirmation**: Verification that all issues are assigned to "github copilot" with proper branch targeting
 5. **Branch targeting confirmation**: Verification that all issues include current branch targeting instructions
