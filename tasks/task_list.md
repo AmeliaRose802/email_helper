@@ -2,23 +2,79 @@
 
 Fixes:
 
+- Switch to using the GraphQL API using the Service principle ID: 953f9302-0b10-4bd0-985b-36dc8d58d143
+
+- Fix runtime errors:
+
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\tkinter\__init__.py", line 1968, in __call__
+    return self.func(*args)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\tkinter\__init__.py", line 862, in callit
+    func(*args)
+  File "C:\Users\ameliapayne\email_helper\src\unified_gui.py", line 1485, in generate_summary
+    self.display_formatted_summary_in_app(self.summary_sections)      
+  File "C:\Users\ameliapayne\email_helper\src\unified_gui.py", line 1562, in display_formatted_summary_in_app
+    display_func(items)
+  File "C:\Users\ameliapayne\email_helper\src\unified_gui.py", line 1721, in _display_optional_actions
+    self.summary_text.insert(tk.END, f"{item['explanation']}\n", "content_text")
+                                        ~~~~^^^^^^^^^^^^^^^
+KeyError: 'explanation'
+
 - The unified GUI file is a total amonimation of a megaclass. We need to clean it up ASAP.
   - Remove unused functions
   - Static text should mostly be read from files. Create templates under the templates directory rather then inline text
   - Do not break the UI. Test frequently
   - Refactor UI into multiple components according to python best practices. Stick the components under a new components directory
 
+- No longer try to move emails when the done button is selected. Instead, just mark the task as completed
 
-- Fix moving email to done after marking it as complete. THe system still does not seem to be assocating entity id's with emails
+- Make the UI look less 1992
 
-- Make sorting by category actually work. Clicking columns does not work
-- Display summery and holistic insights in a more clear way rather then in tiny text
+- Implement comprehensive testing for the UI using UI orchestration tools that can verify behavior works as expected.
+
+- DONE: FYI and newsletter items and job listings no longer appear in the summery tab. Make sure they appear in the summery.
+
+- ✅ **Add a button to dismiss the FYI's and newsletters and clear the section. Until dismissed, they should remain** - **COMPLETED**: Implemented comprehensive dismiss functionality for FYI and newsletter items:
+   - ✅ Added "🗑️ Clear All FYI Items" button in FYI notices section
+   - ✅ Added "🗑️ Clear All Newsletters" button in newsletter section  
+   - ✅ Both buttons appear only when items are present
+   - ✅ Confirmation dialogs prevent accidental clearing
+   - ✅ Items persist between sessions until explicitly dismissed
+   - ✅ Automatic summary refresh after dismissing items
+   - ✅ Backend persistence methods: `clear_fyi_items()` and `clear_newsletter_items()`
+   - ✅ UI integration with styled buttons matching section themes
+   - ✅ User feedback with success/error messages
+
+- ✅ **Add a button to clear all of the FYI items** - **COMPLETED**: This functionality is included in the dismiss button implementation above. The "🗑️ Clear All FYI Items" button provides exactly this functionality with proper confirmation dialogs and persistence management.
+
+- We need a better way to detect and group duplicate tasks so they don't appear multiple times
+
+- The whole project has a lot of junk code. We should run a janitor like agent task on the whole damn thing to clean up the mess.
+
+- When you click "Open in browser" on the summery tab, you get an error saying that this is not supported.
+
+- The summery and holistic info should display in a more readable way for emails
+
+- Add an explanation for categorization choices even for things not categorized by the holistic categorizer.
+
+- Fix category based sorting. Clicking columns does not work for all columns.
+
+- We should be able to view our task list without first loading emails
+
+- When we enter our own number of emails to load, it should auto select a other box instead of remaining on one of the existing boxes.
+
+- Display summery and holistic insights in a more clear way rather then in tiny text inside the email box
 
 - Similar items and or threads are not getting grouped correctly in review phase
 
 - Is email_classifier_system_improved.prompty or email_classifier_system.prompty getting used? Remove the one that is no longer relevent
 
-Improvements:
+- Load in 5 or so most relevent emails from our past classification and inject them into the classification prompt as few shot examples
+
+- Links should have descriptive labels.
+
+- We should assess the 
 
 - We should include links to open the emails themselves in outlook (or the web view if that is easier).
   - Links to OG email should be shown with tasks
@@ -30,10 +86,10 @@ Improvements:
 - Include the date(s) email was sent in task listing
    -Keep in mind an task may have multiple assocated emails
 
-- Fyi's and newsletter summaries should persist in the summery between runs
-  - Add a clear button to delete all FYIs and another button under newsletter summaries to clear all newsletter summaries
+- ✅ **Fyi's and newsletter summaries should persist in the summery between runs** - **COMPLETED**: Implemented comprehensive persistence functionality where FYI and newsletter items are saved to persistent storage and remain visible across email processing sessions until explicitly dismissed.
+  - ✅ **Add a clear button to delete all FYIs and another button under newsletter summaries to clear all newsletter summaries** - **COMPLETED**: Both dismiss buttons implemented with proper confirmation dialogs and automatic summary refresh.
 
-- Add buttons to clear all FYI's or all newsletters
+- ✅ **Add buttons to clear all FYI's or all newsletters** - **COMPLETED**: Dismiss buttons implemented for both FYI and newsletter sections with confirmation dialogs and persistence management.
 
 - Links in tasks should have a description rather then just saying "link"
 
