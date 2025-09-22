@@ -19,7 +19,7 @@ from email_processor import EmailProcessor
 from task_persistence import TaskPersistence
 
 # Import new modular components and services
-from components import ProgressComponent, EmailTreeComponent, ActionPanelComponent
+from components import ProgressComponent, EmailTreeComponent, ActionPanelComponent, SummaryDisplayComponent
 from services import NotificationService, UIService, EmailService
 
 
@@ -283,14 +283,30 @@ class UnifiedEmailGUI:
         ttk.Button(control_frame, text="Process New Batch", 
                   command=self.start_new_session).pack(side=tk.LEFT, padx=5)
         
-        # Enhanced summary text widget with rich formatting
-        self.summary_text = scrolledtext.ScrolledText(main_frame, wrap=tk.WORD, 
-                                                     height=20, state=tk.DISABLED,
-                                                     font=('Segoe UI', 10))
-        self.summary_text.pack(fill=tk.BOTH, expand=True, pady=10)
+        # Summary display using SummaryDisplayComponent
+        summary_config = {
+            'height': 20,
+            'font': ('Segoe UI', 10),
+            'wrap': tk.WORD,
+            'enable_links': True
+        }
         
-        # Configure rich text formatting tags for summary display
-        self._configure_summary_text_tags()
+        self.summary_display_component = SummaryDisplayComponent(main_frame, summary_config)
+        summary_widget = self.summary_display_component.initialize()
+        summary_widget.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # Register summary component with UI service
+        self.ui_service.register_component('summary_display', self.summary_display_component)
+        
+        # Register event handlers for summary component
+        self.summary_display_component.register_callback('task_complete', self._on_task_complete)
+        self.summary_display_component.register_callback('dismiss_fyi_items', self._dismiss_all_fyi_items)
+        self.summary_display_component.register_callback('dismiss_newsletters', self._dismiss_all_newsletters)
+        self.summary_display_component.register_callback('url_opened', self._on_url_opened)
+        self.summary_display_component.register_callback('link_clicked', self._on_summary_link_click)
+        
+        # Keep reference for backwards compatibility during transition
+        self.summary_text = self.summary_display_component.get_text_widget()
     
     def _configure_summary_text_tags(self):
         """Configure rich text formatting tags for beautiful summary display"""
@@ -2075,88 +2091,16 @@ This will help keep your inbox focused on actionable items only."""
         self.generate_summary_btn.config(state=tk.NORMAL)
     
     def display_formatted_summary_in_app(self, summary_sections):
-        """Display beautifully formatted summary directly in the application"""
-        # Clear existing content
-        self.summary_text.config(state=tk.NORMAL)
-        self.summary_text.delete(1.0, tk.END)
-        
-        # Calculate totals including task persistence info
-        total_items = sum(len(items) for items in summary_sections.values())
-        high_priority = len(summary_sections.get('required_actions', []))
-        
-        # Get task statistics for context
-        task_stats = self.task_persistence.get_task_statistics()
-        
-        # Count items from previous batches (those with batch_count > 1)
-        outstanding_from_previous = 0
-        new_from_current = 0
-        for key, items in summary_sections.items():
-            if key in ['required_actions', 'team_actions', 'optional_actions', 'job_listings', 'optional_events']:
-                for item in items:
-                    batch_count = item.get('batch_count', 1)
-                    if batch_count > 1:
-                        outstanding_from_previous += 1
-                    else:
-                        new_from_current += 1
-        
-        # Header with comprehensive context
-        self.summary_text.insert(tk.END, "📊 Comprehensive Email & Task Summary\n", "main_title")
-        self.summary_text.insert(tk.END, "Current Batch + Outstanding Tasks\n\n", "subtitle")
-        
-        # Overview section with task persistence info
-        self.summary_text.insert(tk.END, "📊 Summary Overview\n", "overview_title")
-        self.summary_text.insert(tk.END, "═" * 60 + "\n", "separator")
-        overview_text = f"Total Items: {total_items}    |    High Priority: {high_priority}\n"
-        overview_text += f"New from current batch: {new_from_current}    |    "
-        overview_text += f"Outstanding from previous: {outstanding_from_previous}\n"
-        
-        if task_stats['old_tasks_count'] > 0:
-            overview_text += f"⚠️ Tasks older than 7 days: {task_stats['old_tasks_count']}\n"
-        
-        overview_text += "💡 Comprehensive view - all actionable items in one place!\n\n"
-        self.summary_text.insert(tk.END, overview_text, "overview_stats")
-        
-        # Define sections with their styling
-        sections_config = [
-            ('required_actions', '🔴 REQUIRED ACTION ITEMS (ME)', 'section_required', self._display_action_items),
-            ('team_actions', '👥 TEAM ACTION ITEMS', 'section_team', self._display_action_items),
-            ('completed_team_actions', '✅ COMPLETED TEAM ACTIONS', 'section_completed', self._display_completed_team_actions),
-            ('optional_actions', '📝 OPTIONAL ACTION ITEMS', 'section_optional', self._display_optional_actions),
-            ('job_listings', '💼 JOB LISTINGS', 'section_jobs', self._display_job_listings),
-            ('optional_events', '🎪 OPTIONAL EVENTS', 'section_events', self._display_events),
-            ('fyi_notices', '📋 FYI NOTICES', 'section_fyi', self._display_fyi_notices),
-            ('newsletters', '📰 NEWSLETTERS SUMMARY', 'section_newsletter', self._display_newsletters)
-        ]
-        
-        # Display each section
-        for section_key, title, style_tag, display_func in sections_config:
-            items = summary_sections.get(section_key, [])
-            if not items and section_key in ['required_actions', 'team_actions']:
-                # Always show critical sections even if empty
-                pass
-            elif not items:
-                # Skip empty optional sections
-                continue
-            
-            # Section header with count
-            section_title = f"{title} ({len(items)})\n"
-            self.summary_text.insert(tk.END, section_title, style_tag)
-            self.summary_text.insert(tk.END, "─" * len(section_title) + "\n", "separator")
-            
-            if items:
-                display_func(items)
-            else:
-                self.summary_text.insert(tk.END, f"No {title.split()[-1].lower()} found\n\n", "empty_section")
-            
-            self.summary_text.insert(tk.END, "\n", "content_text")
-        
-        # Configure text widget to prevent editing but allow tag clicks
-        self.summary_text.config(state=tk.NORMAL)
-        self.summary_text.bind("<Key>", lambda e: "break")  # Prevent typing
-        # Note: No longer need click handler since we're using embedded Button widgets
-        
-        # Scroll to top for better user experience
-        self.summary_text.see("1.0")
+        """Display beautifully formatted summary directly in the application using SummaryDisplayComponent"""
+        if hasattr(self, 'summary_display_component'):
+            # Use the component's display method
+            self.summary_display_component.update_data({'summary_sections': summary_sections})
+        else:
+            # Fallback message for backwards compatibility
+            self.summary_text.config(state=tk.NORMAL)
+            self.summary_text.delete(1.0, tk.END)
+            self.summary_text.insert(tk.END, "Summary display component not available.\nPlease regenerate summary.", "content_text")
+            self.summary_text.config(state=tk.DISABLED)
     
     def _display_action_items(self, items):
         """Display required or team action items with full details"""
@@ -2921,6 +2865,28 @@ This will help keep your inbox focused on actionable items only."""
         except Exception as e:
             self.status_var.set(f"Error loading tasks: {str(e)}")
             messagebox.showerror("Error", f"Failed to load outstanding tasks:\n{str(e)}")
+    
+    def _on_task_complete(self, event_data: Dict[str, Any]) -> None:
+        """Handle task completion event from SummaryDisplayComponent."""
+        if event_data and 'task_id' in event_data:
+            task_id = event_data['task_id']
+            try:
+                # Use existing method to mark task complete
+                self._mark_single_task_complete(task_id)
+                # Refresh summary to show updated status
+                self._refresh_summary_after_dismiss()
+            except Exception as e:
+                self.notification_service.show_error("Task Error", f"Failed to mark task complete: {e}")
+                
+    def _on_url_opened(self, event_data: Dict[str, Any]) -> None:
+        """Handle URL opened event from SummaryDisplayComponent."""
+        if event_data and 'url' in event_data:
+            self.notification_service.show_status(f"Opened URL: {event_data['url']}")
+            
+    def _on_summary_link_click(self, event_data: Dict[str, Any]) -> None:
+        """Handle link clicks in the summary display from SummaryDisplayComponent."""
+        # This can be used for custom link handling if needed
+        pass
     
     def _on_email_tree_selection(self, event_data: Dict[str, Any]) -> None:
         """Handle email tree selection event from EmailTreeComponent."""

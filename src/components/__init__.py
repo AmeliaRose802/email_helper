@@ -12,10 +12,12 @@ from .base_component import BaseComponent
 from .progress_component import ProgressComponent
 from .email_tree_component import EmailTreeComponent
 from .action_panel_component import ActionPanelComponent
+from .summary_display_component import SummaryDisplayComponent
 
 __all__ = [
     'BaseComponent',
     'ProgressComponent',
     'EmailTreeComponent',
-    'ActionPanelComponent'
+    'ActionPanelComponent',
+    'SummaryDisplayComponent'
 ]
