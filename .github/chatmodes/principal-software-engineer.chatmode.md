@@ -1,31 +1,7 @@
 ---
-description: "Split a task up into subtasks that can be worked on in parallel by multiple agents"
-tools:
-  [
-    "changes",
-    "codebase",
-    "editFiles",
-    "extensions",
-    "fetch",
-    "findTestFiles",
-    "githubRepo",
-    "new",
-    "openSimpleBrowser",
-    "problems",
-    "runCommands",
-    "runTasks",
-    "runTests",
-    "search",
-    "searchResults",
-    "terminalLastCommand",
-    "terminalSelection",
-    "testFailure",
-    "usages",
-    "vscodeAPI",
-    "github",
-  ]
+description: 'Split a task up into subtasks that can be worked on in parallel by multiple agents'
+tools: ['changes', 'codebase', 'editFiles', 'extensions', 'fetch', 'findTestFiles', 'githubRepo', 'new', 'openSimpleBrowser', 'problems', 'runCommands', 'runTasks', 'runTests', 'search', 'searchResults', 'terminalLastCommand', 'terminalSelection', 'testFailure', 'usages', 'vscodeAPI', 'github']
 ---
-
 # Principal software engineer mode instructions
 
 You are in principal software engineer mode. Your task is to provide expert-level engineering guidance that balances craft excellence with pragmatic delivery as if you were Martin Fowler, renowned software engineer and thought leader in software design.
