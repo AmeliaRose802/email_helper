@@ -72,14 +72,19 @@ class UnifiedEmailGUI:
         self.notebook.add(self.summary_frame, text="3. Summary & Results")
         self.create_summary_tab()
         
+        # Tab 4: Accuracy Dashboard
+        self.accuracy_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.accuracy_frame, text="4. Accuracy Dashboard")
+        self.create_accuracy_tab()
+        
         # Create status bar
         self.status_var = tk.StringVar(value="Ready")
         status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=(0, 5))
         
-        # Initially disable tabs 2 and 3
-        self.notebook.tab(1, state="disabled")
-        self.notebook.tab(2, state="disabled")
+        # Initially disable tabs 1, 3 (enable summary tab immediately for task viewing)
+        self.notebook.tab(1, state="disabled")  # Review & Edit tab - requires email processing
+        self.notebook.tab(3, state="disabled")  # Accuracy Dashboard - requires email processing
     
     def create_processing_tab(self):
         # Email count selection
@@ -108,6 +113,11 @@ class UnifiedEmailGUI:
                                                command=self.cancel_processing, 
                                                state=tk.DISABLED)
         self.cancel_processing_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Accuracy Dashboard access button
+        self.accuracy_btn = ttk.Button(control_frame, text="📊 Accuracy Dashboard", 
+                                      command=self.open_accuracy_dashboard)
+        self.accuracy_btn.pack(side=tk.LEFT, padx=5)
         
         # Progress section
         self.progress_var = tk.DoubleVar()
@@ -218,6 +228,10 @@ class UnifiedEmailGUI:
         self.generate_summary_btn = ttk.Button(control_frame, text="Generate Summary", 
                                               command=self.generate_summary)
         self.generate_summary_btn.pack(side=tk.LEFT, padx=5)
+        
+        # View Outstanding Tasks button for accessing persistent tasks without email processing
+        ttk.Button(control_frame, text="View Outstanding Tasks", 
+                  command=self.view_outstanding_tasks_only).pack(side=tk.LEFT, padx=5)
         
         ttk.Button(control_frame, text="Open in Browser", 
                   command=self.open_summary_in_browser).pack(side=tk.LEFT, padx=5)
@@ -356,6 +370,488 @@ class UnifiedEmailGUI:
         self.summary_text.tag_bind("link", "<Enter>", lambda e: self.summary_text.config(cursor="hand2"))
         self.summary_text.tag_bind("link", "<Leave>", lambda e: self.summary_text.config(cursor=""))
     
+    def create_accuracy_tab(self):
+        """Create the accuracy dashboard tab with comprehensive analytics"""
+        main_frame = ttk.Frame(self.accuracy_frame, padding="15")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title and controls section
+        title_frame = ttk.Frame(main_frame)
+        title_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        ttk.Label(title_frame, text="📊 Accuracy Dashboard", 
+                 font=("Segoe UI", 16, "bold"), foreground="#007acc").pack(side=tk.LEFT)
+        
+        # Control buttons
+        button_frame = ttk.Frame(title_frame)
+        button_frame.pack(side=tk.RIGHT)
+        
+        ttk.Button(button_frame, text="🔄 Refresh", 
+                  command=self.refresh_accuracy_data).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="📤 Export CSV", 
+                  command=self.export_accuracy_data).pack(side=tk.LEFT, padx=5)
+        
+        # Create notebook for different views
+        self.accuracy_notebook = ttk.Notebook(main_frame)
+        self.accuracy_notebook.pack(fill=tk.BOTH, expand=True)
+        
+        # Tab 1: Overview & Metrics
+        self.metrics_frame = ttk.Frame(self.accuracy_notebook)
+        self.accuracy_notebook.add(self.metrics_frame, text="📈 Overview")
+        self.create_metrics_view()
+        
+        # Tab 2: Time Series Analysis
+        self.trends_frame = ttk.Frame(self.accuracy_notebook)
+        self.accuracy_notebook.add(self.trends_frame, text="📊 Trends")
+        self.create_trends_view()
+        
+        # Tab 3: Category Performance
+        self.categories_frame = ttk.Frame(self.accuracy_notebook)
+        self.accuracy_notebook.add(self.categories_frame, text="🏷️ Categories")
+        self.create_categories_view()
+        
+        # Tab 4: Session Details
+        self.sessions_frame = ttk.Frame(self.accuracy_notebook)
+        self.accuracy_notebook.add(self.sessions_frame, text="📋 Sessions")
+        self.create_sessions_view()
+    
+    def create_metrics_view(self):
+        """Create the overview metrics view"""
+        # Key metrics cards at the top
+        metrics_container = ttk.Frame(self.metrics_frame)
+        metrics_container.pack(fill=tk.X, padx=20, pady=20)
+        
+        # Create metric cards
+        self.overall_accuracy_label = ttk.Label(metrics_container, 
+                                               text="Overall Accuracy\n---%", 
+                                               font=("Segoe UI", 12, "bold"),
+                                               anchor="center", width=15)
+        self.overall_accuracy_label.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        
+        self.seven_day_label = ttk.Label(metrics_container, 
+                                        text="7-Day Average\n---%", 
+                                        font=("Segoe UI", 12, "bold"),
+                                        anchor="center", width=15)
+        self.seven_day_label.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+        
+        self.total_sessions_label = ttk.Label(metrics_container, 
+                                             text="Total Sessions\n---", 
+                                             font=("Segoe UI", 12, "bold"),
+                                             anchor="center", width=15)
+        self.total_sessions_label.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
+        
+        self.total_emails_label = ttk.Label(metrics_container, 
+                                           text="Total Emails\n---", 
+                                           font=("Segoe UI", 12, "bold"),
+                                           anchor="center", width=15)
+        self.total_emails_label.grid(row=0, column=3, padx=10, pady=10, sticky="nsew")
+        
+        # Configure grid weights
+        for i in range(4):
+            metrics_container.columnconfigure(i, weight=1)
+        
+        # Trend indicator
+        self.trend_frame = ttk.LabelFrame(self.metrics_frame, text="Accuracy Trend", padding="10")
+        self.trend_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        self.trend_label = ttk.Label(self.trend_frame, 
+                                    text="📊 Trend: Analyzing...", 
+                                    font=("Segoe UI", 11))
+        self.trend_label.pack()
+        
+        # Recent activity summary
+        self.activity_frame = ttk.LabelFrame(self.metrics_frame, text="Recent Activity", padding="10")
+        self.activity_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        self.activity_text = scrolledtext.ScrolledText(self.activity_frame, 
+                                                      height=10, 
+                                                      wrap=tk.WORD,
+                                                      font=("Consolas", 9))
+        self.activity_text.pack(fill=tk.BOTH, expand=True)
+    
+    def create_trends_view(self):
+        """Create the trends analysis view"""
+        # Date range selection
+        controls_frame = ttk.Frame(self.trends_frame)
+        controls_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        ttk.Label(controls_frame, text="Time Range:").pack(side=tk.LEFT, padx=5)
+        
+        self.time_range_var = tk.StringVar(value="30 days")
+        range_combo = ttk.Combobox(controls_frame, textvariable=self.time_range_var,
+                                  values=["7 days", "30 days", "90 days", "1 year", "All time"],
+                                  state="readonly", width=12)
+        range_combo.pack(side=tk.LEFT, padx=5)
+        range_combo.bind("<<ComboboxSelected>>", self.update_trends_chart)
+        
+        ttk.Label(controls_frame, text="Granularity:").pack(side=tk.LEFT, padx=(20,5))
+        
+        self.granularity_var = tk.StringVar(value="daily")
+        granularity_combo = ttk.Combobox(controls_frame, textvariable=self.granularity_var,
+                                        values=["daily", "weekly", "monthly"],
+                                        state="readonly", width=10)
+        granularity_combo.pack(side=tk.LEFT, padx=5)
+        granularity_combo.bind("<<ComboboxSelected>>", self.update_trends_chart)
+        
+        ttk.Button(controls_frame, text="Update Chart", 
+                  command=self.update_trends_chart).pack(side=tk.LEFT, padx=20)
+        
+        # Chart area placeholder
+        self.trends_chart_frame = ttk.LabelFrame(self.trends_frame, text="Accuracy Trends Over Time", padding="10")
+        self.trends_chart_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        self.trends_chart_label = ttk.Label(self.trends_chart_frame, 
+                                           text="📈 Chart will appear here after clicking 'Update Chart'\n\n" +
+                                                "This will show accuracy trends over time with configurable granularity.",
+                                           font=("Segoe UI", 11),
+                                           anchor="center")
+        self.trends_chart_label.pack(expand=True)
+    
+    def create_categories_view(self):
+        """Create the category performance view"""
+        # Controls
+        controls_frame = ttk.Frame(self.categories_frame)
+        controls_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        ttk.Label(controls_frame, text="Analysis Period:").pack(side=tk.LEFT, padx=5)
+        
+        self.category_period_var = tk.StringVar(value="30 days")
+        period_combo = ttk.Combobox(controls_frame, textvariable=self.category_period_var,
+                                   values=["7 days", "30 days", "90 days", "All time"],
+                                   state="readonly", width=12)
+        period_combo.pack(side=tk.LEFT, padx=5)
+        period_combo.bind("<<ComboboxSelected>>", self.update_category_analysis)
+        
+        ttk.Button(controls_frame, text="Analyze Categories", 
+                  command=self.update_category_analysis).pack(side=tk.LEFT, padx=20)
+        
+        # Category performance table
+        self.category_table_frame = ttk.LabelFrame(self.categories_frame, text="Category Performance", padding="10")
+        self.category_table_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Create treeview for category data
+        self.category_tree = ttk.Treeview(self.category_table_frame, 
+                                         columns=("accuracy", "corrections", "sessions"),
+                                         show="tree headings", height=15)
+        
+        self.category_tree.heading("#0", text="Category")
+        self.category_tree.heading("accuracy", text="Accuracy %")
+        self.category_tree.heading("corrections", text="Corrections")
+        self.category_tree.heading("sessions", text="Sessions")
+        
+        self.category_tree.column("#0", width=200, minwidth=150)
+        self.category_tree.column("accuracy", width=100, minwidth=80, anchor="center")
+        self.category_tree.column("corrections", width=100, minwidth=80, anchor="center")
+        self.category_tree.column("sessions", width=100, minwidth=80, anchor="center")
+        
+        # Scrollbar for tree
+        tree_scroll = ttk.Scrollbar(self.category_table_frame, orient="vertical", command=self.category_tree.yview)
+        self.category_tree.configure(yscroll=tree_scroll.set)
+        
+        self.category_tree.pack(side="left", fill=tk.BOTH, expand=True)
+        tree_scroll.pack(side="right", fill="y")
+    
+    def create_sessions_view(self):
+        """Create the sessions detail view"""
+        # Controls
+        controls_frame = ttk.Frame(self.sessions_frame)
+        controls_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        ttk.Label(controls_frame, text="Sessions to show:").pack(side=tk.LEFT, padx=5)
+        
+        self.session_count_var = tk.StringVar(value="20")
+        count_combo = ttk.Combobox(controls_frame, textvariable=self.session_count_var,
+                                  values=["10", "20", "50", "100"],
+                                  state="readonly", width=8)
+        count_combo.pack(side=tk.LEFT, padx=5)
+        count_combo.bind("<<ComboboxSelected>>", self.update_sessions_list)
+        
+        ttk.Button(controls_frame, text="Load Sessions", 
+                  command=self.update_sessions_list).pack(side=tk.LEFT, padx=20)
+        
+        # Sessions table
+        self.sessions_table_frame = ttk.LabelFrame(self.sessions_frame, text="Recent Sessions", padding="10")
+        self.sessions_table_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Create treeview for session data
+        self.sessions_tree = ttk.Treeview(self.sessions_table_frame, 
+                                         columns=("date", "accuracy", "emails", "corrections"),
+                                         show="tree headings", height=15)
+        
+        self.sessions_tree.heading("#0", text="Session ID")
+        self.sessions_tree.heading("date", text="Date/Time")
+        self.sessions_tree.heading("accuracy", text="Accuracy %")
+        self.sessions_tree.heading("emails", text="Emails")
+        self.sessions_tree.heading("corrections", text="Corrections")
+        
+        self.sessions_tree.column("#0", width=150, minwidth=120)
+        self.sessions_tree.column("date", width=150, minwidth=120)
+        self.sessions_tree.column("accuracy", width=100, minwidth=80, anchor="center")
+        self.sessions_tree.column("emails", width=80, minwidth=60, anchor="center")
+        self.sessions_tree.column("corrections", width=100, minwidth=80, anchor="center")
+        
+        # Scrollbar for sessions tree
+        sessions_scroll = ttk.Scrollbar(self.sessions_table_frame, orient="vertical", command=self.sessions_tree.yview)
+        self.sessions_tree.configure(yscroll=sessions_scroll.set)
+        
+        self.sessions_tree.pack(side="left", fill=tk.BOTH, expand=True)
+        sessions_scroll.pack(side="right", fill="y")
+    
+    def refresh_accuracy_data(self):
+        """Refresh all accuracy dashboard data"""
+        try:
+            # Import accuracy tracker
+            from accuracy_tracker import AccuracyTracker
+            
+            # Initialize tracker with same path logic as ai_processor
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(script_dir)
+            runtime_base_dir = os.path.join(project_root, 'runtime_data')
+            self.accuracy_tracker = AccuracyTracker(runtime_base_dir)
+            
+            # Update all views
+            self.update_metrics_display()
+            self.update_trends_chart()
+            self.update_category_analysis()
+            self.update_sessions_list()
+            
+            self.status_var.set("Accuracy dashboard refreshed successfully")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to refresh accuracy data:\n{str(e)}")
+            self.status_var.set("Error refreshing accuracy dashboard")
+    
+    def update_metrics_display(self):
+        """Update the overview metrics display"""
+        try:
+            if not hasattr(self, 'accuracy_tracker'):
+                self.refresh_accuracy_data()
+                return
+            
+            metrics = self.accuracy_tracker.get_dashboard_metrics()
+            
+            # Update metric labels
+            overall = metrics.get('overall_stats', {})
+            self.overall_accuracy_label.config(text=f"Overall Accuracy\n{overall.get('average_accuracy', 0):.1f}%")
+            
+            recent = metrics.get('recent_performance', {})
+            self.seven_day_label.config(text=f"7-Day Average\n{recent.get('last_7_days', 0):.1f}%")
+            
+            self.total_sessions_label.config(text=f"Total Sessions\n{overall.get('total_sessions', 0)}")
+            self.total_emails_label.config(text=f"Total Emails\n{overall.get('total_emails', 0):,}")
+            
+            # Update trend indicator
+            trend = metrics.get('trend_analysis', {})
+            trend_direction = trend.get('improvement_trend', 'stable')
+            trend_pct = trend.get('trend_percentage', 0)
+            
+            if trend_direction == 'improving':
+                trend_text = f"📈 Improving (+{trend_pct:.1f}%)"
+                trend_color = "green"
+            elif trend_direction == 'declining':
+                trend_text = f"📉 Declining ({trend_pct:.1f}%)"
+                trend_color = "red"
+            else:
+                trend_text = "📊 Stable"
+                trend_color = "blue"
+            
+            self.trend_label.config(text=f"Trend: {trend_text}", foreground=trend_color)
+            
+            # Update activity summary
+            self.activity_text.delete(1.0, tk.END)
+            
+            activity_summary = f"""📊 ACCURACY DASHBOARD SUMMARY
+{'='*50}
+
+📈 Overall Performance:
+   • Average Accuracy: {overall.get('average_accuracy', 0):.1f}%
+   • Latest Session: {overall.get('latest_accuracy', 0):.1f}%
+   • Total Corrections: {overall.get('total_corrections', 0)}
+
+🕒 Recent Performance:
+   • Last 7 Days: {recent.get('last_7_days', 0):.1f}% ({recent.get('sessions_last_7_days', 0)} sessions)
+   • Last 30 Days: {recent.get('last_30_days', 0):.1f}% ({recent.get('sessions_last_30_days', 0)} sessions)
+
+📊 Session Statistics:
+   • Min Accuracy: {metrics.get('session_statistics', {}).get('min_accuracy', 0):.1f}%
+   • Max Accuracy: {metrics.get('session_statistics', {}).get('max_accuracy', 0):.1f}%
+   • Median Accuracy: {metrics.get('session_statistics', {}).get('median_accuracy', 0):.1f}%
+
+🏷️ Top Correction Categories:"""
+            
+            # Add category summary
+            category_summary = metrics.get('category_summary', {})
+            for rank_key in sorted(category_summary.keys()):
+                cat_info = category_summary[rank_key]
+                activity_summary += f"\n   • {cat_info.get('category', 'Unknown')}: {cat_info.get('corrections', 0)} corrections"
+            
+            # Add data quality info
+            data_quality = metrics.get('data_quality', {})
+            date_range = data_quality.get('date_range', {})
+            
+            activity_summary += f"""
+
+🔍 Data Quality:
+   • Total Data Points: {data_quality.get('total_data_points', 0)}
+   • Date Range: {date_range.get('earliest', 'N/A')[:10]} to {date_range.get('latest', 'N/A')[:10]}
+   • Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+            
+            self.activity_text.insert(tk.END, activity_summary)
+            
+        except Exception as e:
+            self.activity_text.delete(1.0, tk.END)
+            self.activity_text.insert(tk.END, f"Error loading metrics: {str(e)}")
+    
+    def update_trends_chart(self, event=None):
+        """Update the trends chart (placeholder for now)"""
+        try:
+            if not hasattr(self, 'accuracy_tracker'):
+                self.refresh_accuracy_data()
+                return
+            
+            # Get time range
+            time_range = self.time_range_var.get()
+            granularity = self.granularity_var.get()
+            
+            # Calculate date range
+            from datetime import datetime, timedelta
+            end_date = datetime.now()
+            
+            if time_range == "7 days":
+                start_date = end_date - timedelta(days=7)
+            elif time_range == "30 days":
+                start_date = end_date - timedelta(days=30)
+            elif time_range == "90 days":
+                start_date = end_date - timedelta(days=90)
+            elif time_range == "1 year":
+                start_date = end_date - timedelta(days=365)
+            else:  # All time
+                start_date = None
+            
+            # Get time series data
+            ts_data = self.accuracy_tracker.get_time_series_data(start_date, end_date, granularity)
+            
+            # Update chart placeholder
+            if ts_data.empty:
+                chart_text = f"📈 No data available for {time_range} with {granularity} granularity\n\n" + \
+                           "Process some emails to generate accuracy trends data."
+            else:
+                chart_text = f"📈 Trends for {time_range} ({granularity} granularity)\n\n" + \
+                           f"Data Points: {len(ts_data)}\n" + \
+                           f"Accuracy Range: {ts_data['accuracy_rate'].min():.1f}% - {ts_data['accuracy_rate'].max():.1f}%\n" + \
+                           f"Average: {ts_data['accuracy_rate'].mean():.1f}%\n\n" + \
+                           "📊 Chart visualization requires matplotlib integration\n" + \
+                           "(Coming in next phase of development)"
+            
+            self.trends_chart_label.config(text=chart_text)
+            
+        except Exception as e:
+            self.trends_chart_label.config(text=f"Error loading trends: {str(e)}")
+    
+    def update_category_analysis(self, event=None):
+        """Update the category performance analysis"""
+        try:
+            if not hasattr(self, 'accuracy_tracker'):
+                self.refresh_accuracy_data()
+                return
+            
+            # Clear existing data
+            for item in self.category_tree.get_children():
+                self.category_tree.delete(item)
+            
+            # Get period
+            period_str = self.category_period_var.get()
+            days_back = {"7 days": 7, "30 days": 30, "90 days": 90, "All time": 9999}.get(period_str, 30)
+            
+            # Get category performance data
+            category_data = self.accuracy_tracker.get_category_performance_summary(days_back)
+            
+            if not category_data:
+                self.category_tree.insert("", "end", text="No category data available", values=("--", "--", "--"))
+                return
+            
+            # Populate tree
+            for category, stats in category_data.items():
+                accuracy = stats.get('accuracy_rate', 0)
+                corrections = stats.get('total_corrections', 0)
+                sessions = stats.get('sessions_involved', 0)
+                display_name = stats.get('category_name', category)
+                
+                self.category_tree.insert("", "end", 
+                                         text=display_name,
+                                         values=(f"{accuracy:.1f}%", corrections, sessions))
+            
+        except Exception as e:
+            self.category_tree.insert("", "end", text=f"Error: {str(e)}", values=("--", "--", "--"))
+    
+    def update_sessions_list(self, event=None):
+        """Update the sessions list"""
+        try:
+            if not hasattr(self, 'accuracy_tracker'):
+                self.refresh_accuracy_data()
+                return
+            
+            # Clear existing data
+            for item in self.sessions_tree.get_children():
+                self.sessions_tree.delete(item)
+            
+            # Get session count
+            session_count = int(self.session_count_var.get())
+            
+            # Get session comparison data
+            session_data = self.accuracy_tracker.get_session_comparison_data()
+            
+            if session_data.empty:
+                self.sessions_tree.insert("", "end", text="No session data", 
+                                         values=("--", "--", "--", "--"))
+                return
+            
+            # Show recent sessions (limit to requested count)
+            recent_sessions = session_data.head(session_count)
+            
+            for _, session in recent_sessions.iterrows():
+                session_id = session.get('session_run_id', 'Unknown')
+                date_time = session.get('session_date', 'Unknown')
+                if hasattr(date_time, 'strftime'):
+                    date_str = date_time.strftime('%Y-%m-%d %H:%M')
+                else:
+                    date_str = str(date_time)[:16]
+                
+                accuracy = session.get('current_accuracy', 0)
+                emails = session.get('current_emails', 0)
+                corrections = session.get('current_modifications', 0)
+                
+                self.sessions_tree.insert("", "end", 
+                                         text=session_id,
+                                         values=(date_str, f"{accuracy:.1f}%", emails, corrections))
+            
+        except Exception as e:
+            self.sessions_tree.insert("", "end", text=f"Error: {str(e)}", 
+                                     values=("--", "--", "--", "--"))
+    
+    def export_accuracy_data(self):
+        """Export accuracy data to CSV"""
+        try:
+            if not hasattr(self, 'accuracy_tracker'):
+                self.refresh_accuracy_data()
+                return
+            
+            # Export data
+            csv_path = self.accuracy_tracker.export_dashboard_data(format='csv')
+            
+            if csv_path:
+                result = messagebox.askyesno("Export Successful", 
+                                           f"Accuracy data exported to:\n{csv_path}\n\nOpen file location?")
+                if result:
+                    import subprocess
+                    subprocess.run(['explorer', '/select,', csv_path])
+            else:
+                messagebox.showwarning("Export Failed", "No data available to export")
+                
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Failed to export data:\n{str(e)}")
+
     def _on_summary_link_click(self, event):
         """Handle link clicks in the summary display"""
         # Get the tag at the click position
@@ -495,6 +991,17 @@ class UnifiedEmailGUI:
         # Synchronize GUI's action_items_data with the updated email processor data
         self.action_items_data = self.email_processor.action_items_data.copy()
         print(f"📊 Final sync complete. Action items categories: {list(self.action_items_data.keys())}")
+        
+        # Finalize accuracy tracking session
+        total_emails_processed = len(self.email_suggestions)
+        categories_used = set(suggestion['ai_suggestion'] for suggestion in self.email_suggestions)
+        print(f"🎯 FINALIZING ACCURACY SESSION: {total_emails_processed} emails, {len(categories_used)} categories")
+        self.ai_processor.finalize_accuracy_session(
+            success_count=total_emails_processed, 
+            error_count=0, 
+            categories_used=categories_used
+        )
+        print("✅ Accuracy session finalized!")
         
         self.update_progress(100, "Processing complete")
         self.root.after(0, self.on_processing_complete)
@@ -847,6 +1354,7 @@ class UnifiedEmailGUI:
     
     def on_processing_complete(self):
         self.notebook.tab(1, state="normal")
+        self.notebook.tab(3, state="normal")  # Enable accuracy dashboard tab
         self.load_processed_emails()
         self.notebook.select(1)
         
@@ -1397,6 +1905,13 @@ This will help keep your inbox focused on actionable items only."""
         # Automatically generate and display the formatted summary
         self.root.after(100, self.generate_summary)
     
+    def open_accuracy_dashboard(self):
+        """Enable and open the accuracy dashboard tab"""
+        self.notebook.tab(3, state="normal")
+        self.notebook.select(3)
+        # Refresh the accuracy data when opening
+        self.root.after(100, self.refresh_accuracy_data)
+    
     def generate_summary(self):
         self.generate_summary_btn.config(state=tk.DISABLED)
         
@@ -1659,7 +2174,7 @@ This will help keep your inbox focused on actionable items only."""
             self.summary_text.insert(tk.END, f"{item.get('why_relevant', item.get('explanation', 'No specific reason provided'))}\n", "content_text")
             
             self.summary_text.insert(tk.END, "   Context: ", "content_label")
-            self.summary_text.insert(tk.END, f"{item.get('explanation', 'No explanation provided')}\n", "content_text")
+            self.summary_text.insert(tk.END, f"{item.get('explanation', 'No context available')}\n", "content_text")
             
             # Task ID for completion tracking
             if item.get('task_id'):
@@ -1827,14 +2342,35 @@ This will help keep your inbox focused on actionable items only."""
             self.summary_text.insert(tk.END, "\n", "content_text")
     
     def _display_fyi_notices(self, items):
-        """Display FYI notices as bullet points"""
+        """Display FYI notices as bullet points with dismiss functionality"""
         for item in items:
             bullet_text = f"• {item['summary']} ({item['sender']})\n"
             self.summary_text.insert(tk.END, bullet_text, "content_text")
+        
+        # Add dismiss button if there are FYI items
+        if items:
+            self.summary_text.insert(tk.END, "   ", "content_text")
+            
+            dismiss_fyi_button = tk.Button(
+                self.summary_text,
+                text="🗑️ Clear All FYI Items",
+                command=self._dismiss_all_fyi_items,
+                bg="#f8d7da",
+                fg="#721c24",
+                font=("Arial", 8, "bold"),
+                relief="raised",
+                padx=8,
+                pady=2,
+                cursor="hand2"
+            )
+            
+            self.summary_text.window_create(tk.END, window=dismiss_fyi_button)
+            self.summary_text.insert(tk.END, "\n", "content_text")
+        
         self.summary_text.insert(tk.END, "\n", "content_text")
     
     def _display_newsletters(self, items):
-        """Display newsletter summaries"""
+        """Display newsletter summaries with dismiss functionality"""
         if len(items) > 1:
             # Combined newsletter highlights
             self.summary_text.insert(tk.END, "Combined Newsletter Highlights:\n", "item_title")
@@ -1848,7 +2384,65 @@ This will help keep your inbox focused on actionable items only."""
                 self.summary_text.insert(tk.END, f"From: {item['sender']}, {item['date']}\n", "item_meta")
                 self.summary_text.insert(tk.END, f"{item['summary']}\n", "content_text")
         
+        # Add dismiss button if there are newsletter items
+        if items:
+            self.summary_text.insert(tk.END, "   ", "content_text")
+            
+            dismiss_newsletter_button = tk.Button(
+                self.summary_text,
+                text="🗑️ Clear All Newsletters",
+                command=self._dismiss_all_newsletters,
+                bg="#fff3cd",
+                fg="#856404",
+                font=("Arial", 8, "bold"),
+                relief="raised",
+                padx=8,
+                pady=2,
+                cursor="hand2"
+            )
+            
+            self.summary_text.window_create(tk.END, window=dismiss_newsletter_button)
+            self.summary_text.insert(tk.END, "\n", "content_text")
+        
         self.summary_text.insert(tk.END, "\n", "content_text")
+    
+    def _dismiss_all_fyi_items(self):
+        """Dismiss all FYI items from persistent storage and refresh summary"""
+        result = messagebox.askyesno("Clear FYI Items", 
+                                   "Clear all FYI items?\n\n"
+                                   "This will remove all FYI notices from your summary.")
+        if result:
+            cleared_count = self.task_persistence.clear_fyi_items()
+            if cleared_count > 0:
+                messagebox.showinfo("FYI Items Cleared", f"Cleared {cleared_count} FYI items.")
+                # Refresh the summary to show the changes - use outstanding tasks only
+                self._refresh_summary_after_dismiss()
+            else:
+                messagebox.showinfo("No Items", "No FYI items to clear.")
+    
+    def _dismiss_all_newsletters(self):
+        """Dismiss all newsletter items from persistent storage and refresh summary"""
+        result = messagebox.askyesno("Clear Newsletter Items", 
+                                   "Clear all newsletter items?\n\n"
+                                   "This will remove all newsletter summaries from your summary.")
+        if result:
+            cleared_count = self.task_persistence.clear_newsletter_items()
+            if cleared_count > 0:
+                messagebox.showinfo("Newsletter Items Cleared", f"Cleared {cleared_count} newsletter items.")
+                # Refresh the summary to show the changes - use outstanding tasks only
+                self._refresh_summary_after_dismiss()
+            else:
+                messagebox.showinfo("No Items", "No newsletter items to clear.")
+    
+    def _refresh_summary_after_dismiss(self):
+        """Refresh summary display after dismissing items"""
+        # Check if we have current email processing data
+        if hasattr(self, 'action_items_data') and self.action_items_data:
+            # If we have current batch data, regenerate full summary
+            self.generate_summary()
+        else:
+            # If no current batch, just load outstanding tasks
+            self.view_outstanding_tasks_only()
     
     def open_summary_in_browser(self):
         if hasattr(self, 'saved_summary_path') and self.saved_summary_path:
@@ -1888,9 +2482,8 @@ This will help keep your inbox focused on actionable items only."""
             self.start_processing_btn.config(state=tk.NORMAL)
             self.cancel_processing_btn.config(state=tk.DISABLED)
             
-            # Disable tabs 2 and 3
+            # Disable only the review tab - keep summary tab available for outstanding tasks
             self.notebook.tab(1, state="disabled")
-            self.notebook.tab(2, state="disabled")
             
             # Switch to processing tab
             self.notebook.select(0)
@@ -2078,9 +2671,8 @@ This will help keep your inbox focused on actionable items only."""
                                       f"✅ Marked {len(selected_task_ids)} tasks as complete!{email_message}")
                     completion_window.destroy()
                     
-                    # Refresh summary if it's currently displayed
-                    if hasattr(self, 'summary_sections') and self.summary_sections:
-                        self.generate_summary()
+                    # Refresh summary using proper method
+                    self._refresh_summary_after_dismiss()
                         
                 except Exception as e:
                     messagebox.showerror("Error", f"Failed to complete tasks: {e}")
@@ -2126,9 +2718,8 @@ This will help keep your inbox focused on actionable items only."""
                 messagebox.showinfo("Task Completed", 
                                   f"✅ Task {task_id} marked as complete!{email_message}")
                 
-                # Refresh summary immediately
-                if hasattr(self, 'summary_sections') and self.summary_sections:
-                    self.generate_summary()
+                # Refresh summary immediately using proper method
+                self._refresh_summary_after_dismiss()
                     
             except Exception as e:
                 error_msg = f"Failed to complete task: {e}"
@@ -2153,6 +2744,45 @@ This will help keep your inbox focused on actionable items only."""
             return (datetime.now() - first_seen).days
         except:
             return 0
+    
+    def view_outstanding_tasks_only(self):
+        """Load and display outstanding tasks without processing new emails"""
+        try:
+            self.status_var.set("Loading outstanding tasks...")
+            
+            # Load outstanding tasks from persistent storage
+            outstanding_tasks = self.task_persistence.load_outstanding_tasks()
+            
+            # Check if there are any tasks to display
+            total_tasks = sum(len(tasks) for tasks in outstanding_tasks.values())
+            
+            if total_tasks == 0:
+                # Display empty state message
+                self.summary_text.config(state=tk.NORMAL)
+                self.summary_text.delete(1.0, tk.END)
+                
+                self.summary_text.insert(tk.END, "📋 Outstanding Tasks\n", "main_title")
+                self.summary_text.insert(tk.END, "\n")
+                self.summary_text.insert(tk.END, "No outstanding tasks found.\n", "subtitle")
+                self.summary_text.insert(tk.END, "\nTo get started:\n", "section_header")
+                self.summary_text.insert(tk.END, "• Go to 'Process Emails' tab to analyze new emails\n", "content_text")
+                self.summary_text.insert(tk.END, "• Or process a new batch using 'Process New Batch' button\n", "content_text")
+                
+                self.summary_text.config(state=tk.DISABLED)
+                self.status_var.set("No outstanding tasks")
+                return
+            
+            # Set up summary sections with outstanding tasks only
+            self.summary_sections = self.task_persistence.get_comprehensive_summary({})
+            
+            # Display the tasks
+            self.display_formatted_summary_in_app(self.summary_sections)
+            
+            self.status_var.set(f"Loaded {total_tasks} outstanding tasks")
+            
+        except Exception as e:
+            self.status_var.set(f"Error loading tasks: {str(e)}")
+            messagebox.showerror("Error", f"Failed to load outstanding tasks:\n{str(e)}")
     
     def run(self):
         self.root.mainloop()
