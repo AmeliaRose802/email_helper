@@ -493,7 +493,7 @@ class SummaryGenerator:
         return summary_sections
     
     def build_summary_sections(self, action_items_data, ai_processor=None):
-        """Build summary sections using collected AI analysis data"""
+        """Build summary sections using collected AI analysis data with holistic duplicate removal"""
         summary_sections = self.EMPTY_SECTIONS.copy()
         processed_entry_ids = set()
         
@@ -511,8 +511,94 @@ class SummaryGenerator:
         if ai_processor:
             summary_sections = self._remove_duplicate_items(summary_sections, ai_processor)
         
+        # Apply holistic cross-section duplicate removal
+        summary_sections = self._remove_cross_section_duplicates(summary_sections, ai_processor)
+        
         # Separate completed team actions from active ones
         summary_sections = self._separate_completed_team_actions(summary_sections)
+        
+        return summary_sections
+    
+    def _remove_cross_section_duplicates(self, summary_sections, ai_processor):
+        """Remove FYIs/newsletters already covered by tasks - holistic duplicate removal"""
+        print("🔄 Applying holistic cross-section duplicate removal...")
+        
+        # Collect all action items (high priority sections)
+        action_items = []
+        action_sections = ['required_actions', 'team_actions', 'optional_actions']
+        
+        for section_name in action_sections:
+            if section_name in summary_sections:
+                action_items.extend(summary_sections[section_name])
+        
+        if not action_items:
+            print("   No action items found, skipping cross-section deduplication")
+            return summary_sections
+        
+        cross_duplicates_removed = 0
+        
+        # Check FYI notices against action items
+        if 'fyi_notices' in summary_sections:
+            unique_fyis = []
+            
+            for fyi_item in summary_sections['fyi_notices']:
+                is_covered_by_action = False
+                
+                # Check if this FYI is already covered by an action item
+                if hasattr(ai_processor, 'email_analyzer') and ai_processor.email_analyzer:
+                    for action_item in action_items:
+                        is_similar, similarity_score = ai_processor.email_analyzer.calculate_content_similarity(
+                            fyi_item, action_item, threshold=0.15  # Lower threshold for cross-section
+                        )
+                        
+                        if is_similar:
+                            is_covered_by_action = True
+                            cross_duplicates_removed += 1
+                            
+                            fyi_subject = fyi_item.get('subject', fyi_item.get('summary', 'unknown'))[:40]
+                            action_subject = action_item.get('subject', 'unknown')[:40]
+                            print(f"   🔗 Removed FYI covered by task: '{fyi_subject}...' → covered by '{action_subject}...' (similarity: {similarity_score:.2f})")
+                            break
+                
+                if not is_covered_by_action:
+                    unique_fyis.append(fyi_item)
+            
+            summary_sections['fyi_notices'] = unique_fyis
+        
+        # Check newsletters against action items and FYIs
+        if 'newsletters' in summary_sections:
+            unique_newsletters = []
+            
+            # Combine action items and remaining FYIs for comparison
+            comparison_items = action_items + summary_sections.get('fyi_notices', [])
+            
+            for newsletter_item in summary_sections['newsletters']:
+                is_covered = False
+                
+                if hasattr(ai_processor, 'email_analyzer') and ai_processor.email_analyzer:
+                    for comparison_item in comparison_items:
+                        is_similar, similarity_score = ai_processor.email_analyzer.calculate_content_similarity(
+                            newsletter_item, comparison_item, threshold=0.12  # Even lower threshold for newsletters
+                        )
+                        
+                        if is_similar:
+                            is_covered = True
+                            cross_duplicates_removed += 1
+                            
+                            newsletter_subject = newsletter_item.get('subject', newsletter_item.get('summary', 'unknown'))[:40]
+                            comparison_subject = comparison_item.get('subject', comparison_item.get('summary', 'unknown'))[:40]
+                            print(f"   🔗 Removed newsletter covered by other content: '{newsletter_subject}...' → covered by '{comparison_subject}...' (similarity: {similarity_score:.2f})")
+                            break
+                
+                if not is_covered:
+                    unique_newsletters.append(newsletter_item)
+            
+            summary_sections['newsletters'] = unique_newsletters
+        
+        if cross_duplicates_removed > 0:
+            print(f"✅ Holistic deduplication: {cross_duplicates_removed} cross-section duplicates removed")
+        else:
+            print("✅ No cross-section duplicates found")
         
         return summary_sections
     

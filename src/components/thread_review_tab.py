@@ -192,7 +192,7 @@ class ThreadReviewTab:
             self.toggle_thread(first_thread_id)  # This will expand and select the first thread
 
     def group_suggestions_by_thread(self, email_suggestions):
-        """Group email suggestions by thread"""
+        """Group email suggestions by thread with enhanced similarity detection"""
         thread_groups = {}
         
         for suggestion in email_suggestions:
@@ -212,9 +212,62 @@ class ThreadReviewTab:
             
             thread_groups[thread_id]['emails'].append(suggestion)
         
-        # Sort by latest date
+        # Enhanced grouping: Apply content similarity to merge similar threads
+        merged_groups = {}
+        processed_ids = set()
+        
+        for thread_id, thread_data in thread_groups.items():
+            if thread_id in processed_ids:
+                continue
+                
+            # Check if this thread should be merged with any existing merged group
+            merged = False
+            sample_email = thread_data['emails'][0] if thread_data['emails'] else None
+            
+            if sample_email and hasattr(self.controller, 'email_analyzer'):
+                for merged_id, merged_data in merged_groups.items():
+                    if merged_id in processed_ids:
+                        continue
+                        
+                    merged_sample = merged_data['emails'][0] if merged_data['emails'] else None
+                    
+                    if merged_sample:
+                        # Use content similarity to check if threads should be merged
+                        email_obj1 = sample_email.get('email_object')
+                        email_obj2 = merged_sample.get('email_object')
+                        
+                        if email_obj1 and email_obj2:
+                            is_similar, similarity_score = self.controller.email_analyzer.calculate_content_similarity(
+                                email_obj1, email_obj2, threshold=0.6
+                            )
+                            
+                            if is_similar:
+                                # Merge threads
+                                merged_data['emails'].extend(thread_data['emails'])
+                                merged_data['thread_count'] += thread_data['thread_count']
+                                merged_data['participants'] = list(set(merged_data['participants'] + thread_data['participants']))
+                                
+                                # Use the latest date
+                                if thread_data['latest_date']:
+                                    if not merged_data['latest_date'] or thread_data['latest_date'] > merged_data['latest_date']:
+                                        merged_data['latest_date'] = thread_data['latest_date']
+                                
+                                processed_ids.add(thread_id)
+                                merged = True
+                                print(f"🔗 Merged similar threads: '{thread_data['topic'][:30]}...' → '{merged_data['topic'][:30]}...' (similarity: {similarity_score:.2f})")
+                                break
+            
+            if not merged:
+                merged_groups[thread_id] = thread_data
+                processed_ids.add(thread_id)
+        
+        # Sort emails within each thread chronologically
+        for thread_data in merged_groups.values():
+            thread_data['emails'].sort(key=lambda x: x.get('email_data', {}).get('received_time', ''), reverse=True)
+        
+        # Sort threads by latest date
         sorted_threads = dict(sorted(
-            thread_groups.items(),
+            merged_groups.items(),
             key=lambda x: x[1]['latest_date'] if x[1]['latest_date'] else datetime.min,
             reverse=True
         ))
@@ -243,7 +296,7 @@ class ThreadReviewTab:
         self.create_thread_header(thread_frame, thread_id, thread_data)
 
     def create_thread_header(self, parent_frame, thread_id, thread_data):
-        """Create clickable thread header"""
+        """Create clickable thread header with enhanced information"""
         header_frame = ttk.Frame(parent_frame)
         header_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E))
         header_frame.columnconfigure(1, weight=1)
@@ -258,24 +311,48 @@ class ThreadReviewTab:
         expand_btn.grid(row=0, column=0, padx=(0, 5))
         self.thread_frames[thread_id]['expand_btn'] = expand_btn
         
-        # Thread info
+        # Thread info with enhanced display
         thread_count = thread_data['thread_count']
         participants = thread_data.get('participants', [])
         topic = thread_data['topic']
+        emails_in_group = len(thread_data['emails'])
         
+        # Create thread info text with hierarchy indicators
         if thread_count > 1:
+            # Multi-email thread
             icon = "🧵"
-            count_text = f"({thread_count} emails, {len(participants)} participants)"
+            if emails_in_group > thread_count:
+                # This indicates merged threads
+                count_text = f"({emails_in_group} emails from {thread_count} conversations, {len(participants)} participants)"
+                icon = "🔗"  # Merged thread indicator
+            else:
+                count_text = f"({thread_count} emails, {len(participants)} participants)"
         else:
-            icon = "📧"
-            count_text = f"(Single email)"
+            # Single email or merged single emails
+            if emails_in_group > 1:
+                icon = "🔗"  # Merged similar emails
+                count_text = f"({emails_in_group} similar emails)"
+            else:
+                icon = "📧"
+                count_text = f"(Single email)"
         
         info_text = f"{icon} {topic[:60]}" + ("..." if len(topic) > 60 else "")
         category = thread_data['ai_category'].replace('_', ' ').title()
         
+        # Add chronological indicator for multi-email threads
+        latest_info = ""
+        if emails_in_group > 1:
+            latest_date = thread_data.get('latest_date')
+            if latest_date:
+                if hasattr(latest_date, 'strftime'):
+                    date_text = latest_date.strftime('%m/%d %H:%M')
+                else:
+                    date_text = str(latest_date)[:16]
+                latest_info = f" • Latest: {date_text}"
+        
         info_label = ttk.Label(
             header_frame,
-            text=f"{info_text}\n{count_text} • Category: {category}",
+            text=f"{info_text}\n{count_text} • Category: {category}{latest_info}",
             font=('Segoe UI', 9)
         )
         info_label.grid(row=0, column=1, sticky=(tk.W, tk.E))
@@ -311,7 +388,7 @@ class ThreadReviewTab:
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def create_thread_content(self, thread_id):
-        """Create expanded content for a thread"""
+        """Create expanded content for a thread with chronological ordering"""
         thread_info = self.thread_frames[thread_id]
         thread_data = thread_info['data']
         
@@ -322,15 +399,45 @@ class ThreadReviewTab:
         content_frame.columnconfigure(0, weight=1)  # Allow content to expand horizontally
         thread_info['content_frame'] = content_frame
         
-        # Create individual email items
+        # Sort emails chronologically (oldest first for better thread reading)
         emails = thread_data['emails']
-        for i, email_suggestion in enumerate(emails):
-            self.create_email_item(content_frame, i, email_suggestion, thread_id)
+        sorted_emails = sorted(emails, key=lambda x: x.get('email_data', {}).get('received_time', ''))
+        
+        # Add thread overview if multiple emails
+        if len(sorted_emails) > 1:
+            overview_frame = ttk.LabelFrame(content_frame, text="📊 Thread Overview", padding=5)
+            overview_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
+            overview_frame.columnconfigure(0, weight=1)
+            
+            participants = thread_data.get('participants', [])
+            overview_text = f"👥 Participants: {', '.join(participants)}\n"
+            overview_text += f"📧 Total emails: {len(sorted_emails)}\n"
+            overview_text += f"🏷️ Category: {thread_data['ai_category'].replace('_', ' ').title()}"
+            
+            overview_label = ttk.Label(overview_frame, text=overview_text, font=('Segoe UI', 8))
+            overview_label.grid(row=0, column=0, sticky=tk.W)
+        
+        # Create individual email items in chronological order
+        for i, email_suggestion in enumerate(sorted_emails):
+            row_offset = 1 if len(sorted_emails) > 1 else 0
+            self.create_email_item(content_frame, row_offset + i, email_suggestion, thread_id, i == 0, i == len(sorted_emails) - 1)
 
-    def create_email_item(self, parent_frame, email_index, email_suggestion, thread_id):
-        """Create individual email item within thread"""
-        email_frame = ttk.LabelFrame(parent_frame, text=f"Email {email_index + 1}", padding=5)
-        email_frame.grid(row=email_index, column=0, sticky=(tk.W, tk.E), pady=2)
+    def create_email_item(self, parent_frame, row_index, email_suggestion, thread_id, is_first=False, is_last=False):
+        """Create individual email item within thread with enhanced chronological display"""
+        email_data = email_suggestion.get('email_data', {})
+        ai_summary = email_suggestion.get('ai_summary', 'No summary')
+        
+        # Create frame with chronological indicators
+        frame_text = f"📧 Email {row_index}"
+        if is_first and not is_last:
+            frame_text = f"📧 Email {row_index} (Oldest)"
+        elif is_last and not is_first:
+            frame_text = f"📧 Email {row_index} (Latest)"
+        elif is_first and is_last:
+            frame_text = f"📧 Email {row_index} (Only)"
+        
+        email_frame = ttk.LabelFrame(parent_frame, text=frame_text, padding=5)
+        email_frame.grid(row=row_index, column=0, sticky=(tk.W, tk.E), pady=2)
         email_frame.columnconfigure(1, weight=1)
         
         email_data = email_suggestion.get('email_data', {})
