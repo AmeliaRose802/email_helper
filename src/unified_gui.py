@@ -44,6 +44,8 @@ from email_analyzer import EmailAnalyzer
 from summary_generator import SummaryGenerator
 from email_processor import EmailProcessor
 from task_persistence import TaskPersistence
+from accuracy_tracker import AccuracyTracker
+from database.migrations import DatabaseMigrations
 
 
 class UnifiedEmailGUI:
@@ -86,6 +88,16 @@ class UnifiedEmailGUI:
             self.summary_generator
         )
         self.task_persistence = TaskPersistence()  # Add task persistence
+        
+        # Initialize accuracy tracking and database
+        runtime_data_dir = os.path.join(os.path.dirname(__file__), '..', 'runtime_data')
+        os.makedirs(runtime_data_dir, exist_ok=True)
+        self.accuracy_tracker = AccuracyTracker(runtime_data_dir)
+        
+        # Initialize database for historical storage
+        db_path = os.path.join(runtime_data_dir, 'email_helper_history.db')
+        self.db_migrations = DatabaseMigrations(db_path)
+        self.db_migrations.apply_migrations()  # Ensure database is up to date
         
         # Data storage
         self.email_suggestions = []
@@ -469,12 +481,12 @@ class UnifiedEmailGUI:
         self.create_sessions_view()
     
     def create_metrics_view(self):
-        """Create the overview metrics view"""
+        """Create the overview metrics view with running accuracy and task resolution"""
         # Key metrics cards at the top
         metrics_container = ttk.Frame(self.metrics_frame)
         metrics_container.pack(fill=tk.X, padx=20, pady=20)
         
-        # Create metric cards
+        # Create enhanced metric cards
         self.overall_accuracy_label = ttk.Label(metrics_container, 
                                                text="Overall Accuracy\n---%", 
                                                font=("Segoe UI", 12, "bold"),
@@ -487,24 +499,24 @@ class UnifiedEmailGUI:
                                         anchor="center", width=15)
         self.seven_day_label.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
         
+        self.thirty_day_label = ttk.Label(metrics_container, 
+                                         text="30-Day Average\n---%", 
+                                         font=("Segoe UI", 12, "bold"),
+                                         anchor="center", width=15)
+        self.thirty_day_label.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
+        
         self.total_sessions_label = ttk.Label(metrics_container, 
                                              text="Total Sessions\n---", 
                                              font=("Segoe UI", 12, "bold"),
                                              anchor="center", width=15)
-        self.total_sessions_label.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
-        
-        self.total_emails_label = ttk.Label(metrics_container, 
-                                           text="Total Emails\n---", 
-                                           font=("Segoe UI", 12, "bold"),
-                                           anchor="center", width=15)
-        self.total_emails_label.grid(row=0, column=3, padx=10, pady=10, sticky="nsew")
+        self.total_sessions_label.grid(row=0, column=3, padx=10, pady=10, sticky="nsew")
         
         # Configure grid weights
         for i in range(4):
             metrics_container.columnconfigure(i, weight=1)
         
-        # Trend indicator
-        self.trend_frame = ttk.LabelFrame(self.metrics_frame, text="Accuracy Trend", padding="10")
+        # Enhanced trend indicator with real-time data
+        self.trend_frame = ttk.LabelFrame(self.metrics_frame, text="Live Accuracy Trend", padding="10")
         self.trend_frame.pack(fill=tk.X, padx=20, pady=10)
         
         self.trend_label = ttk.Label(self.trend_frame, 
@@ -512,12 +524,35 @@ class UnifiedEmailGUI:
                                     font=("Segoe UI", 11))
         self.trend_label.pack()
         
+        # Task Resolution Summary
+        self.resolution_frame = ttk.LabelFrame(self.metrics_frame, text="Task Resolution History (Last 30 Days)", padding="10")
+        self.resolution_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        # Resolution metrics row
+        resolution_metrics_frame = ttk.Frame(self.resolution_frame)
+        resolution_metrics_frame.pack(fill=tk.X, pady=5)
+        
+        self.completed_tasks_label = ttk.Label(resolution_metrics_frame, 
+                                              text="Completed: ---", 
+                                              font=("Segoe UI", 10))
+        self.completed_tasks_label.grid(row=0, column=0, padx=10, sticky="w")
+        
+        self.dismissed_tasks_label = ttk.Label(resolution_metrics_frame, 
+                                              text="Dismissed: ---", 
+                                              font=("Segoe UI", 10))
+        self.dismissed_tasks_label.grid(row=0, column=1, padx=10, sticky="w")
+        
+        self.avg_resolution_time_label = ttk.Label(resolution_metrics_frame, 
+                                                  text="Avg Age: --- days", 
+                                                  font=("Segoe UI", 10))
+        self.avg_resolution_time_label.grid(row=0, column=2, padx=10, sticky="w")
+        
         # Recent activity summary
         self.activity_frame = ttk.LabelFrame(self.metrics_frame, text="Recent Activity", padding="10")
         self.activity_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         self.activity_text = scrolledtext.ScrolledText(self.activity_frame, 
-                                                      height=10, 
+                                                      height=8, 
                                                       wrap=tk.WORD,
                                                       font=("Consolas", 9))
         self.activity_text.pack(fill=tk.BOTH, expand=True)
@@ -605,9 +640,25 @@ class UnifiedEmailGUI:
         tree_scroll.pack(side="right", fill="y")
     
     def create_sessions_view(self):
-        """Create the sessions detail view"""
+        """Create the sessions detail view with both accuracy sessions and task resolution history"""
+        # Create sub-notebook for different types of session data
+        self.sessions_notebook = ttk.Notebook(self.sessions_frame)
+        self.sessions_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Tab 1: Accuracy Sessions
+        self.accuracy_sessions_frame = ttk.Frame(self.sessions_notebook)
+        self.sessions_notebook.add(self.accuracy_sessions_frame, text="📊 Accuracy Sessions")
+        self.create_accuracy_sessions_view()
+        
+        # Tab 2: Task Resolution History
+        self.task_history_frame = ttk.Frame(self.sessions_notebook)
+        self.sessions_notebook.add(self.task_history_frame, text="📋 Task Resolution History")
+        self.create_task_history_view()
+    
+    def create_accuracy_sessions_view(self):
+        """Create the accuracy sessions view"""
         # Controls
-        controls_frame = ttk.Frame(self.sessions_frame)
+        controls_frame = ttk.Frame(self.accuracy_sessions_frame)
         controls_frame.pack(fill=tk.X, padx=20, pady=10)
         
         ttk.Label(controls_frame, text="Sessions to show:").pack(side=tk.LEFT, padx=5)
@@ -623,7 +674,7 @@ class UnifiedEmailGUI:
                   command=self.update_sessions_list).pack(side=tk.LEFT, padx=20)
         
         # Sessions table
-        self.sessions_table_frame = ttk.LabelFrame(self.sessions_frame, text="Recent Sessions", padding="10")
+        self.sessions_table_frame = ttk.LabelFrame(self.accuracy_sessions_frame, text="Recent Accuracy Sessions", padding="10")
         self.sessions_table_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         # Create treeview for session data
@@ -650,7 +701,419 @@ class UnifiedEmailGUI:
         self.sessions_tree.pack(side="left", fill=tk.BOTH, expand=True)
         sessions_scroll.pack(side="right", fill="y")
     
-    def refresh_accuracy_data(self):
+    def create_task_history_view(self):
+        """Create the task resolution history view"""
+        # Controls for task history
+        task_controls_frame = ttk.Frame(self.task_history_frame)
+        task_controls_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        ttk.Label(task_controls_frame, text="Time Range:").pack(side=tk.LEFT, padx=5)
+        
+        self.task_history_range_var = tk.StringVar(value="30 days")
+        range_combo = ttk.Combobox(task_controls_frame, textvariable=self.task_history_range_var,
+                                  values=["7 days", "30 days", "90 days", "6 months", "1 year"],
+                                  state="readonly", width=12)
+        range_combo.pack(side=tk.LEFT, padx=5)
+        range_combo.bind("<<ComboboxSelected>>", self.update_task_history_list)
+        
+        ttk.Label(task_controls_frame, text="Resolution Type:").pack(side=tk.LEFT, padx=(20,5))
+        
+        self.task_resolution_filter_var = tk.StringVar(value="All")
+        filter_combo = ttk.Combobox(task_controls_frame, textvariable=self.task_resolution_filter_var,
+                                   values=["All", "completed", "dismissed", "deferred", "delegated"],
+                                   state="readonly", width=12)
+        filter_combo.pack(side=tk.LEFT, padx=5)
+        filter_combo.bind("<<ComboboxSelected>>", self.update_task_history_list)
+        
+        ttk.Button(task_controls_frame, text="Load History", 
+                  command=self.update_task_history_list).pack(side=tk.LEFT, padx=20)
+        
+        ttk.Button(task_controls_frame, text="Export CSV", 
+                  command=self.export_task_history).pack(side=tk.LEFT, padx=5)
+        
+        # Task history table
+        self.task_history_table_frame = ttk.LabelFrame(self.task_history_frame, text="Task Resolution History", padding="10")
+        self.task_history_table_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Create treeview for task resolution data
+        self.task_history_tree = ttk.Treeview(self.task_history_table_frame, 
+                                             columns=("timestamp", "resolution_type", "section", "age", "sender"),
+                                             show="tree headings", height=15)
+        
+        self.task_history_tree.heading("#0", text="Task ID")
+        self.task_history_tree.heading("timestamp", text="Resolution Date")
+        self.task_history_tree.heading("resolution_type", text="Resolution")
+        self.task_history_tree.heading("section", text="Section")
+        self.task_history_tree.heading("age", text="Age (days)")
+        self.task_history_tree.heading("sender", text="Sender")
+        
+        self.task_history_tree.column("#0", width=120, minwidth=100)
+        self.task_history_tree.column("timestamp", width=150, minwidth=120)
+        self.task_history_tree.column("resolution_type", width=100, minwidth=80, anchor="center")
+        self.task_history_tree.column("section", width=120, minwidth=100)
+        self.task_history_tree.column("age", width=80, minwidth=60, anchor="center")
+        self.task_history_tree.column("sender", width=150, minwidth=120)
+        
+        # Scrollbar for task history tree
+        task_history_scroll = ttk.Scrollbar(self.task_history_table_frame, orient="vertical", command=self.task_history_tree.yview)
+        self.task_history_tree.configure(yscroll=task_history_scroll.set)
+        
+        self.task_history_tree.pack(side="left", fill=tk.BOTH, expand=True)
+        task_history_scroll.pack(side="right", fill="y")
+        
+        # Task resolution statistics summary
+        self.task_stats_frame = ttk.LabelFrame(self.task_history_frame, text="Resolution Statistics", padding="10")
+        self.task_stats_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        self.task_stats_text = tk.Text(self.task_stats_frame, height=4, wrap=tk.WORD, font=("Consolas", 9))
+        self.task_stats_text.pack(fill=tk.X)
+    
+    def update_task_history_list(self, event=None):
+        """Update the task resolution history list"""
+        try:
+            # Clear existing items
+            for item in self.task_history_tree.get_children():
+                self.task_history_tree.delete(item)
+            
+            # Get time range in days
+            range_text = self.task_history_range_var.get()
+            if range_text == "7 days":
+                days_back = 7
+            elif range_text == "30 days":
+                days_back = 30
+            elif range_text == "90 days":
+                days_back = 90
+            elif range_text == "6 months":
+                days_back = 180
+            elif range_text == "1 year":
+                days_back = 365
+            else:
+                days_back = 30
+            
+            # Get resolution type filter
+            resolution_filter = self.task_resolution_filter_var.get()
+            if resolution_filter == "All":
+                resolution_filter = None
+            
+            # Get task resolution history
+            history_data = self.task_persistence.get_resolution_history(
+                days_back=days_back, 
+                resolution_type=resolution_filter, 
+                include_stats=True
+            )
+            
+            # Populate tree with resolution data
+            for resolution in history_data.get('resolutions', []):
+                task_id = resolution.get('task_id', 'Unknown')
+                timestamp = resolution.get('resolution_timestamp', '')
+                resolution_type = resolution.get('resolution_type', 'Unknown')
+                section = resolution.get('task_section', 'Unknown').replace('_', ' ').title()
+                age_days = resolution.get('task_age_days', 0)
+                sender = resolution.get('task_sender', 'Unknown')
+                
+                # Format timestamp for display
+                try:
+                    from datetime import datetime
+                    dt = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                    display_timestamp = dt.strftime('%m/%d/%Y %H:%M')
+                except:
+                    display_timestamp = timestamp[:16] if len(timestamp) > 16 else timestamp
+                
+                self.task_history_tree.insert("", "end", text=task_id,
+                                              values=(display_timestamp, resolution_type.title(), 
+                                                     section, age_days, sender))
+            
+            # Update statistics display
+            self.update_task_resolution_stats(history_data)
+            
+        except Exception as e:
+            print(f"⚠️ Error updating task history list: {e}")
+    
+    def update_task_resolution_stats(self, history_data):
+        """Update task resolution statistics display"""
+        try:
+            self.task_stats_text.delete(1.0, tk.END)
+            
+            if history_data['total_count'] == 0:
+                self.task_stats_text.insert(1.0, "No task resolution data available for the selected period.")
+                return
+            
+            stats = history_data.get('statistics', {})
+            completion_rate = stats.get('completion_rate', {})
+            age_stats = stats.get('age_statistics', {})
+            type_dist = stats.get('resolution_type_distribution', {})
+            
+            stats_text = f"""Resolution Summary ({history_data['total_count']} tasks):
+• Completed: {completion_rate.get('completed', 0)}, Dismissed: {completion_rate.get('dismissed', 0)}, Deferred: {completion_rate.get('deferred', 0)}
+• Average Task Age: {age_stats.get('average_age_days', 0):.1f} days (Range: {age_stats.get('min_age_days', 0)}-{age_stats.get('max_age_days', 0)} days)
+• Resolution Types: {', '.join([f"{k}: {v}" for k, v in type_dist.items()])}"""
+            
+            self.task_stats_text.insert(1.0, stats_text)
+            
+        except Exception as e:
+            print(f"⚠️ Error updating task resolution stats: {e}")
+    
+    def export_task_history(self):
+        """Export task resolution history to CSV"""
+        try:
+            from tkinter import filedialog
+            import csv
+            from datetime import datetime
+            
+            # Get current history data
+            range_text = self.task_history_range_var.get()
+            if range_text == "7 days":
+                days_back = 7
+            elif range_text == "30 days":
+                days_back = 30
+            elif range_text == "90 days":
+                days_back = 90
+            elif range_text == "6 months":
+                days_back = 180
+            elif range_text == "1 year":
+                days_back = 365
+            else:
+                days_back = 30
+            
+            resolution_filter = self.task_resolution_filter_var.get()
+            if resolution_filter == "All":
+                resolution_filter = None
+            
+            history_data = self.task_persistence.get_resolution_history(
+                days_back=days_back, 
+                resolution_type=resolution_filter, 
+                include_stats=True
+            )
+            
+            if history_data['total_count'] == 0:
+                messagebox.showinfo("Export", "No data to export for the selected period.")
+                return
+            
+            # Get save file path
+            default_filename = f"task_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+                initialname=default_filename
+            )
+            
+            if not file_path:
+                return
+            
+            # Write CSV
+            with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+                fieldnames = ['task_id', 'resolution_timestamp', 'resolution_type', 'task_section', 
+                             'task_age_days', 'task_sender', 'resolution_notes']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                
+                writer.writeheader()
+                for resolution in history_data.get('resolutions', []):
+                    writer.writerow({
+                        'task_id': resolution.get('task_id', ''),
+                        'resolution_timestamp': resolution.get('resolution_timestamp', ''),
+                        'resolution_type': resolution.get('resolution_type', ''),
+                        'task_section': resolution.get('task_section', ''),
+                        'task_age_days': resolution.get('task_age_days', 0),
+                        'task_sender': resolution.get('task_sender', ''),
+                        'resolution_notes': resolution.get('resolution_notes', '')
+                    })
+            
+            messagebox.showinfo("Export Complete", f"Task history exported to:\n{file_path}")
+            
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Failed to export task history:\n{str(e)}")
+    
+    def create_metrics_dashboard(self):
+        """
+        Create comprehensive metrics dashboard for accuracy and task resolution tracking.
+        
+        This method creates the main dashboard interface combining:
+        - Real-time running accuracy metrics (7-day and 30-day averages)
+        - Task resolution history and statistics
+        - Performance trends and insights
+        - Export capabilities for historical analysis
+        
+        Returns:
+            bool: True if dashboard was successfully created
+        """
+        try:
+            # Ensure accuracy tracker and database are initialized
+            if not hasattr(self, 'accuracy_tracker'):
+                runtime_data_dir = os.path.join(os.path.dirname(__file__), '..', 'runtime_data')
+                os.makedirs(runtime_data_dir, exist_ok=True)
+                self.accuracy_tracker = AccuracyTracker(runtime_data_dir)
+            
+            if not hasattr(self, 'db_migrations'):
+                db_path = os.path.join(runtime_data_dir, 'email_helper_history.db')
+                self.db_migrations = DatabaseMigrations(db_path)
+                self.db_migrations.apply_migrations()
+            
+            # Enable the accuracy dashboard tab
+            self.notebook.tab(3, state="normal")
+            
+            # Load initial data for all dashboard components
+            self.refresh_accuracy_data()
+            
+            print("✅ Metrics dashboard created successfully")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error creating metrics dashboard: {e}")
+            return False
+    
+    def record_task_completion_with_metrics(self, task_ids, completion_type="completed", notes=""):
+        """
+        Enhanced task completion that records to both persistence and metrics tracking.
+        
+        Args:
+            task_ids (list): List of task IDs to mark as completed
+            completion_type (str): Type of completion ('completed', 'dismissed', 'deferred')
+            notes (str): Optional completion notes
+            
+        Returns:
+            bool: True if recording was successful
+        """
+        try:
+            # Record completion in task persistence (existing functionality)
+            for task_id in task_ids:
+                # Record in task persistence
+                self.task_persistence.mark_tasks_completed([task_id])
+                
+                # Record detailed resolution for metrics
+                self.task_persistence.record_task_resolution(
+                    task_id, completion_type, notes
+                )
+                
+                # Store in database for historical tracking
+                if hasattr(self, 'db_migrations'):
+                    # Get task data for database storage
+                    resolution_data = {
+                        'task_id': task_id,
+                        'resolution_timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'resolution_type': completion_type,
+                        'resolution_notes': notes,
+                        'task_section': 'unknown',  # Would be populated with actual section
+                        'task_age_days': 0,  # Would be calculated from actual task data
+                        'task_data': {}  # Would contain full task data
+                    }
+                    self.db_migrations.store_task_resolution(resolution_data)
+            
+            # Refresh dashboard if it exists
+            if hasattr(self, 'accuracy_tracker'):
+                self.update_task_resolution_display()
+                
+            return True
+            
+        except Exception as e:
+            print(f"⚠️ Error recording task completion with metrics: {e}")
+            return False
+    
+    def get_comprehensive_metrics_summary(self):
+        """
+        Get comprehensive summary of both accuracy and task resolution metrics.
+        
+        Returns:
+            dict: Complete metrics summary for dashboard display
+        """
+        try:
+            metrics_summary = {
+                'accuracy_metrics': {},
+                'task_metrics': {},
+                'combined_insights': {},
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Get running accuracy metrics
+            if hasattr(self, 'accuracy_tracker'):
+                running_accuracy = self.accuracy_tracker.calculate_running_accuracy()
+                dashboard_metrics = self.accuracy_tracker.get_dashboard_metrics()
+                
+                metrics_summary['accuracy_metrics'] = {
+                    'running_accuracy': running_accuracy,
+                    'dashboard_data': dashboard_metrics
+                }
+            
+            # Get task resolution metrics
+            if hasattr(self, 'task_persistence'):
+                task_history = self.task_persistence.get_resolution_history(days_back=30, include_stats=True)
+                task_stats = self.task_persistence.get_task_statistics()
+                
+                metrics_summary['task_metrics'] = {
+                    'resolution_history': task_history,
+                    'task_statistics': task_stats
+                }
+            
+            # Generate combined insights
+            metrics_summary['combined_insights'] = self._generate_performance_insights(metrics_summary)
+            
+            return metrics_summary
+            
+        except Exception as e:
+            print(f"⚠️ Error getting comprehensive metrics summary: {e}")
+            return {
+                'accuracy_metrics': {},
+                'task_metrics': {},
+                'combined_insights': {'error': str(e)},
+                'timestamp': datetime.now().isoformat()
+            }
+    
+    def _generate_performance_insights(self, metrics_summary):
+        """Generate performance insights from combined metrics data"""
+        insights = {
+            'performance_score': 'unknown',
+            'recommendations': [],
+            'trends': [],
+            'alerts': []
+        }
+        
+        try:
+            accuracy_data = metrics_summary.get('accuracy_metrics', {}).get('running_accuracy', {})
+            task_data = metrics_summary.get('task_metrics', {}).get('resolution_history', {})
+            
+            # Calculate performance score
+            accuracy_7d = accuracy_data.get('last_7_days', 0)
+            accuracy_30d = accuracy_data.get('last_30_days', 0)
+            task_completion_rate = 0
+            
+            if task_data.get('total_count', 0) > 0:
+                stats = task_data.get('statistics', {})
+                completion_rate = stats.get('completion_rate', {})
+                completed = completion_rate.get('completed', 0)
+                total = completion_rate.get('total', 1)
+                task_completion_rate = (completed / total) * 100 if total > 0 else 0
+            
+            # Combined performance score (weighted average)
+            performance_score = (accuracy_7d * 0.6) + (task_completion_rate * 0.4)
+            
+            if performance_score >= 90:
+                insights['performance_score'] = 'excellent'
+            elif performance_score >= 80:
+                insights['performance_score'] = 'good'
+            elif performance_score >= 70:
+                insights['performance_score'] = 'fair'
+            else:
+                insights['performance_score'] = 'needs_improvement'
+            
+            # Generate recommendations
+            if accuracy_7d < 75:
+                insights['recommendations'].append("Consider reviewing AI classification rules - recent accuracy below 75%")
+            
+            if task_completion_rate < 80 and task_data.get('total_count', 0) > 5:
+                insights['recommendations'].append("Focus on completing more outstanding tasks")
+            
+            # Generate trend analysis
+            trend = accuracy_data.get('current_trend', 'stable')
+            if trend == 'improving':
+                insights['trends'].append("✅ Accuracy is improving over time")
+            elif trend == 'declining':
+                insights['trends'].append("⚠️ Accuracy appears to be declining")
+                insights['alerts'].append("Monitor accuracy trend - consider system review")
+            
+            return insights
+            
+        except Exception as e:
+            insights['error'] = str(e)
+            return insights
         """Refresh all accuracy dashboard data"""
         try:
             # Import accuracy tracker
@@ -675,34 +1138,32 @@ class UnifiedEmailGUI:
             self.status_var.set("Error refreshing accuracy dashboard")
     
     def update_metrics_display(self):
-        """Update the overview metrics display"""
+        """Update the overview metrics display with running accuracy and task resolution data"""
         try:
             if not hasattr(self, 'accuracy_tracker'):
                 self.refresh_accuracy_data()
                 return
             
-            metrics = self.accuracy_tracker.get_dashboard_metrics()
+            # Get running accuracy metrics (new method)
+            running_metrics = self.accuracy_tracker.calculate_running_accuracy()
             
-            # Update metric labels
-            overall = metrics.get('overall_stats', {})
+            # Get overall dashboard metrics
+            dashboard_metrics = self.accuracy_tracker.get_dashboard_metrics()
+            overall = dashboard_metrics.get('overall_stats', {})
+            
+            # Update metric labels with running accuracy data
             self.overall_accuracy_label.config(text=f"Overall Accuracy\n{overall.get('average_accuracy', 0):.1f}%")
-            
-            recent = metrics.get('recent_performance', {})
-            self.seven_day_label.config(text=f"7-Day Average\n{recent.get('last_7_days', 0):.1f}%")
-            
+            self.seven_day_label.config(text=f"7-Day Average\n{running_metrics.get('last_7_days', 0):.1f}%")
+            self.thirty_day_label.config(text=f"30-Day Average\n{running_metrics.get('last_30_days', 0):.1f}%")
             self.total_sessions_label.config(text=f"Total Sessions\n{overall.get('total_sessions', 0)}")
-            self.total_emails_label.config(text=f"Total Emails\n{overall.get('total_emails', 0):,}")
             
-            # Update trend indicator
-            trend = metrics.get('trend_analysis', {})
-            trend_direction = trend.get('improvement_trend', 'stable')
-            trend_pct = trend.get('trend_percentage', 0)
-            
-            if trend_direction == 'improving':
-                trend_text = f"📈 Improving (+{trend_pct:.1f}%)"
+            # Update trend indicator with real-time trend
+            trend = running_metrics.get('current_trend', 'stable')
+            if trend == 'improving':
+                trend_text = "📈 Improving"
                 trend_color = "green"
-            elif trend_direction == 'declining':
-                trend_text = f"📉 Declining ({trend_pct:.1f}%)"
+            elif trend == 'declining':
+                trend_text = "📉 Declining" 
                 trend_color = "red"
             else:
                 trend_text = "📊 Stable"
@@ -710,46 +1171,92 @@ class UnifiedEmailGUI:
             
             self.trend_label.config(text=f"Trend: {trend_text}", foreground=trend_color)
             
-            # Update activity summary
+            # Update task resolution metrics
+            self.update_task_resolution_display()
+            
+            # Update activity summary with both accuracy and task data
             self.activity_text.delete(1.0, tk.END)
             
-            activity_summary = f"""📊 ACCURACY DASHBOARD SUMMARY
+            activity_summary = f"""📊 ACCURACY & TASK DASHBOARD SUMMARY
 {'='*50}
 
-📈 Overall Performance:
-   • Average Accuracy: {overall.get('average_accuracy', 0):.1f}%
-   • Latest Session: {overall.get('latest_accuracy', 0):.1f}%
-   • Total Corrections: {overall.get('total_corrections', 0)}
+📈 Running Accuracy Performance:
+   • 7-Day Average: {running_metrics.get('last_7_days', 0):.1f}% ({running_metrics.get('total_sessions_7d', 0)} sessions)
+   • 30-Day Average: {running_metrics.get('last_30_days', 0):.1f}% ({running_metrics.get('total_sessions_30d', 0)} sessions)
+   • Current Trend: {trend.replace('_', ' ').title()}
 
-🕒 Recent Performance:
-   • Last 7 Days: {recent.get('last_7_days', 0):.1f}% ({recent.get('sessions_last_7_days', 0)} sessions)
-   • Last 30 Days: {recent.get('last_30_days', 0):.1f}% ({recent.get('sessions_last_30_days', 0)} sessions)
+📧 Email Processing Volume:
+   • Last 7 Days: {running_metrics.get('total_emails_7d', 0):,} emails
+   • Last 30 Days: {running_metrics.get('total_emails_30d', 0):,} emails
 
-📊 Session Statistics:
-   • Min Accuracy: {metrics.get('session_statistics', {}).get('min_accuracy', 0):.1f}%
-   • Max Accuracy: {metrics.get('session_statistics', {}).get('max_accuracy', 0):.1f}%
-   • Median Accuracy: {metrics.get('session_statistics', {}).get('median_accuracy', 0):.1f}%
+📋 Task Resolution Summary:
+   • View task resolution details in the frame above
+   • Historical data tracked for performance analysis
 
-🏷️ Top Correction Categories:"""
-            
-            # Add category summary
-            category_summary = metrics.get('category_summary', {})
-            for rank_key in sorted(category_summary.keys()):
-                cat_info = category_summary[rank_key]
-                activity_summary += f"\n   • {cat_info.get('category', 'Unknown')}: {cat_info.get('corrections', 0)} corrections"
-            
-            # Add data quality info
-            data_quality = metrics.get('data_quality', {})
-            date_range = data_quality.get('date_range', {})
-            
-            activity_summary += f"""
+🔄 Data Sources:
+   • Live calculations from session data
+   • Historical trends from persistent storage
+   • Real-time task completion tracking
 
-🔍 Data Quality:
-   • Total Data Points: {data_quality.get('total_data_points', 0)}
-   • Date Range: {date_range.get('earliest', 'N/A')[:10]} to {date_range.get('latest', 'N/A')[:10]}
-   • Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+💡 Performance Insights:
 """
             
+            # Add performance insights based on data
+            if running_metrics.get('last_7_days', 0) > 85:
+                activity_summary += "   • ✅ Excellent recent accuracy performance\n"
+            elif running_metrics.get('last_7_days', 0) > 75:
+                activity_summary += "   • ✔️ Good recent accuracy performance\n"
+            else:
+                activity_summary += "   • ⚠️ Recent accuracy could be improved\n"
+                
+            if running_metrics.get('total_sessions_7d', 0) > 0:
+                activity_summary += f"   • 📈 Active usage: {running_metrics.get('total_sessions_7d', 0)} sessions this week\n"
+            else:
+                activity_summary += "   • 📊 No recent activity to analyze\n"
+                
+            self.activity_text.insert(1.0, activity_summary)
+            
+            # Auto-persist metrics to database for historical tracking
+            self.accuracy_tracker.persist_accuracy_metrics(running_metrics)
+            if hasattr(self, 'db_migrations'):
+                self.db_migrations.store_accuracy_metrics(running_metrics)
+                
+        except Exception as e:
+            print(f"⚠️ Error updating metrics display: {e}")
+            self.activity_text.delete(1.0, tk.END)
+            self.activity_text.insert(1.0, f"Error loading metrics: {str(e)}")
+    
+    def update_task_resolution_display(self):
+        """Update task resolution summary in the metrics view"""
+        try:
+            # Get task resolution history
+            resolution_history = self.task_persistence.get_resolution_history(days_back=30, include_stats=True)
+            
+            if resolution_history['total_count'] > 0:
+                stats = resolution_history.get('statistics', {})
+                completion_rate = stats.get('completion_rate', {})
+                age_stats = stats.get('age_statistics', {})
+                
+                completed = completion_rate.get('completed', 0)
+                dismissed = completion_rate.get('dismissed', 0) 
+                avg_age = age_stats.get('average_age_days', 0)
+                
+                # Update resolution labels
+                self.completed_tasks_label.config(text=f"Completed: {completed}")
+                self.dismissed_tasks_label.config(text=f"Dismissed: {dismissed}")
+                self.avg_resolution_time_label.config(text=f"Avg Age: {avg_age:.1f} days")
+            else:
+                # No resolution data available
+                self.completed_tasks_label.config(text="Completed: ---")
+                self.dismissed_tasks_label.config(text="Dismissed: ---") 
+                self.avg_resolution_time_label.config(text="Avg Age: ---")
+                
+        except Exception as e:
+            print(f"⚠️ Error updating task resolution display: {e}")
+            self.completed_tasks_label.config(text="Completed: Error")
+            self.dismissed_tasks_label.config(text="Dismissed: Error")
+            self.avg_resolution_time_label.config(text="Avg Age: Error")
+
             self.activity_text.insert(tk.END, activity_summary)
             
         except Exception as e:
