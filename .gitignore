@@ -11,6 +11,10 @@ azure_config.json
 # Runtime data - generated files and AI summaries
 runtime_data/
 
+# Test data - temporary files generated during testing
+test/test_data/*/
+**/test_temp/
+
 # Environment files - DO NOT COMMIT
 .env
 .env.local
