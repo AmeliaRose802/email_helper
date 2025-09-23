@@ -592,10 +592,17 @@ class EmailAnalyzer:
             }
         else:
             # Processed summary item format (from summary generation)
+            # For cross-section comparison, use both action_required and summary fields
+            action_text = item.get('action_required', '')
+            summary_text = item.get('summary', '')
+            
+            # Combine action and summary for better cross-section matching
+            combined_action = f"{action_text} {summary_text}".strip()
+            
             return {
                 'subject': self._normalize_text(item.get('subject', '')),
                 'sender': item.get('sender', '').lower(),
-                'action': self._normalize_text(item.get('action_required', '')),
+                'action': self._normalize_text(combined_action),
                 'due_date': item.get('due_date')
             }
     

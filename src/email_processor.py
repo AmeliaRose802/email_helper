@@ -199,14 +199,19 @@ class EmailProcessor:
     def process_detailed_analysis(self, finalized_suggestions):
         """
         Perform detailed AI analysis only after user has completed reclassification.
-        This avoids wasting AI calls on emails that will be reclassified.
+        This includes enhanced thread grouping and duplicate detection.
         """
         print("\n🔍 Processing detailed analysis for finalized classifications...")
         
         # Reset action items data for fresh processing
         self._reset_data_storage()
         
-        # Group suggestions by category for efficient batch processing
+        # Step 1: Apply enhanced thread grouping to improve organization
+        print("🔗 Applying enhanced thread grouping...")
+        enhanced_thread_groups = self.group_similar_threads(finalized_suggestions)
+        print(f"✅ Enhanced grouping: {len(enhanced_thread_groups)} thread groups created")
+        
+        # Step 2: Process by category but with enhanced grouping awareness
         by_category = {}
         for suggestion in finalized_suggestions:
             category = suggestion.get('ai_suggestion', 'fyi')
@@ -224,10 +229,14 @@ class EmailProcessor:
                 explanation = suggestion.get('explanation', f"Classified as {category}")
                 
                 if email_object:
-                    # Now perform the detailed processing
+                    # Process with enhanced thread context
                     self._process_email_by_category(email_object, thread_data, category, explanation)
         
-        print("✅ Detailed analysis completed")
+        # Step 3: Apply content-based duplicate detection to processed results
+        print("🤖 Applying content-based duplicate detection...")
+        self.action_items_data = self.detect_duplicate_tasks(self.action_items_data)
+        
+        print("✅ Detailed analysis completed with enhanced grouping and deduplication")
         return self.action_items_data
     
     def _build_thread_context(self, emails, representative_email):
