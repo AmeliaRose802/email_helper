@@ -150,9 +150,16 @@ class UnifiedEmailGUI:
             ttk.Radiobutton(email_count_frame, text=str(count), variable=self.email_count_var, 
                            value=str(count)).pack(side=tk.LEFT, padx=5)
         
-        # Custom option
+        # Other option with custom entry
+        ttk.Radiobutton(email_count_frame, text="Other:", variable=self.email_count_var, 
+                       value="other").pack(side=tk.LEFT, padx=5)
+        
         self.custom_count_entry = ttk.Entry(email_count_frame, width=10)
-        self.custom_count_entry.pack(side=tk.LEFT, padx=(10, 0))
+        self.custom_count_entry.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # Bind events to auto-select "Other" option when typing in custom field
+        self.custom_count_entry.bind('<KeyPress>', self._on_custom_count_keypress)
+        self.custom_count_entry.bind('<FocusIn>', self._on_custom_count_focus)
         
         # Processing controls
         control_frame = ttk.Frame(self.processing_frame)
@@ -960,10 +967,26 @@ class UnifiedEmailGUI:
     
     def start_email_processing(self):
         # Get email count
-        if self.custom_count_entry.get().strip():
-            max_emails = int(self.custom_count_entry.get().strip())
+        selected_option = self.email_count_var.get()
+        if selected_option == "other":
+            # Use custom count entry
+            if self.custom_count_entry.get().strip():
+                try:
+                    max_emails = int(self.custom_count_entry.get().strip())
+                    if max_emails <= 0:
+                        messagebox.showwarning("Invalid Input", 
+                                             "Please enter a positive number for email count.")
+                        return
+                except ValueError:
+                    messagebox.showwarning("Invalid Input", 
+                                         "Please enter a valid number for email count.")
+                    return
+            else:
+                messagebox.showwarning("Missing Input", 
+                                     "Please enter a number in the custom count field.")
+                return
         else:
-            max_emails = int(self.email_count_var.get())
+            max_emails = int(selected_option)
         
         # Reset processing state
         self.processing_cancelled = False
@@ -1797,6 +1820,208 @@ class UnifiedEmailGUI:
         except Exception as e:
             messagebox.showwarning("Error Opening Link", f"Could not open URL: {url}\n\nError: {str(e)}")
     
+    def open_email_in_browser(self, email_data):
+        """Open specific email in Outlook (or web fallback)"""
+        try:
+            # Try to open in Outlook first using EntryID
+            entry_id = email_data.get('entry_id')
+            if entry_id and hasattr(self.outlook_manager, 'outlook') and self.outlook_manager.outlook:
+                try:
+                    # Use Outlook COM to open the email directly
+                    namespace = self.outlook_manager.namespace
+                    email_item = namespace.GetItemFromID(entry_id)
+                    email_item.Display()
+                    return
+                except Exception as outlook_error:
+                    print(f"Failed to open email in Outlook: {outlook_error}")
+            
+            # Fallback to web Outlook with search parameters
+            subject = email_data.get('subject', '')
+            sender = email_data.get('sender', '')
+            
+            if subject:
+                # Create Outlook web search URL
+                import urllib.parse
+                search_query = f"subject:\"{subject}\""
+                if sender:
+                    search_query += f" from:{sender}"
+                
+                encoded_query = urllib.parse.quote(search_query)
+                outlook_web_url = f"https://outlook.office.com/mail/search/query/{encoded_query}"
+                
+                webbrowser.open(outlook_web_url)
+            else:
+                # Ultimate fallback - just open Outlook web
+                webbrowser.open("https://outlook.office.com/mail/")
+                messagebox.showinfo("Email Link", 
+                                  "Opened Outlook web. Please search for the email manually.")
+                
+        except Exception as e:
+            messagebox.showwarning("Error Opening Email", 
+                                 f"Could not open email in Outlook.\n\nError: {str(e)}\n\n"
+                                 f"Fallback: Opening Outlook web interface.")
+            try:
+                webbrowser.open("https://outlook.office.com/mail/")
+            except:
+                pass
+    
+    def _on_custom_count_keypress(self, event):
+        """Auto-select 'Other' radio button when typing in custom count field"""
+        # Use after_idle to ensure the character is processed first
+        self.root.after_idle(self._validate_and_select_other)
+    
+    def _on_custom_count_focus(self, event):
+        """Auto-select 'Other' radio button when focusing on custom count field"""
+        current_value = self.custom_count_entry.get().strip()
+        if current_value:
+            self._validate_and_select_other()
+    
+    def _validate_and_select_other(self):
+        """Validate custom count input and auto-select 'Other' option"""
+        try:
+            current_value = self.custom_count_entry.get().strip()
+            if current_value:
+                # Try to parse as integer to validate
+                count = int(current_value)
+                if count > 0:
+                    # Valid number, select "other" option
+                    self.email_count_var.set("other")
+                else:
+                    # Invalid number, show validation message
+                    messagebox.showwarning("Invalid Input", 
+                                         "Please enter a positive number for email count.")
+                    self.custom_count_entry.delete(0, tk.END)
+        except ValueError:
+            # Not a valid number yet, but don't show error until they finish typing
+            # Only auto-select if there's content
+            if self.custom_count_entry.get().strip():
+                self.email_count_var.set("other")
+    
+    def _generate_email_links(self, email_data):
+        """Generate descriptive email links for tasks and summaries"""
+        links = []
+        
+        # Add View in Outlook link
+        outlook_link = {
+            'text': 'View in Outlook',
+            'action': lambda: self.open_email_in_browser(email_data)
+        }
+        links.append(outlook_link)
+        
+        return links
+    
+    def _create_descriptive_link_text(self, url, context='general'):
+        """Create descriptive text for a URL based on context"""
+        import urllib.parse
+        
+        try:
+            parsed = urllib.parse.urlparse(url.lower())
+            domain = parsed.netloc
+            path = parsed.path
+            
+            # Context-specific link descriptions
+            if context == 'job':
+                if 'apply' in url.lower() or 'application' in url.lower():
+                    return 'Apply Now'
+                elif 'career' in domain or 'jobs' in domain:
+                    return 'Job Details'
+                else:
+                    return 'View Job'
+            
+            elif context == 'event':
+                if 'register' in url.lower() or 'signup' in url.lower():
+                    return 'Register'
+                elif 'calendar' in url.lower() or 'event' in url.lower():
+                    return 'Event Details'
+                else:
+                    return 'View Event'
+            
+            elif context == 'newsletter':
+                if 'unsubscribe' in url.lower():
+                    return 'Unsubscribe'
+                elif 'archive' in url.lower():
+                    return 'View Archive'
+                else:
+                    return 'Read More'
+            
+            # Domain-based descriptions (check more specific patterns first)
+            if 'forms.' in domain or 'survey' in url.lower():
+                return 'Complete Survey'
+            elif 'github.com' in domain:
+                return 'View on GitHub'
+            elif 'linkedin.com' in domain:
+                return 'View on LinkedIn'
+            elif 'teams.microsoft.com' in domain:
+                return 'Join Teams Meeting'
+            elif 'docs.' in domain or 'documentation' in url.lower():
+                return 'View Documentation'
+            elif any(word in domain for word in ['zoom', 'meet', 'webex']):
+                return 'Join Meeting'
+            elif 'calendar' in url.lower():
+                return 'Add to Calendar'
+            elif 'outlook.com' in domain or (domain.endswith('office.com') and not domain.startswith('forms.')):
+                return 'View in Outlook'
+            
+            # Fallback to generic but still descriptive
+            if len(domain) > 30:
+                return f"Visit {domain[:25]}..."
+            else:
+                return f"Visit {domain}"
+                
+        except:
+            return 'View Link'
+    
+    def _format_task_dates(self, item):
+        """Format date(s) for task listing - single date or range for multi-email tasks"""
+        try:
+            # Check if this is a multi-email task (thread)
+            thread_data = item.get('thread_data', {})
+            if thread_data and thread_data.get('thread_count', 1) > 1:
+                # Multi-email task - show date range
+                all_emails = thread_data.get('all_emails_data', [])
+                if all_emails and len(all_emails) > 1:
+                    dates = []
+                    for email_data in all_emails:
+                        email_date = email_data.get('received_time')
+                        if hasattr(email_date, 'strftime'):
+                            dates.append(email_date)
+                    
+                    if dates:
+                        dates.sort()
+                        start_date = dates[0]
+                        end_date = dates[-1]
+                        
+                        # If same day, show single date
+                        if start_date.date() == end_date.date():
+                            return start_date.strftime('%b %d, %Y')
+                        else:
+                            # Show concise range
+                            if start_date.year == end_date.year:
+                                if start_date.month == end_date.month:
+                                    return f"{start_date.strftime('%b %d')}–{end_date.strftime('%d, %Y')}"
+                                else:
+                                    return f"{start_date.strftime('%b %d')}–{end_date.strftime('%b %d, %Y')}"
+                            else:
+                                return f"{start_date.strftime('%b %d, %Y')}–{end_date.strftime('%b %d, %Y')}"
+            
+            # Single email task - show single date
+            email_date = item.get('received_time') or item.get('email_date')
+            if email_date and hasattr(email_date, 'strftime'):
+                return email_date.strftime('%B %d, %Y at %I:%M %p')
+            
+            # Fallback to first_seen or unknown
+            if item.get('first_seen'):
+                try:
+                    first_seen = datetime.strptime(item['first_seen'], '%Y-%m-%d %H:%M:%S')
+                    return first_seen.strftime('%B %d, %Y')
+                except:
+                    pass
+            
+            return 'Unknown date'
+            
+        except Exception as e:
+            return 'Unknown date'
+    
     def on_category_change(self, event):
         if self.current_email_index is not None:
             current_category = self.get_category_internal_name(self.category_var.get())
@@ -2073,6 +2298,22 @@ This will help keep your inbox focused on actionable items only."""
                 self.summary_text.insert(tk.END, f"No {title.split()[-1].lower()} found\n\n", "empty_section")
             
             self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
         
         # Configure text widget to prevent editing but allow tag clicks
         self.summary_text.config(state=tk.NORMAL)
@@ -2094,10 +2335,16 @@ This will help keep your inbox focused on actionable items only."""
             self.summary_text.insert(tk.END, f"{i}. {title_prefix}{item['subject']}\n", "item_title")
             
             # Metadata with first seen info
-            self.summary_text.insert(tk.END, f"   From: {item['sender']}", "item_meta")
-            if item.get('first_seen'):
+            # Metadata with first seen info and sent date
+            self.summary_text.insert(tk.END, f"   From: {item["sender"]}", "item_meta")
+            
+            # Add sent date(s) using the new formatting function
+            sent_date = self._format_task_dates(item)
+            self.summary_text.insert(tk.END, f"  |  Sent: {sent_date}", "item_meta")
+            
+            if item.get("first_seen"):
                 try:
-                    first_seen = datetime.strptime(item['first_seen'], '%Y-%m-%d %H:%M:%S')
+                    first_seen = datetime.strptime(item["first_seen"], "%Y-%m-%d %H:%M:%S")
                     days_old = (datetime.now() - first_seen).days
                     if days_old > 0:
                         self.summary_text.insert(tk.END, f"  |  First seen: {days_old} days ago", "item_meta")
@@ -2143,6 +2390,22 @@ This will help keep your inbox focused on actionable items only."""
                 
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
             # Links
             if item.get('links'):
                 self.summary_text.insert(tk.END, "   Links: ", "content_label")
@@ -2162,7 +2425,39 @@ This will help keep your inbox focused on actionable items only."""
                         self.summary_text.insert(tk.END, " | ", "content_text")
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
             self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
     
     def _display_completed_team_actions(self, items):
         """Display completed team action items with completion details"""
@@ -2195,6 +2490,22 @@ This will help keep your inbox focused on actionable items only."""
                 self.summary_text.insert(tk.END, f"{item['completion_note']}\n", "completion_note")
             
             self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
 
     def _display_optional_actions(self, items):
         """Display optional action items with relevance context"""
@@ -2257,6 +2568,22 @@ This will help keep your inbox focused on actionable items only."""
                 
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
             # Links
             if item.get('links'):
                 self.summary_text.insert(tk.END, "   Links: ", "content_label")
@@ -2276,7 +2603,39 @@ This will help keep your inbox focused on actionable items only."""
                         self.summary_text.insert(tk.END, " | ", "content_text")
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
             self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
     
     def _display_job_listings(self, items):
         """Display job listings with qualification match"""
@@ -2336,6 +2695,22 @@ This will help keep your inbox focused on actionable items only."""
                 
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
             # Links
             if item.get('links'):
                 self.summary_text.insert(tk.END, "   Apply: ", "content_label")
@@ -2355,7 +2730,39 @@ This will help keep your inbox focused on actionable items only."""
                         self.summary_text.insert(tk.END, " | ", "content_text")
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
             self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
     
     def _display_events(self, items):
         """Display optional events with relevance"""
@@ -2377,7 +2784,7 @@ This will help keep your inbox focused on actionable items only."""
             if item.get('links'):
                 self.summary_text.insert(tk.END, "   Register: ", "content_label")
                 for j, link in enumerate(item['links'][:2]):
-                    link_text = f"Register {j+1}"
+                    link_text = self._create_descriptive_link_text(link, "event")
                     link_start = self.summary_text.index(tk.END)
                     self.summary_text.insert(tk.END, link_text, "link")
                     link_end = self.summary_text.index(tk.END)
@@ -2392,7 +2799,39 @@ This will help keep your inbox focused on actionable items only."""
                         self.summary_text.insert(tk.END, " | ", "content_text")
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
             self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
     
     def _display_fyi_notices(self, items):
         """Display FYI notices as bullet points with dismiss functionality"""
@@ -2419,10 +2858,24 @@ This will help keep your inbox focused on actionable items only."""
             
             self.summary_text.window_create(tk.END, window=dismiss_fyi_button)
             self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
         
         self.summary_text.insert(tk.END, "\n", "content_text")
-    
-    def _display_newsletters(self, items):
         """Display newsletter summaries with dismiss functionality"""
         if len(items) > 1:
             # Combined newsletter highlights
@@ -2456,6 +2909,22 @@ This will help keep your inbox focused on actionable items only."""
             
             self.summary_text.window_create(tk.END, window=dismiss_newsletter_button)
             self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            # Add View in Outlook link for each task item
+            email_data = item.get("email_data", {})
+            if email_data:
+                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                link_start = self.summary_text.index(tk.END)
+                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                link_end = self.summary_text.index(tk.END)
+                
+                # Create unique tag for this email link
+                email_link_tag = f"email_link_{hash(str(email_data))}"
+                self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                         lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
         
         self.summary_text.insert(tk.END, "\n", "content_text")
     
