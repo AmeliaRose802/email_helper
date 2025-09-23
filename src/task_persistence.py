@@ -27,7 +27,7 @@ to provide seamless task management functionality.
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Any
 
 
@@ -504,3 +504,209 @@ class TaskPersistence:
                 json.dump(data, f, indent=2, ensure_ascii=False, default=str)
         except Exception as e:
             print(f"⚠️ Error saving tasks to {filepath}: {e}")
+
+    def record_task_resolution(self, task_id: str, resolution_type: str, resolution_notes: str = "", completion_timestamp: str = None) -> bool:
+        """
+        Record task resolution with detailed tracking for historical analysis.
+        
+        Args:
+            task_id (str): Unique identifier for the task
+            resolution_type (str): Type of resolution ('completed', 'dismissed', 'deferred', 'delegated')
+            resolution_notes (str): Optional notes about the resolution
+            completion_timestamp (str): Optional custom timestamp
+            
+        Returns:
+            bool: True if resolution was successfully recorded
+        """
+        if completion_timestamp is None:
+            completion_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        try:
+            # Create resolution history directory
+            history_dir = os.path.join(self.storage_dir, 'task_history')
+            os.makedirs(history_dir, exist_ok=True)
+            
+            # Load outstanding tasks to get task details
+            outstanding_tasks = self.load_outstanding_tasks()
+            completed_tasks = self.load_completed_tasks()
+            
+            # Find the task being resolved
+            task_data = None
+            task_section = None
+            
+            for section_key in outstanding_tasks:
+                for task in outstanding_tasks[section_key]:
+                    if task.get('task_id') == task_id:
+                        task_data = task.copy()
+                        task_section = section_key
+                        break
+                if task_data:
+                    break
+            
+            if not task_data:
+                print(f"⚠️ Task {task_id} not found in outstanding tasks")
+                return False
+            
+            # Create detailed resolution record
+            resolution_record = {
+                'task_id': task_id,
+                'resolution_timestamp': completion_timestamp,
+                'resolution_type': resolution_type,
+                'resolution_notes': resolution_notes,
+                'task_section': task_section,
+                'task_data': task_data,
+                'task_age_days': self._calculate_task_age(task_data),
+                'associated_emails': task_data.get('_entry_ids', []),
+                'task_priority': task_data.get('priority', 'normal'),
+                'task_sender': task_data.get('sender', 'unknown'),
+                'resolution_metadata': {
+                    'system_version': '1.0',  # Track for future compatibility
+                    'recorded_by': 'user_interaction'
+                }
+            }
+            
+            # Save to monthly resolution history file
+            current_month = datetime.now().strftime('%Y_%m')
+            history_file = os.path.join(history_dir, f'task_resolutions_{current_month}.jsonl')
+            
+            with open(history_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(resolution_record, default=str) + '\n')
+            
+            # Mark task as completed in the regular completed tasks (existing behavior)
+            self.mark_tasks_completed([task_id], completion_timestamp)
+            
+            print(f"📝 Recorded task resolution: {task_id} - {resolution_type}")
+            return True
+            
+        except Exception as e:
+            print(f"⚠️ Error recording task resolution: {e}")
+            return False
+    
+    def get_resolution_history(self, days_back: int = 30, resolution_type: str = None, include_stats: bool = True) -> Dict[str, Any]:
+        """
+        Retrieve task resolution history for analysis and reporting.
+        
+        Args:
+            days_back (int): Number of days to look back for history
+            resolution_type (str): Filter by specific resolution type
+            include_stats (bool): Whether to include summary statistics
+            
+        Returns:
+            dict: Resolution history with optional statistics
+        """
+        try:
+            history_dir = os.path.join(self.storage_dir, 'task_history')
+            if not os.path.exists(history_dir):
+                return {
+                    'resolutions': [],
+                    'total_count': 0,
+                    'statistics': {} if include_stats else None
+                }
+            
+            # Load resolution records from all relevant monthly files
+            cutoff_date = datetime.now() - timedelta(days=days_back)
+            resolutions = []
+            
+            for filename in os.listdir(history_dir):
+                if filename.startswith('task_resolutions_') and filename.endswith('.jsonl'):
+                    file_path = os.path.join(history_dir, filename)
+                    
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            try:
+                                record = json.loads(line.strip())
+                                record_date = datetime.strptime(record['resolution_timestamp'], '%Y-%m-%d %H:%M:%S')
+                                
+                                # Filter by date range
+                                if record_date >= cutoff_date:
+                                    # Filter by resolution type if specified
+                                    if resolution_type is None or record['resolution_type'] == resolution_type:
+                                        resolutions.append(record)
+                                        
+                            except (json.JSONDecodeError, ValueError, KeyError) as e:
+                                print(f"⚠️ Error parsing resolution record: {e}")
+                                continue
+            
+            # Sort by resolution timestamp (most recent first)
+            resolutions.sort(key=lambda x: x['resolution_timestamp'], reverse=True)
+            
+            result = {
+                'resolutions': resolutions,
+                'total_count': len(resolutions),
+                'date_range': {
+                    'start_date': cutoff_date.strftime('%Y-%m-%d'),
+                    'end_date': datetime.now().strftime('%Y-%m-%d'),
+                    'days_covered': days_back
+                }
+            }
+            
+            # Calculate statistics if requested
+            if include_stats and resolutions:
+                result['statistics'] = self._calculate_resolution_statistics(resolutions)
+            
+            return result
+            
+        except Exception as e:
+            print(f"⚠️ Error retrieving resolution history: {e}")
+            return {
+                'resolutions': [],
+                'total_count': 0,
+                'statistics': {} if include_stats else None,
+                'error': str(e)
+            }
+    
+    def _calculate_task_age(self, task_data: Dict) -> int:
+        """Calculate age of task in days."""
+        try:
+            first_seen = task_data.get('first_seen', '')
+            if first_seen:
+                first_seen_date = datetime.strptime(first_seen, '%Y-%m-%d %H:%M:%S')
+                return (datetime.now() - first_seen_date).days
+        except:
+            pass
+        return 0
+    
+    def _calculate_resolution_statistics(self, resolutions: List[Dict]) -> Dict[str, Any]:
+        """Calculate comprehensive statistics from resolution data."""
+        if not resolutions:
+            return {}
+        
+        # Resolution type distribution
+        resolution_types = {}
+        task_sections = {}
+        age_distribution = []
+        
+        for resolution in resolutions:
+            # Count resolution types
+            res_type = resolution.get('resolution_type', 'unknown')
+            resolution_types[res_type] = resolution_types.get(res_type, 0) + 1
+            
+            # Count task sections
+            section = resolution.get('task_section', 'unknown')
+            task_sections[section] = task_sections.get(section, 0) + 1
+            
+            # Collect age data
+            age = resolution.get('task_age_days', 0)
+            age_distribution.append(age)
+        
+        # Calculate age statistics
+        avg_age = sum(age_distribution) / len(age_distribution) if age_distribution else 0
+        max_age = max(age_distribution) if age_distribution else 0
+        min_age = min(age_distribution) if age_distribution else 0
+        
+        return {
+            'resolution_type_distribution': resolution_types,
+            'task_section_distribution': task_sections,
+            'age_statistics': {
+                'average_age_days': round(avg_age, 1),
+                'max_age_days': max_age,
+                'min_age_days': min_age,
+                'total_tasks': len(resolutions)
+            },
+            'completion_rate': {
+                'completed': resolution_types.get('completed', 0),
+                'dismissed': resolution_types.get('dismissed', 0),
+                'deferred': resolution_types.get('deferred', 0),
+                'total': len(resolutions)
+            }
+        }
