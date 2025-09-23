@@ -76,8 +76,16 @@ class UnifiedEmailGUI:
     def __init__(self):
         # Initialize components
         self.outlook_manager = OutlookManager()
-        self.ai_processor = AIProcessor()
-        self.email_analyzer = EmailAnalyzer(self.ai_processor)
+        
+        # Initialize email analyzer first
+        self.email_analyzer = EmailAnalyzer()
+        
+        # Initialize AI processor with email analyzer reference
+        self.ai_processor = AIProcessor(self.email_analyzer)
+        
+        # Set the AI processor reference in email analyzer (circular dependency)
+        self.email_analyzer.ai_processor = self.ai_processor
+        
         self.summary_generator = SummaryGenerator()
         self.email_processor = EmailProcessor(
             self.outlook_manager,

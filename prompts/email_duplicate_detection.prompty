@@ -51,3 +51,11 @@ EXISTING ITEMS:
 → DUPLICATE:1 (both about same database maintenance)
 
 Be precise and focus on the core underlying issue, not surface-level text differences.
+
+NEW ITEM:
+{{new_item}}
+
+EXISTING ITEMS:
+{{existing_items}}
+
+Your response:
