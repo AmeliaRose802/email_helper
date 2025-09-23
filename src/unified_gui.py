@@ -3681,31 +3681,15 @@ This will help keep your inbox focused on actionable items only."""
                                        f"Mark {len(selected_task_ids)} tasks as complete?\n\n"
                                        "This will:\n"
                                        "• Remove them from future summaries\n"
-                                       "• Move associated emails to Done folder")
+                                       "• Mark tasks as completed with timestamp")
             
             if result:
                 try:
-                    # Get EntryIDs for these tasks before marking them complete
-                    entry_ids = self.task_persistence.get_entry_ids_for_tasks(selected_task_ids)
-                    
                     # Mark tasks as completed
                     self.task_persistence.mark_tasks_completed(selected_task_ids)
                     
-                    # Move associated emails to Done folder
-                    email_message = ""
-                    if entry_ids and hasattr(self, 'outlook_manager') and self.outlook_manager:
-                        try:
-                            moved_count, error_count = self.outlook_manager.move_emails_to_done_folder(entry_ids)
-                            if moved_count > 0:
-                                email_message = f"\n📁 Moved {moved_count} associated email(s) to Done folder"
-                            if error_count > 0:
-                                email_message += f"\n⚠️ {error_count} email(s) could not be moved"
-                        except Exception as e:
-                            email_message = f"\n⚠️ Could not move emails to Done folder: {e}"
-                            print(f"Error moving emails to Done folder: {e}")
-                    
                     messagebox.showinfo("Tasks Completed", 
-                                      f"✅ Marked {len(selected_task_ids)} tasks as complete!{email_message}")
+                                      f"✅ Marked {len(selected_task_ids)} tasks as complete!")
                     completion_window.destroy()
                     
                     # Refresh summary using proper method
@@ -3722,38 +3706,20 @@ This will help keep your inbox focused on actionable items only."""
                   command=completion_window.destroy).pack(side=tk.LEFT, padx=5)
 
     def _mark_single_task_complete(self, task_id):
-        """Mark a single task as complete, move associated emails to Done folder, and refresh the summary"""
+        """Mark a single task as complete and refresh the summary"""
         result = messagebox.askyesno("Confirm Completion", 
                                    f"Mark task {task_id} as complete?\n\n"
                                    "This will:\n"
                                    "• Remove it from future summaries\n"
-                                   "• Move associated emails to Done folder")
+                                   "• Mark the task as completed with timestamp")
         
         if result:
             try:
-                # Get EntryIDs for this task before marking it complete
-                entry_ids = self.task_persistence.get_entry_ids_for_tasks([task_id])
-                
                 # Mark the task as completed
                 self.task_persistence.mark_tasks_completed([task_id])
                 
-                # Move associated emails to Done folder
-                if entry_ids and hasattr(self, 'outlook_manager') and self.outlook_manager:
-                    try:
-                        moved_count, error_count = self.outlook_manager.move_emails_to_done_folder(entry_ids)
-                        email_message = ""
-                        if moved_count > 0:
-                            email_message = f"\n📁 Moved {moved_count} associated email(s) to Done folder"
-                        if error_count > 0:
-                            email_message += f"\n⚠️ {error_count} email(s) could not be moved"
-                    except Exception as e:
-                        email_message = f"\n⚠️ Could not move emails to Done folder: {e}"
-                        print(f"Error moving emails to Done folder: {e}")
-                else:
-                    email_message = "\n📧 No associated emails to move"
-                
                 messagebox.showinfo("Task Completed", 
-                                  f"✅ Task {task_id} marked as complete!{email_message}")
+                                  f"✅ Task {task_id} marked as complete!")
                 
                 # Refresh summary immediately using proper method
                 self._refresh_summary_after_dismiss()

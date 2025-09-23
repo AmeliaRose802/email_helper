@@ -9,5 +9,27 @@
     "batch_count": 1,
     "_entry_ids": [],
     "completion_timestamp": "2025-09-22 15:06:52"
+  },
+  {
+    "task_id": "opt1",
+    "subject": "Test Optional Action",
+    "sender": "test@example.com",
+    "batch_timestamp": "2025-01-01 12:00:00",
+    "first_seen": "2025-01-01 12:00:00",
+    "status": "completed",
+    "batch_count": 1,
+    "_entry_ids": [],
+    "completion_timestamp": "2025-09-23 19:45:15"
+  },
+  {
+    "task_id": "opt1",
+    "subject": "Test Optional Action",
+    "sender": "test@example.com",
+    "batch_timestamp": "2025-01-01 12:00:00",
+    "first_seen": "2025-01-01 12:00:00",
+    "status": "completed",
+    "batch_count": 1,
+    "_entry_ids": [],
+    "completion_timestamp": "2025-09-23 19:49:01"
   }
 ]
