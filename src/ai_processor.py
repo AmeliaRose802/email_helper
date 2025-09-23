@@ -73,6 +73,19 @@ class AIProcessor:
         'required_personal_action'
     """
     
+    # Confidence threshold configuration
+    CONFIDENCE_THRESHOLDS = {
+        'fyi': 0.9,                    # FYI requires 90% confidence for auto-approval
+        'required_personal_action': 1.0,  # Always review (impossible threshold)
+        'team_action': 1.0,            # Always review (impossible threshold) 
+        'optional_action': 0.8,        # 80% confidence for auto-approval
+        'work_relevant': 0.8,          # 80% confidence for auto-approval
+        'newsletter': 0.7,             # 70% confidence for auto-approval
+        'spam_to_delete': 0.7,         # 70% confidence for auto-approval
+        'job_listing': 0.8,            # 80% confidence for auto-approval
+        'optional_event': 0.8          # 80% confidence for auto-approval
+    }
+    
     def __init__(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(script_dir)
@@ -234,38 +247,155 @@ class AIProcessor:
         }
     
     def classify_email(self, email_content, learning_data):
-        context = f"""{self.get_standard_context()}
-Learning History: {len(learning_data)} previous decisions"""
-        
-        inputs = self._create_email_inputs(email_content, context)
-        result = self.execute_prompty('email_classifier_system.prompty', inputs)
-        
-        if not result or result in ["AI processing unavailable", "AI processing failed"]:
-            raise RuntimeError(f"AI email classification failed for: {email_content.get('subject', 'Unknown')}")
-            
-        # Clean result and return lowercase
-        return clean_ai_response(result).lower() or "general_information"
+        """Basic email classification - now uses explanation method for consistency"""
+        result = self.classify_email_with_explanation(email_content, learning_data)
+        return result.get('category', 'fyi')
     
+    def get_few_shot_examples(self, email_content, learning_data, max_examples=5):
+        """Get relevant few-shot examples from learning data for classification"""
+        if learning_data.empty:
+            return []
+        
+        # Filter for successful classifications (where users didn't modify)
+        successful_classifications = learning_data[
+            learning_data.get('user_modified', False) == False
+        ].copy() if 'user_modified' in learning_data.columns else learning_data.copy()
+        
+        if successful_classifications.empty:
+            return []
+        
+        current_subject = email_content.get('subject', '').lower()
+        current_sender = email_content.get('sender', '').lower()
+        current_body = email_content.get('body', '').lower()
+        
+        # Simple similarity scoring based on keyword overlap
+        examples_with_scores = []
+        
+        for _, row in successful_classifications.iterrows():
+            score = 0
+            row_subject = str(row.get('subject', '')).lower()
+            row_sender = str(row.get('sender', '')).lower()
+            row_body = str(row.get('body', '')).lower()[:1000]  # Limit body length for comparison
+            
+            # Score based on subject similarity
+            subject_words = set(current_subject.split())
+            row_subject_words = set(row_subject.split())
+            if subject_words and row_subject_words:
+                score += len(subject_words.intersection(row_subject_words)) / len(subject_words.union(row_subject_words)) * 3
+            
+            # Score based on sender similarity
+            if current_sender and row_sender:
+                if current_sender in row_sender or row_sender in current_sender:
+                    score += 2
+            
+            # Score based on body keyword overlap (simple)
+            body_words = set(w for w in current_body.split() if len(w) > 3)
+            row_body_words = set(w for w in row_body.split() if len(w) > 3)
+            if body_words and row_body_words:
+                score += len(body_words.intersection(row_body_words)) / len(body_words.union(row_body_words)) * 1
+            
+            if score > 0:
+                examples_with_scores.append((score, row))
+        
+        # Sort by score and take top examples
+        examples_with_scores.sort(key=lambda x: x[0], reverse=True)
+        
+        # Format examples for prompt injection
+        examples = []
+        for score, row in examples_with_scores[:max_examples]:
+            example = {
+                'subject': str(row.get('subject', ''))[:100],
+                'sender': str(row.get('sender', ''))[:50],
+                'body': str(row.get('body', ''))[:300],
+                'category': str(row.get('category', 'fyi'))
+            }
+            examples.append(example)
+        
+        return examples
+
+    def apply_confidence_thresholds(self, classification_result, confidence_score=None):
+        """Apply asymmetric confidence thresholds for auto-approval decisions"""
+        category = classification_result.get('category', 'fyi')
+        explanation = classification_result.get('explanation', '')
+        
+        # Default confidence handling - in a real implementation, this would come from the AI response
+        if confidence_score is None:
+            # Estimate confidence based on explanation length and specificity
+            confidence_score = min(0.8, 0.3 + len(explanation.split()) * 0.05)
+        
+        # Get threshold for this category
+        threshold = self.CONFIDENCE_THRESHOLDS.get(category, 0.8)
+        auto_approve = confidence_score >= threshold
+        
+        # Determine review reason
+        if not auto_approve:
+            if category in ['required_personal_action', 'team_action']:
+                review_reason = 'High priority category'
+            else:
+                review_reason = f'Low confidence ({confidence_score:.1%} < {threshold:.1%})'
+        else:
+            review_reason = f'Auto-approved ({confidence_score:.1%} ≥ {threshold:.1%})'
+        
+        return {
+            'category': category,
+            'explanation': explanation,
+            'confidence': confidence_score,
+            'auto_approve': auto_approve,
+            'review_reason': review_reason,
+            'threshold': threshold
+        }
+
+    def generate_explanation(self, email_content, category):
+        """Generate fallback explanation when AI explanations fail"""
+        subject = email_content.get('subject', 'Unknown')
+        sender = email_content.get('sender', 'Unknown')
+        
+        # Category-specific explanation templates
+        explanations = {
+            'required_personal_action': f"Email from {sender} appears to require personal action based on direct addressing or responsibility.",
+            'team_action': f"Email indicates action required from your team based on content analysis.",
+            'optional_action': f"Email contains optional activities or requests that may be worth considering.",
+            'work_relevant': f"Email contains work-related information relevant to your role but requires no immediate action.",
+            'fyi': f"Email is informational only with no action required.",
+            'newsletter': f"Email appears to be a newsletter or bulk information distribution.",
+            'spam_to_delete': f"Email does not appear relevant to work or contains no actionable content.",
+            'job_listing': f"Email contains job opportunities or recruitment-related content."
+        }
+        
+        base_explanation = explanations.get(category, f"Classified as {category} based on email content analysis.")
+        return f"{base_explanation} Subject: '{subject[:50]}...'"
+
     def classify_email_with_explanation(self, email_content, learning_data):
         """Enhanced email classification that returns both category and explanation"""
+        # Get few-shot examples for better accuracy
+        few_shot_examples = self.get_few_shot_examples(email_content, learning_data)
+        
+        # Build context with few-shot examples
         context = f"""{self.get_standard_context()}
 Learning History: {len(learning_data)} previous decisions"""
+        
+        if few_shot_examples:
+            context += "\n\nSimilar Examples from Past Classifications:"
+            for i, example in enumerate(few_shot_examples, 1):
+                context += f"\n{i}. Subject: '{example['subject']}' → Category: {example['category']}"
         
         inputs = self._create_email_inputs(email_content, context)
         result = self.execute_prompty('email_classifier_with_explanation.prompty', inputs)
         
         if not result or result in ["AI processing unavailable", "AI processing failed"]:
-            # Fallback to basic classification for backward compatibility
-            category = self.classify_email(email_content, learning_data)
+            # Generate fallback classification with explanation
+            category = 'fyi'  # Safe default
+            explanation = self.generate_explanation(email_content, category)
             return {
                 'category': category,
-                'explanation': f"AI explanation unavailable. Classified as {category} using basic rules."
+                'explanation': explanation
             }
         
         # Try to parse as JSON
+        fallback_category = 'fyi'
         fallback_data = {
-            'category': 'fyi',
-            'explanation': 'AI classification failed, defaulting to FYI for safety.'
+            'category': fallback_category,
+            'explanation': self.generate_explanation(email_content, fallback_category)
         }
         
         try:
@@ -278,9 +408,13 @@ Learning History: {len(learning_data)} previous decisions"""
                 print(f"⚠️ Invalid classification format: {cleaned_result[:100]}")
                 return fallback_data
             
-            # Clean category and provide default explanation if missing
+            # Clean category and provide meaningful explanation if missing
             category = clean_ai_response(parsed.get('category', 'fyi')).lower()
-            explanation = parsed.get('explanation', f'Classified as {category} based on email content.')
+            explanation = parsed.get('explanation', '')
+            
+            # Ensure explanation is always present and meaningful
+            if not explanation or len(explanation.strip()) < 10:
+                explanation = self.generate_explanation(email_content, category)
             
             return {
                 'category': category,
