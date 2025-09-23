@@ -73,7 +73,7 @@ class AIProcessor:
         'required_personal_action'
     """
     
-    def __init__(self):
+    def __init__(self, email_analyzer=None):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(script_dir)
         self.prompts_dir = os.path.join(project_root, 'prompts')
@@ -81,6 +81,9 @@ class AIProcessor:
         self.runtime_data_dir = os.path.join(
             project_root, 'runtime_data', 'user_feedback'
         )
+        
+        # Store reference to email analyzer for content similarity detection
+        self.email_analyzer = email_analyzer
         
         self.job_summary_file = os.path.join(self.user_data_dir, 'job_summery.md')
         self.job_skills_file = os.path.join(

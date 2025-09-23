@@ -531,3 +531,149 @@ class EmailAnalyzer:
         
         # Return email with highest score
         return max(scored_emails, key=lambda x: x[1])[0]
+
+    def calculate_content_similarity(self, item1, item2, threshold=0.8):
+        """Calculate content similarity between two email items for duplicate detection
+        
+        Args:
+            item1, item2: Email items to compare (dict with subject, sender, action_details)
+            threshold: Similarity threshold (0-1, default 0.8)
+            
+        Returns:
+            tuple: (is_similar: bool, similarity_score: float)
+        """
+        try:
+            # Extract comparable features
+            features1 = self._extract_similarity_features(item1)
+            features2 = self._extract_similarity_features(item2)
+            
+            # Calculate similarity scores for different aspects
+            subject_score = self._calculate_text_similarity(features1['subject'], features2['subject'])
+            sender_score = self._calculate_exact_match_score(features1['sender'], features2['sender'])
+            action_score = self._calculate_text_similarity(features1['action'], features2['action'])
+            date_score = self._calculate_date_similarity(features1['due_date'], features2['due_date'])
+            
+            # Weighted similarity calculation
+            # Subject and action are most important, sender and date provide context
+            weighted_score = (
+                subject_score * 0.3 +     # Subject similarity
+                action_score * 0.4 +      # Action similarity (most important)
+                sender_score * 0.2 +      # Sender match
+                date_score * 0.1          # Date proximity
+            )
+            
+            is_similar = weighted_score >= threshold
+            
+            return is_similar, weighted_score
+            
+        except Exception as e:
+            print(f"⚠️  Content similarity calculation failed: {e}")
+            return False, 0.0
+    
+    def _extract_similarity_features(self, item):
+        """Extract features for similarity comparison"""
+        # Handle both email objects and processed items
+        if hasattr(item, 'Subject'):
+            # Raw email object
+            return {
+                'subject': self._normalize_text(item.Subject),
+                'sender': item.SenderName.lower() if hasattr(item, 'SenderName') else '',
+                'action': '',
+                'due_date': None
+            }
+        elif 'email_subject' in item:
+            # Raw action item data format (from email processing)
+            action_details = item.get('action_details', {})
+            return {
+                'subject': self._normalize_text(item.get('email_subject', '')),
+                'sender': item.get('email_sender', '').lower(),
+                'action': self._normalize_text(action_details.get('action_required', '')),
+                'due_date': action_details.get('due_date')
+            }
+        else:
+            # Processed summary item format (from summary generation)
+            return {
+                'subject': self._normalize_text(item.get('subject', '')),
+                'sender': item.get('sender', '').lower(),
+                'action': self._normalize_text(item.get('action_required', '')),
+                'due_date': item.get('due_date')
+            }
+    
+    def _normalize_text(self, text):
+        """Normalize text for comparison"""
+        if not text:
+            return ''
+        
+        # Remove common email prefixes and normalize
+        normalized = text.lower().strip()
+        normalized = re.sub(r'^(re:|fw:|fwd:|forward:)\s*', '', normalized)
+        normalized = re.sub(r'\[.*?\]', '', normalized)  # Remove tags like [EXTERNAL]
+        normalized = re.sub(r'\s+', ' ', normalized)  # Normalize whitespace
+        normalized = re.sub(r'[^\w\s]', '', normalized)  # Remove punctuation
+        
+        return normalized.strip()
+    
+    def _calculate_text_similarity(self, text1, text2):
+        """Calculate similarity between two text strings using token overlap"""
+        if not text1 or not text2:
+            return 0.0
+        
+        # Tokenize and create sets
+        tokens1 = set(text1.split())
+        tokens2 = set(text2.split())
+        
+        if not tokens1 or not tokens2:
+            return 0.0
+        
+        # Calculate Jaccard similarity (intersection over union)
+        intersection = len(tokens1.intersection(tokens2))
+        union = len(tokens1.union(tokens2))
+        
+        return intersection / union if union > 0 else 0.0
+    
+    def _calculate_exact_match_score(self, val1, val2):
+        """Calculate exact match score (1.0 for exact match, 0.0 for different)"""
+        return 1.0 if val1 == val2 else 0.0
+    
+    def _calculate_date_similarity(self, date1, date2):
+        """Calculate date similarity (1.0 for same/close dates, decreasing with distance)"""
+        if not date1 or not date2:
+            return 0.5  # Neutral score if dates unavailable
+        
+        # Handle "No specific deadline" case
+        if date1 == date2:
+            return 1.0
+        
+        if date1 == "No specific deadline" or date2 == "No specific deadline":
+            return 0.3  # Lower similarity if one has no deadline
+        
+        try:
+            # Try to parse dates and calculate proximity
+            from datetime import datetime
+            
+            # Simple date parsing - adjust format as needed
+            for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%Y-%m-%d %H:%M']:
+                try:
+                    d1 = datetime.strptime(date1, fmt)
+                    d2 = datetime.strptime(date2, fmt)
+                    
+                    # Calculate days difference
+                    diff_days = abs((d1 - d2).days)
+                    
+                    # Similarity decreases with date distance
+                    if diff_days == 0:
+                        return 1.0
+                    elif diff_days <= 7:
+                        return 0.8
+                    elif diff_days <= 30:
+                        return 0.6
+                    else:
+                        return 0.3
+                        
+                except ValueError:
+                    continue
+                    
+        except Exception:
+            pass
+        
+        return 0.5  # Default neutral score
