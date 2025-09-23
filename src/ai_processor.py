@@ -73,6 +73,19 @@ class AIProcessor:
         'required_personal_action'
     """
     
+    # Confidence threshold configuration
+    CONFIDENCE_THRESHOLDS = {
+        'fyi': 0.9,                    # FYI requires 90% confidence for auto-approval
+        'required_personal_action': 1.0,  # Always review (impossible threshold)
+        'team_action': 1.0,            # Always review (impossible threshold) 
+        'optional_action': 0.8,        # 80% confidence for auto-approval
+        'work_relevant': 0.8,          # 80% confidence for auto-approval
+        'newsletter': 0.7,             # 70% confidence for auto-approval
+        'spam_to_delete': 0.7,         # 70% confidence for auto-approval
+        'job_listing': 0.8,            # 80% confidence for auto-approval
+        'optional_event': 0.8          # 80% confidence for auto-approval
+    }
+    
     def __init__(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(script_dir)
@@ -310,25 +323,26 @@ class AIProcessor:
             # Estimate confidence based on explanation length and specificity
             confidence_score = min(0.8, 0.3 + len(explanation.split()) * 0.05)
         
-        # Asymmetric thresholds: FYI requires 90% confidence for auto-approval
-        # Required actions always need manual review regardless of confidence
-        auto_approve = False
+        # Get threshold for this category
+        threshold = self.CONFIDENCE_THRESHOLDS.get(category, 0.8)
+        auto_approve = confidence_score >= threshold
         
-        if category == 'fyi' and confidence_score >= 0.9:
-            auto_approve = True
-        elif category in ['required_personal_action', 'team_action']:
-            auto_approve = False  # Always review high-priority items
-        elif category in ['optional_action', 'work_relevant'] and confidence_score >= 0.8:
-            auto_approve = True
-        elif category in ['newsletter', 'spam_to_delete'] and confidence_score >= 0.7:
-            auto_approve = True
+        # Determine review reason
+        if not auto_approve:
+            if category in ['required_personal_action', 'team_action']:
+                review_reason = 'High priority category'
+            else:
+                review_reason = f'Low confidence ({confidence_score:.1%} < {threshold:.1%})'
+        else:
+            review_reason = f'Auto-approved ({confidence_score:.1%} ≥ {threshold:.1%})'
         
         return {
             'category': category,
             'explanation': explanation,
             'confidence': confidence_score,
             'auto_approve': auto_approve,
-            'review_reason': 'Low confidence' if not auto_approve and category != 'required_personal_action' else 'High priority category'
+            'review_reason': review_reason,
+            'threshold': threshold
         }
 
     def generate_explanation(self, email_content, category):

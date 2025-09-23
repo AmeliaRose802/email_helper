@@ -143,6 +143,12 @@ class EmailProcessor:
             suggestion = classification_result['category']
             explanation = classification_result['explanation']
             
+            # Apply confidence thresholds for auto-approval decisions
+            confidence_result = self.ai_processor.apply_confidence_thresholds(classification_result)
+            auto_approve = confidence_result['auto_approve']
+            confidence_score = confidence_result['confidence']
+            review_reason = confidence_result.get('review_reason', '')
+            
             # CRASH HARD if AI classification failed
             if suggestion in ["AI processing unavailable", "AI processing failed", "general_information"]:
                 print("\n" + "="*80)
@@ -165,6 +171,7 @@ class EmailProcessor:
             
             print(f"🤖 AI Classification: {suggestion.replace('_', ' ').title()}")
             print(f"   📝 Reasoning: {explanation}")
+            print(f"   🎯 Confidence: {confidence_score:.1%} ({'Auto-approve' if auto_approve else f'Manual review: {review_reason}'})")
             print(f"   ⏳ Detailed processing deferred until after review")
             
             # Store email suggestion with full conversation context and explanation
@@ -172,6 +179,9 @@ class EmailProcessor:
                 'email_object': representative_email,
                 'ai_suggestion': suggestion,
                 'explanation': explanation,  # Store the AI explanation
+                'confidence_score': confidence_score,
+                'auto_approve': auto_approve,
+                'review_reason': review_reason,
                 'thread_data': {
                     'conversation_id': conversation_id,
                     'thread_count': thread_count,
