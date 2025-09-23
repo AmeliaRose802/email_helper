@@ -87,8 +87,16 @@ def test_duplicate_detection():
         print()
         
         # Test deduplication
+        from ai_processor import AIProcessor
+        from email_analyzer import EmailAnalyzer
+        
+        # Create email analyzer and AI processor
+        email_analyzer = EmailAnalyzer()
+        ai_processor = AIProcessor(email_analyzer)
+        email_analyzer.ai_processor = ai_processor
+        
         generator = SummaryGenerator()
-        summary_sections = generator.build_summary_sections(action_items_data)
+        summary_sections = generator.build_summary_sections(action_items_data, ai_processor)
         
         print("📋 Results After Deduplication:")
         print(f"   Required Actions: {len(summary_sections['required_actions'])} items")

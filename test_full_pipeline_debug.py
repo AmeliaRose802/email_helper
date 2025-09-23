@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
 """
-Test content-based deduplication for similar emails
+Debug script to test the full deduplication pipeline
 """
 
 import sys
 import os
 
 # Add parent directory to path so we can import from src
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+parent_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, parent_dir)
 sys.path.append(os.path.join(parent_dir, 'src'))
 
-def test_content_deduplication():
-    """Test that similar content emails are properly deduplicated"""
-    print("🧪 TESTING CONTENT-BASED DEDUPLICATION")
+def test_full_deduplication_pipeline():
+    """Test the full deduplication pipeline with debug output"""
+    print("🔍 TESTING FULL DEDUPLICATION PIPELINE")
     print("=" * 60)
     
     try:
         from summary_generator import SummaryGenerator
+        from ai_processor import AIProcessor
+        from email_analyzer import EmailAnalyzer
         
         # Mock email objects with different EntryIDs but similar content
         class MockEmail:
@@ -68,22 +70,39 @@ def test_content_deduplication():
         }
         
         print("📊 Input Test Data:")
-        print("   Email 1: 'Credential Expiring' from One Yubi (2025-10-09)")
-        print("   Email 2: 'Credential Expiring' from One Yubi (2025-10-09) - SIMILAR CONTENT")
-        print("   Email 3: 'Different Task' from Another Sender - UNIQUE")
         print(f"   Total input items: {len(action_items_data['required_personal_action'])}")
         print()
-        
-        # Test content-based deduplication
-        from ai_processor import AIProcessor
-        from email_analyzer import EmailAnalyzer
         
         # Create email analyzer and AI processor
         email_analyzer = EmailAnalyzer()
         ai_processor = AIProcessor(email_analyzer)
         email_analyzer.ai_processor = ai_processor
         
+        print("🔧 Component Setup:")
+        print(f"   Email Analyzer: {email_analyzer}")
+        print(f"   AI Processor: {ai_processor}")
+        print(f"   AI Processor has email_analyzer: {hasattr(ai_processor, 'email_analyzer')}")
+        print(f"   AI Processor.email_analyzer: {getattr(ai_processor, 'email_analyzer', None)}")
+        print()
+        
+        # Test the summary generator
         generator = SummaryGenerator()
+        
+        # Add debug to the _remove_duplicate_items method
+        original_method = generator._remove_duplicate_items
+        
+        def debug_remove_duplicate_items(summary_sections, ai_processor):
+            print("🔍 DEBUG: _remove_duplicate_items called")
+            print(f"   ai_processor: {ai_processor}")
+            print(f"   hasattr(ai_processor, 'email_analyzer'): {hasattr(ai_processor, 'email_analyzer') if ai_processor else 'N/A'}")
+            print(f"   ai_processor.email_analyzer: {getattr(ai_processor, 'email_analyzer', None) if ai_processor else 'N/A'}")
+            
+            result = original_method(summary_sections, ai_processor)
+            print("🔍 DEBUG: _remove_duplicate_items completed")
+            return result
+        
+        generator._remove_duplicate_items = debug_remove_duplicate_items
+        
         summary_sections = generator.build_summary_sections(action_items_data, ai_processor)
         
         print("📋 Results After Content Deduplication:")
@@ -92,6 +111,8 @@ def test_content_deduplication():
         
         for i, action in enumerate(required_actions, 1):
             print(f"   {i}. '{action['subject']}' from {action['sender']} (Due: {action['due_date']})")
+            if 'contributing_emails' in action:
+                print(f"      Contributing emails: {len(action['contributing_emails'])}")
         print()
         
         # Verify results
@@ -100,24 +121,13 @@ def test_content_deduplication():
             print("   - Similar 'Credential Expiring' emails merged to 1 item")
             print("   - 'Different Task' email preserved as unique")
             
-            # Check that we kept the first occurrence
-            credential_items = [a for a in required_actions if 'Credential' in a['subject']]
-            if len(credential_items) == 1:
-                print(f"   - Kept credential item with action: {credential_items[0]['action_required'][:50]}...")
-            
         else:
             print(f"❌ FAILURE: Expected 2 items, got {len(required_actions)}")
             print("   Content-based deduplication not working properly")
-            
-            # Debug output
-            print("\n🔍 Debug Information:")
-            for i, action in enumerate(required_actions):
-                content_hash = action.get('_content_hash', 'NO_HASH')
-                print(f"   Item {i+1}: {action['subject']} (Hash: {content_hash[:8]}...)")
-                
+        
         print()
         print("=" * 60)
-        print("✅ Content deduplication test completed")
+        print("✅ Full pipeline test completed")
         
     except Exception as e:
         print(f"❌ Test failed with error: {e}")
@@ -125,4 +135,4 @@ def test_content_deduplication():
         traceback.print_exc()
 
 if __name__ == "__main__":
-    test_content_deduplication()
+    test_full_deduplication_pipeline()
