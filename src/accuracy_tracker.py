@@ -641,3 +641,150 @@ class AccuracyTracker:
             )
         
         return comparison_df
+
+    def calculate_running_accuracy(self, days_back=None):
+        """
+        Calculate running accuracy averages for dashboard display.
+        
+        Args:
+            days_back (int, optional): Days to look back. If None, calculates both 7-day and 30-day
+            
+        Returns:
+            dict: Running accuracy metrics with 7-day and 30-day moving averages
+        """
+        if not os.path.exists(self.accuracy_file):
+            return {
+                'last_7_days': 0.0,
+                'last_30_days': 0.0,
+                'current_trend': 'no_data',
+                'total_sessions_7d': 0,
+                'total_sessions_30d': 0,
+                'total_emails_7d': 0,
+                'total_emails_30d': 0
+            }
+            
+        df = pd.read_csv(self.accuracy_file)
+        if df.empty:
+            return {
+                'last_7_days': 0.0,
+                'last_30_days': 0.0,
+                'current_trend': 'no_data',
+                'total_sessions_7d': 0,
+                'total_sessions_30d': 0,
+                'total_emails_7d': 0,
+                'total_emails_30d': 0
+            }
+            
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        current_time = datetime.now()
+        
+        # Calculate 7-day metrics
+        seven_days_ago = current_time - timedelta(days=7)
+        df_7d = df[df['timestamp'] >= seven_days_ago]
+        
+        # Calculate 30-day metrics  
+        thirty_days_ago = current_time - timedelta(days=30)
+        df_30d = df[df['timestamp'] >= thirty_days_ago]
+        
+        # Calculate accuracies
+        accuracy_7d = round(df_7d['accuracy_rate'].mean(), 2) if not df_7d.empty else 0.0
+        accuracy_30d = round(df_30d['accuracy_rate'].mean(), 2) if not df_30d.empty else 0.0
+        
+        # Determine trend based on comparison of recent vs older data within 30 days
+        trend = 'stable'
+        if len(df_30d) >= 4:  # Need enough data for trend analysis
+            # Compare first half vs second half of 30-day period
+            mid_point = len(df_30d) // 2
+            first_half_avg = df_30d.iloc[:mid_point]['accuracy_rate'].mean()
+            second_half_avg = df_30d.iloc[mid_point:]['accuracy_rate'].mean()
+            diff = second_half_avg - first_half_avg
+            
+            if diff > 2:
+                trend = 'improving'
+            elif diff < -2:
+                trend = 'declining'
+        
+        return {
+            'last_7_days': accuracy_7d,
+            'last_30_days': accuracy_30d,
+            'current_trend': trend,
+            'total_sessions_7d': len(df_7d),
+            'total_sessions_30d': len(df_30d),
+            'total_emails_7d': int(df_7d['total_emails_processed'].sum()) if not df_7d.empty else 0,
+            'total_emails_30d': int(df_30d['total_emails_processed'].sum()) if not df_30d.empty else 0
+        }
+
+    def persist_accuracy_metrics(self, metrics_data=None):
+        """
+        Persist accuracy metrics to long-term storage for historical analysis.
+        
+        Args:
+            metrics_data (dict, optional): Additional metrics to persist. 
+                                         If None, calculates current metrics
+                                         
+        Returns:
+            bool: True if persistence was successful, False otherwise
+        """
+        try:
+            # Get current running accuracy if no specific data provided
+            if metrics_data is None:
+                metrics_data = self.calculate_running_accuracy()
+            
+            # Create long-term metrics directory
+            long_term_dir = os.path.join(self.user_feedback_dir, 'long_term_metrics')
+            os.makedirs(long_term_dir, exist_ok=True)
+            
+            # Create metrics file path (monthly files for organization)
+            current_month = datetime.now().strftime('%Y_%m')
+            metrics_file = os.path.join(long_term_dir, f'accuracy_metrics_{current_month}.jsonl')
+            
+            # Prepare metrics entry with timestamp
+            metrics_entry = {
+                'timestamp': datetime.now().isoformat(),
+                'calculation_date': datetime.now().strftime('%Y-%m-%d'),
+                'metrics': metrics_data,
+                'system_info': {
+                    'total_historical_sessions': self._count_total_sessions(),
+                    'data_retention_days': 365  # Configurable retention policy
+                }
+            }
+            
+            # Append to JSONL file (allows easy streaming and analysis)
+            with open(metrics_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(metrics_entry, default=str) + '\n')
+            
+            # Optional: Clean up old metrics files beyond retention period
+            self._cleanup_old_metrics_files(long_term_dir, retention_months=12)
+            
+            return True
+            
+        except Exception as e:
+            print(f"⚠️ Error persisting accuracy metrics: {e}")
+            return False
+    
+    def _count_total_sessions(self):
+        """Count total sessions in accuracy tracking file."""
+        if not os.path.exists(self.accuracy_file):
+            return 0
+        try:
+            df = pd.read_csv(self.accuracy_file)
+            return len(df)
+        except:
+            return 0
+    
+    def _cleanup_old_metrics_files(self, metrics_dir, retention_months=12):
+        """Clean up old metrics files beyond retention period."""
+        try:
+            cutoff_date = datetime.now() - timedelta(days=retention_months * 30)
+            cutoff_month = cutoff_date.strftime('%Y_%m')
+            
+            for filename in os.listdir(metrics_dir):
+                if filename.startswith('accuracy_metrics_') and filename.endswith('.jsonl'):
+                    # Extract month from filename
+                    month_part = filename.replace('accuracy_metrics_', '').replace('.jsonl', '')
+                    if month_part < cutoff_month:
+                        old_file = os.path.join(metrics_dir, filename)
+                        os.remove(old_file)
+                        print(f"🧹 Cleaned up old metrics file: {filename}")
+        except Exception as e:
+            print(f"⚠️ Error during metrics cleanup: {e}")
