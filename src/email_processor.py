@@ -209,14 +209,19 @@ class EmailProcessor:
     def process_detailed_analysis(self, finalized_suggestions):
         """
         Perform detailed AI analysis only after user has completed reclassification.
-        This avoids wasting AI calls on emails that will be reclassified.
+        This includes enhanced thread grouping and duplicate detection.
         """
         print("\n🔍 Processing detailed analysis for finalized classifications...")
         
         # Reset action items data for fresh processing
         self._reset_data_storage()
         
-        # Group suggestions by category for efficient batch processing
+        # Step 1: Apply enhanced thread grouping to improve organization
+        print("🔗 Applying enhanced thread grouping...")
+        enhanced_thread_groups = self.group_similar_threads(finalized_suggestions)
+        print(f"✅ Enhanced grouping: {len(enhanced_thread_groups)} thread groups created")
+        
+        # Step 2: Process by category but with enhanced grouping awareness
         by_category = {}
         for suggestion in finalized_suggestions:
             category = suggestion.get('ai_suggestion', 'fyi')
@@ -234,10 +239,14 @@ class EmailProcessor:
                 explanation = suggestion.get('explanation', f"Classified as {category}")
                 
                 if email_object:
-                    # Now perform the detailed processing
+                    # Process with enhanced thread context
                     self._process_email_by_category(email_object, thread_data, category, explanation)
         
-        print("✅ Detailed analysis completed")
+        # Step 3: Apply content-based duplicate detection to processed results
+        print("🤖 Applying content-based duplicate detection...")
+        self.action_items_data = self.detect_duplicate_tasks(self.action_items_data)
+        
+        print("✅ Detailed analysis completed with enhanced grouping and deduplication")
         return self.action_items_data
     
     def _build_thread_context(self, emails, representative_email):
@@ -467,6 +476,178 @@ class EmailProcessor:
                 }
                 self.action_items_data['newsletter'].append(newsletter_data)
     
+    def detect_duplicate_tasks(self, action_items_data):
+        """Detect and merge duplicate tasks using content similarity analysis
+        
+        Args:
+            action_items_data: Dictionary of categorized action items
+            
+        Returns:
+            dict: De-duplicated action items with merged information
+        """
+        print("🔍 Detecting duplicate tasks using content similarity...")
+        
+        merged_data = {}
+        duplicates_removed = 0
+        
+        # Process action-oriented categories that benefit from duplicate detection
+        action_categories = ['required_personal_action', 'team_action', 'optional_action']
+        
+        for category in action_categories:
+            if category not in action_items_data:
+                merged_data[category] = []
+                continue
+                
+            items = action_items_data[category]
+            unique_items = []
+            
+            print(f"   Analyzing {len(items)} {category.replace('_', ' ')} items...")
+            
+            for item in items:
+                # Check if this item is similar to any already processed unique items
+                is_duplicate = False
+                
+                for unique_item in unique_items:
+                    is_similar, similarity_score = self.email_analyzer.calculate_content_similarity(
+                        item, unique_item, threshold=0.75
+                    )
+                    
+                    if is_similar:
+                        # Merge the duplicate into the existing unique item
+                        self._merge_duplicate_tasks(unique_item, item, similarity_score)
+                        is_duplicate = True
+                        duplicates_removed += 1
+                        
+                        item_subject = item.get('email_subject', 'Unknown')[:40]
+                        unique_subject = unique_item.get('email_subject', 'Unknown')[:40]
+                        print(f"   🤖 Merged duplicate: '{item_subject}...' → '{unique_subject}...' (similarity: {similarity_score:.2f})")
+                        break
+                
+                if not is_duplicate:
+                    unique_items.append(item)
+            
+            merged_data[category] = unique_items
+        
+        # Copy other categories unchanged
+        for category, items in action_items_data.items():
+            if category not in action_categories:
+                merged_data[category] = items
+        
+        if duplicates_removed > 0:
+            print(f"✅ Duplicate detection complete: {duplicates_removed} tasks merged")
+        else:
+            print("✅ No duplicate tasks detected")
+        
+        return merged_data
+    
+    def _merge_duplicate_tasks(self, target_item, duplicate_item, similarity_score):
+        """Merge duplicate task information into target item"""
+        try:
+            # Add contributing email information
+            if 'contributing_emails' not in target_item:
+                target_item['contributing_emails'] = []
+            
+            # Add the duplicate's email information
+            duplicate_email_info = {
+                'email_object': duplicate_item.get('email_object'),
+                'subject': duplicate_item.get('email_subject', ''),
+                'sender': duplicate_item.get('email_sender', ''),
+                'received_time': getattr(duplicate_item.get('email_object'), 'ReceivedTime', ''),
+                'similarity_score': similarity_score
+            }
+            target_item['contributing_emails'].append(duplicate_email_info)
+            
+            # Merge action details if they provide additional information
+            target_action = target_item.get('action_details', {})
+            duplicate_action = duplicate_item.get('action_details', {})
+            
+            # Keep the more specific action description if available
+            if len(duplicate_action.get('action_required', '')) > len(target_action.get('action_required', '')):
+                target_action['action_required'] = duplicate_action['action_required']
+            
+            # Combine explanations if different
+            target_explanation = target_action.get('explanation', '')
+            duplicate_explanation = duplicate_action.get('explanation', '')
+            if duplicate_explanation and duplicate_explanation not in target_explanation:
+                if target_explanation:
+                    target_action['explanation'] = f"{target_explanation}; {duplicate_explanation}"
+                else:
+                    target_action['explanation'] = duplicate_explanation
+            
+            # Use earlier due date if both are available
+            target_due = target_action.get('due_date')
+            duplicate_due = duplicate_action.get('due_date')
+            if duplicate_due and duplicate_due != "No specific deadline":
+                if target_due == "No specific deadline" or not target_due:
+                    target_action['due_date'] = duplicate_due
+                elif target_due != duplicate_due:
+                    # Keep both dates for reference
+                    target_action['alternative_due_dates'] = target_action.get('alternative_due_dates', [])
+                    if duplicate_due not in target_action['alternative_due_dates']:
+                        target_action['alternative_due_dates'].append(duplicate_due)
+            
+            # Merge links
+            target_links = target_action.get('links', [])
+            duplicate_links = duplicate_action.get('links', [])
+            for link in duplicate_links:
+                if link not in target_links:
+                    target_links.append(link)
+            if target_links:
+                target_action['links'] = target_links
+            
+            target_item['action_details'] = target_action
+            
+        except Exception as e:
+            print(f"⚠️  Task merge failed: {e}")
+
+    def group_similar_threads(self, email_suggestions):
+        """Group email suggestions by thread with enhanced similarity detection"""
+        print("🔗 Grouping similar email threads...")
+        
+        # Use existing thread grouping from email_analyzer
+        thread_groups = self.email_analyzer.group_emails_by_thread(
+            [suggestion.get('email_object') for suggestion in email_suggestions 
+             if suggestion.get('email_object')]
+        )
+        
+        # Enhanced grouping: merge groups with similar subjects/content
+        enhanced_groups = {}
+        group_id = 0
+        
+        for thread_key, emails in thread_groups.items():
+            # Find if this thread should merge with an existing enhanced group
+            merged = False
+            
+            for existing_key, existing_group in enhanced_groups.items():
+                # Check if threads should be merged based on content similarity
+                sample_email_new = emails[0] if emails else None
+                sample_email_existing = existing_group['emails'][0] if existing_group['emails'] else None
+                
+                if sample_email_new and sample_email_existing:
+                    is_similar, _ = self.email_analyzer.calculate_content_similarity(
+                        sample_email_new, sample_email_existing, threshold=0.6
+                    )
+                    
+                    if is_similar:
+                        # Merge threads
+                        existing_group['emails'].extend(emails)
+                        existing_group['thread_keys'].append(thread_key)
+                        merged = True
+                        break
+            
+            if not merged:
+                # Create new enhanced group
+                group_id += 1
+                enhanced_groups[f"group_{group_id}"] = {
+                    'emails': emails,
+                    'thread_keys': [thread_key],
+                    'primary_subject': emails[0].Subject if emails else 'Unknown'
+                }
+        
+        print(f"✅ Thread grouping complete: {len(thread_groups)} original threads → {len(enhanced_groups)} enhanced groups")
+        
+        return enhanced_groups
+
     def generate_summary(self):
         """Generate and display the focused summary"""
         summary_sections = self.summary_generator.build_summary_sections(self.action_items_data)

@@ -252,17 +252,6 @@ class SummaryGenerator:
             return False, None
         
         try:
-            # Load the duplicate detection prompt using ai_processor's method
-            import os
-            prompts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts')
-            prompt_file = os.path.join(prompts_dir, 'email_duplicate_detection.prompty')
-            
-            # Use ai_processor's parse_prompty_file method
-            if os.path.exists(prompt_file):
-                system_prompt = ai_processor.parse_prompty_file(prompt_file)
-            else:
-                raise FileNotFoundError(f"Required prompt file not found: {prompt_file}")
-            
             # Create comparison content for AI
             new_summary = f"Subject: {new_item.get('subject', new_item.get('summary', 'Unknown'))}\nSender: {new_item.get('sender', 'Unknown')}\nAction: {new_item.get('action_required', new_item.get('summary', 'N/A'))}\nDue: {new_item.get('due_date', 'N/A')}"
             
@@ -271,19 +260,15 @@ class SummaryGenerator:
                 existing_summary = f"Item {i+1} - Subject: {item.get('subject', item.get('summary', 'Unknown'))}\nSender: {item.get('sender', 'Unknown')}\nAction: {item.get('action_required', item.get('summary', 'N/A'))}\nDue: {item.get('due_date', 'N/A')}"
                 existing_summaries.append(existing_summary)
             
-            # Build the complete prompt
-            full_prompt = f"""{system_prompt}
-
-NEW ITEM:
-{new_summary}
-
-EXISTING ITEMS:
-{chr(10).join(existing_summaries)}
-
-Your response:"""
-
-            # Use AI to analyze duplication
-            response = ai_processor.query_ai(full_prompt, max_tokens=50)
+            # Create inputs for the duplicate detection prompty
+            inputs = {
+                'new_item': new_summary,
+                'existing_items': '\n'.join(existing_summaries),
+                'item_count': len(existing_items)
+            }
+            
+            # Use AI to analyze duplication using the prompty file
+            response = ai_processor.execute_prompty('email_duplicate_detection.prompty', inputs)
             
             if response and response.strip().upper().startswith('DUPLICATE:'):
                 try:
@@ -373,7 +358,7 @@ Your response:"""
             return None
     
     def _remove_duplicate_items(self, summary_sections, ai_processor):
-        """Remove duplicate action items, FYIs, etc. from final summary sections using AI"""
+        """Remove duplicate action items, FYIs, etc. from final summary sections using content similarity"""
         duplicates_removed = 0
         
         # Process action-oriented sections that benefit from duplicate detection
@@ -388,17 +373,42 @@ Your response:"""
             
             for item in items:
                 # Check if this item is a duplicate of any item already in unique_items
-                is_duplicate, duplicate_of = self._ai_detect_duplicate_intent(
-                    item, unique_items, ai_processor
-                )
+                is_duplicate = False
+                
+                # First try content-based similarity if email_analyzer is available
+                if hasattr(ai_processor, 'email_analyzer') and ai_processor.email_analyzer:
+                    for unique_item in unique_items:
+                        is_similar, similarity_score = ai_processor.email_analyzer.calculate_content_similarity(
+                            item, unique_item, threshold=0.75
+                        )
+                        
+                        if is_similar:
+                            # Merge information from duplicate into unique item
+                            self._merge_summary_items(unique_item, item, similarity_score)
+                            is_duplicate = True
+                            duplicates_removed += 1
+                            
+                            item_subject = (item.get('subject', item.get('summary', 'unknown')))[:40]
+                            unique_subject = (unique_item.get('subject', unique_item.get('summary', 'unknown')))[:40]
+                            print(f"🤖 Merged duplicate {section_name[:-1]}: '{item_subject}...' → '{unique_subject}...' (similarity: {similarity_score:.2f})")
+                            break
+                
+                # Fallback to AI-powered detection if content similarity didn't catch it
+                if not is_duplicate and ai_processor:
+                    is_ai_duplicate, duplicate_of = self._ai_detect_duplicate_intent(
+                        item, unique_items, ai_processor
+                    )
+                    
+                    if is_ai_duplicate:
+                        is_duplicate = True
+                        duplicates_removed += 1
+                        
+                        item_subject = (item.get('subject', item.get('summary', 'unknown')))[:40]
+                        duplicate_subject = (duplicate_of.get('subject', duplicate_of.get('summary', 'unknown')))[:40] if duplicate_of else 'unknown item'
+                        print(f"🤖 AI detected duplicate {section_name[:-1]}: '{item_subject}...' → similar to '{duplicate_subject}...'")
                 
                 if not is_duplicate:
                     unique_items.append(item)
-                else:
-                    duplicates_removed += 1
-                    duplicate_subject = (duplicate_of.get('subject', duplicate_of.get('summary', 'unknown')))[:40] if duplicate_of else 'unknown item'
-                    item_subject = (item.get('subject', item.get('summary', 'unknown')))[:40]
-                    print(f"🤖 Removed duplicate {section_name[:-1]}: '{item_subject}...' → similar to '{duplicate_subject}...'")
             
             # Update the section with deduplicated items
             summary_sections[section_name] = unique_items
@@ -407,6 +417,57 @@ Your response:"""
             print(f"📋 Final summary: {duplicates_removed} duplicate items removed")
         
         return summary_sections
+    
+    def _merge_summary_items(self, target_item, duplicate_item, similarity_score):
+        """Merge information from duplicate summary item into target item"""
+        try:
+            # Add contributing email information if not already present
+            if 'contributing_emails' not in target_item:
+                target_item['contributing_emails'] = []
+            
+            # Add the duplicate's email information
+            duplicate_email_info = {
+                'subject': duplicate_item.get('subject', ''),
+                'sender': duplicate_item.get('sender', ''),
+                'date': duplicate_item.get('date', ''),
+                'entry_id': duplicate_item.get('_entry_id', ''),
+                'similarity_score': similarity_score
+            }
+            target_item['contributing_emails'].append(duplicate_email_info)
+            
+            # Merge action details for action items
+            if 'action_required' in duplicate_item:
+                # Keep the more detailed action description
+                if len(duplicate_item.get('action_required', '')) > len(target_item.get('action_required', '')):
+                    target_item['action_required'] = duplicate_item['action_required']
+                
+                # Combine explanations if different
+                target_explanation = target_item.get('explanation', '')
+                duplicate_explanation = duplicate_item.get('explanation', '')
+                if duplicate_explanation and duplicate_explanation not in target_explanation:
+                    if target_explanation:
+                        target_item['explanation'] = f"{target_explanation}; {duplicate_explanation}"
+                    else:
+                        target_item['explanation'] = duplicate_explanation
+                
+                # Keep earlier due date
+                target_due = target_item.get('due_date')
+                duplicate_due = duplicate_item.get('due_date')
+                if duplicate_due and duplicate_due != "No specific deadline":
+                    if target_due == "No specific deadline" or not target_due:
+                        target_item['due_date'] = duplicate_due
+            
+            # Merge links
+            target_links = target_item.get('links', [])
+            duplicate_links = duplicate_item.get('links', [])
+            for link in duplicate_links:
+                if link not in target_links:
+                    target_links.append(link)
+            if target_links:
+                target_item['links'] = target_links
+                
+        except Exception as e:
+            print(f"⚠️  Summary item merge failed: {e}")
     
     def _separate_completed_team_actions(self, summary_sections):
         """Separate completed team actions into their own section"""
@@ -432,7 +493,7 @@ Your response:"""
         return summary_sections
     
     def build_summary_sections(self, action_items_data, ai_processor=None):
-        """Build summary sections using collected AI analysis data"""
+        """Build summary sections using collected AI analysis data with holistic duplicate removal"""
         summary_sections = self.EMPTY_SECTIONS.copy()
         processed_entry_ids = set()
         
@@ -450,8 +511,94 @@ Your response:"""
         if ai_processor:
             summary_sections = self._remove_duplicate_items(summary_sections, ai_processor)
         
+        # Apply holistic cross-section duplicate removal
+        summary_sections = self._remove_cross_section_duplicates(summary_sections, ai_processor)
+        
         # Separate completed team actions from active ones
         summary_sections = self._separate_completed_team_actions(summary_sections)
+        
+        return summary_sections
+    
+    def _remove_cross_section_duplicates(self, summary_sections, ai_processor):
+        """Remove FYIs/newsletters already covered by tasks - holistic duplicate removal"""
+        print("🔄 Applying holistic cross-section duplicate removal...")
+        
+        # Collect all action items (high priority sections)
+        action_items = []
+        action_sections = ['required_actions', 'team_actions', 'optional_actions']
+        
+        for section_name in action_sections:
+            if section_name in summary_sections:
+                action_items.extend(summary_sections[section_name])
+        
+        if not action_items:
+            print("   No action items found, skipping cross-section deduplication")
+            return summary_sections
+        
+        cross_duplicates_removed = 0
+        
+        # Check FYI notices against action items
+        if 'fyi_notices' in summary_sections:
+            unique_fyis = []
+            
+            for fyi_item in summary_sections['fyi_notices']:
+                is_covered_by_action = False
+                
+                # Check if this FYI is already covered by an action item
+                if hasattr(ai_processor, 'email_analyzer') and ai_processor.email_analyzer:
+                    for action_item in action_items:
+                        is_similar, similarity_score = ai_processor.email_analyzer.calculate_content_similarity(
+                            fyi_item, action_item, threshold=0.15  # Lower threshold for cross-section
+                        )
+                        
+                        if is_similar:
+                            is_covered_by_action = True
+                            cross_duplicates_removed += 1
+                            
+                            fyi_subject = fyi_item.get('subject', fyi_item.get('summary', 'unknown'))[:40]
+                            action_subject = action_item.get('subject', 'unknown')[:40]
+                            print(f"   🔗 Removed FYI covered by task: '{fyi_subject}...' → covered by '{action_subject}...' (similarity: {similarity_score:.2f})")
+                            break
+                
+                if not is_covered_by_action:
+                    unique_fyis.append(fyi_item)
+            
+            summary_sections['fyi_notices'] = unique_fyis
+        
+        # Check newsletters against action items and FYIs
+        if 'newsletters' in summary_sections:
+            unique_newsletters = []
+            
+            # Combine action items and remaining FYIs for comparison
+            comparison_items = action_items + summary_sections.get('fyi_notices', [])
+            
+            for newsletter_item in summary_sections['newsletters']:
+                is_covered = False
+                
+                if hasattr(ai_processor, 'email_analyzer') and ai_processor.email_analyzer:
+                    for comparison_item in comparison_items:
+                        is_similar, similarity_score = ai_processor.email_analyzer.calculate_content_similarity(
+                            newsletter_item, comparison_item, threshold=0.12  # Even lower threshold for newsletters
+                        )
+                        
+                        if is_similar:
+                            is_covered = True
+                            cross_duplicates_removed += 1
+                            
+                            newsletter_subject = newsletter_item.get('subject', newsletter_item.get('summary', 'unknown'))[:40]
+                            comparison_subject = comparison_item.get('subject', comparison_item.get('summary', 'unknown'))[:40]
+                            print(f"   🔗 Removed newsletter covered by other content: '{newsletter_subject}...' → covered by '{comparison_subject}...' (similarity: {similarity_score:.2f})")
+                            break
+                
+                if not is_covered:
+                    unique_newsletters.append(newsletter_item)
+            
+            summary_sections['newsletters'] = unique_newsletters
+        
+        if cross_duplicates_removed > 0:
+            print(f"✅ Holistic deduplication: {cross_duplicates_removed} cross-section duplicates removed")
+        else:
+            print("✅ No cross-section duplicates found")
         
         return summary_sections
     
