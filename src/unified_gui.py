@@ -42,7 +42,7 @@ from outlook_manager import OutlookManager
 from ai_processor import AIProcessor
 from email_analyzer import EmailAnalyzer
 from summary_generator import SummaryGenerator
-from email_processor import EmailProcessor
+from modern_email_processor import EmailProcessor
 from task_persistence import TaskPersistence
 from accuracy_tracker import AccuracyTracker
 from database.migrations import DatabaseMigrations
@@ -75,35 +75,25 @@ class UnifiedEmailGUI:
         processing_cancelled (bool): Flag for cancelling long-running operations
     """
     
-    def __init__(self):
-        # Initialize components
-        self.outlook_manager = OutlookManager()
+    def __init__(self, service_factory=None):
+        # Use dependency injection for cleaner architecture
+        from core.service_factory import ServiceFactory
+        from core.config import config
         
-        # Initialize email analyzer first
-        self.email_analyzer = EmailAnalyzer()
+        self.factory = service_factory or ServiceFactory()
         
-        # Initialize AI processor with email analyzer reference
-        self.ai_processor = AIProcessor(self.email_analyzer)
-        
-        # Set the AI processor reference in email analyzer (circular dependency)
-        self.email_analyzer.ai_processor = self.ai_processor
-        
-        self.summary_generator = SummaryGenerator()
-        self.email_processor = EmailProcessor(
-            self.outlook_manager,
-            self.ai_processor,
-            self.email_analyzer,
-            self.summary_generator
-        )
-        self.task_persistence = TaskPersistence()  # Add task persistence
-        
-        # Initialize accuracy tracking and database
-        runtime_data_dir = os.path.join(os.path.dirname(__file__), '..', 'runtime_data')
-        os.makedirs(runtime_data_dir, exist_ok=True)
-        self.accuracy_tracker = AccuracyTracker(runtime_data_dir)
+        # Get all services from factory
+        self.outlook_manager = self.factory.get_outlook_manager()
+        self.ai_processor = self.factory.get_ai_processor()
+        self.email_analyzer = self.factory.get_email_analyzer()
+        self.summary_generator = self.factory.get_summary_generator()
+        self.email_processor = self.factory.get_email_processor()
+        self.task_persistence = self.factory.get_task_persistence()
+        self.accuracy_tracker = self.factory.get_accuracy_tracker()
         
         # Initialize database for historical storage
-        db_path = os.path.join(runtime_data_dir, 'email_helper_history.db')
+        from database.migrations import DatabaseMigrations
+        db_path = config.get_storage_path('email_helper_history.db')
         self.db_migrations = DatabaseMigrations(db_path)
         self.db_migrations.apply_migrations()  # Ensure database is up to date
         
@@ -115,8 +105,9 @@ class UnifiedEmailGUI:
         
         # Create main window
         self.root = tk.Tk()
-        self.root.title("AI Email Management")
-        self.root.geometry("1200x800")
+        self.root.title(config.get('ui.window_title', 'Email Helper'))
+        window_size = f"{config.get('ui.default_width', 1200)}x{config.get('ui.default_height', 800)}"
+        self.root.geometry(window_size)
         self.root.minsize(1000, 700)
         
         # Create GUI components

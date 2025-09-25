@@ -1,28 +1,22 @@
-# Interactive Email Learning System - Azure OpenAI Integration
-# Python package requirements
+# Email Helper - Consolidated Dependencies
+# Optimized for maintainability and minimal dependencies
 
 # Core dependencies
-pandas>=2.0.0
-pywin32>=306                    # For Outlook COM integration
-jinja2>=3.0.0                   # Template engine for HTML generation
+pandas>=2.0.0                   # Data processing and CSV operations
+pywin32>=306                    # Outlook COM integration (Windows only)
+python-dotenv>=1.0.0           # Environment variable management
 
 # Azure OpenAI integration  
-openai>=1.3.0                   # Azure OpenAI client library
-prompty>=1.0.0                  # Microsoft Prompty for AI prompt management
-promptflow>=1.0.0               # PromptFlow core for better prompty integration
-azure-identity>=1.15.0          # Azure authentication using DefaultAzureCredential
-python-dotenv>=1.0.0            # Environment variable management
+openai>=1.3.0                  # Azure OpenAI client library
+prompty>=1.0.0                 # Microsoft Prompty for AI prompt management
+azure-identity>=1.15.0         # Azure authentication using DefaultAzureCredential
 
-# Optional: For advanced text processing
-nltk>=3.8                       # Natural language processing
-scikit-learn>=1.3.0             # Machine learning for classification enhancement
+# Optional: Enhanced text processing (can be removed if not used)
+# nltk>=3.8                     # Natural language processing
+# scikit-learn>=1.3.0          # Machine learning for classification enhancement
 
-# Development dependencies
-pytest>=7.0.0                   # Testing framework
-black>=23.0.0                   # Code formatting
-
-# UI Testing dependencies (headless testing focused)
-pytest-mock>=3.10.0             # Enhanced mocking capabilities
-pytest-timeout>=2.1.0           # Test timeout handling
-pytest-cov>=4.0.0               # Coverage reporting
-pytest-xvfb>=3.0.0              # Virtual display for headless testing (optional)
+# Development and testing
+pytest>=7.0.0                  # Testing framework
+pytest-mock>=3.10.0           # Enhanced mocking capabilities
+pytest-cov>=4.0.0             # Coverage reporting
+black>=23.0.0                  # Code formatting (optional)
