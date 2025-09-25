@@ -1126,28 +1126,6 @@ class UnifiedEmailGUI:
         except Exception as e:
             insights['error'] = str(e)
             return insights
-        """Refresh all accuracy dashboard data"""
-        try:
-            # Import accuracy tracker
-            from accuracy_tracker import AccuracyTracker
-            
-            # Initialize tracker with same path logic as ai_processor
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            project_root = os.path.dirname(script_dir)
-            runtime_base_dir = os.path.join(project_root, 'runtime_data')
-            self.accuracy_tracker = AccuracyTracker(runtime_base_dir)
-            
-            # Update all views
-            self.update_metrics_display()
-            self.update_trends_chart()
-            self.update_category_analysis()
-            self.update_sessions_list()
-            
-            self.status_var.set("Accuracy dashboard refreshed successfully")
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to refresh accuracy data:\n{str(e)}")
-            self.status_var.set("Error refreshing accuracy dashboard")
     
     def update_metrics_display(self):
         """Update the overview metrics display with running accuracy and task resolution data"""
@@ -1401,32 +1379,30 @@ class UnifiedEmailGUI:
                                      values=("--", "--", "--", "--"))
     
     def refresh_accuracy_data(self):
-        """Refresh the accuracy dashboard data"""
+        """Refresh all accuracy dashboard data"""
         try:
-            # Ensure accuracy tracker is available
-            if not hasattr(self, 'accuracy_tracker'):
-                from accuracy_tracker import AccuracyTracker
-                import os
-                # Use a more robust path resolution
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                runtime_base_dir = os.path.join(os.path.dirname(current_dir), 'runtime_data')
-                # Fallback if path doesn't exist
-                if not os.path.exists(os.path.dirname(runtime_base_dir)):
-                    runtime_base_dir = os.path.join(os.getcwd(), 'runtime_data')
-                self.accuracy_tracker = AccuracyTracker(runtime_base_dir)
+            # Import accuracy tracker
+            from accuracy_tracker import AccuracyTracker
             
-            # Update the sessions view if it exists
-            if hasattr(self, 'sessions_tree'):
-                # Clear existing items
-                for item in self.sessions_tree.get_children():
-                    self.sessions_tree.delete(item)
-                # Repopulate with fresh data
-                self.update_sessions_list()
+            # Initialize tracker with same path logic as ai_processor
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(script_dir)
+            runtime_base_dir = os.path.join(project_root, 'runtime_data')
+            self.accuracy_tracker = AccuracyTracker(runtime_base_dir)
             
-            # Update any other accuracy displays
-            self.root.update_idletasks()
+            # Update all views
+            self.update_metrics_display()
+            self.update_trends_chart()
+            self.update_category_analysis()
+            self.update_sessions_list()
+            
+            if hasattr(self, 'status_var'):
+                self.status_var.set("Accuracy dashboard refreshed successfully")
             
         except Exception as e:
+            messagebox.showerror("Error", f"Failed to refresh accuracy data:\n{str(e)}")
+            if hasattr(self, 'status_var'):
+                self.status_var.set("Error refreshing accuracy dashboard")
             print(f"Error refreshing accuracy data: {e}")
     
     def export_accuracy_data(self):
