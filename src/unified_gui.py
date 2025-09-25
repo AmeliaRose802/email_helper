@@ -124,11 +124,17 @@ class UnifiedEmailGUI:
         
         # Initialize Outlook connection
         self.outlook_manager.connect_to_outlook()
+        
+        # Check if we should enable tabs based on existing data
+        self.check_and_enable_tabs_with_data()
     
     def create_widgets(self):
         # Create notebook for tabs
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Bind tab selection event to load data when needed
+        self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
         
         # Tab 1: Email Processing
         self.processing_frame = ttk.Frame(self.notebook)
@@ -1271,8 +1277,6 @@ class UnifiedEmailGUI:
             self.completed_tasks_label.config(text="Completed: Error")
             self.dismissed_tasks_label.config(text="Dismissed: Error")
             self.avg_resolution_time_label.config(text="Avg Age: Error")
-
-            self.activity_text.insert(tk.END, activity_summary)
             
         except Exception as e:
             self.activity_text.delete(1.0, tk.END)
@@ -1404,6 +1408,35 @@ class UnifiedEmailGUI:
         except Exception as e:
             self.sessions_tree.insert("", "end", text=f"Error: {str(e)}", 
                                      values=("--", "--", "--", "--"))
+    
+    def refresh_accuracy_data(self):
+        """Refresh the accuracy dashboard data"""
+        try:
+            # Ensure accuracy tracker is available
+            if not hasattr(self, 'accuracy_tracker'):
+                from accuracy_tracker import AccuracyTracker
+                import os
+                # Use a more robust path resolution
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                runtime_base_dir = os.path.join(os.path.dirname(current_dir), 'runtime_data')
+                # Fallback if path doesn't exist
+                if not os.path.exists(os.path.dirname(runtime_base_dir)):
+                    runtime_base_dir = os.path.join(os.getcwd(), 'runtime_data')
+                self.accuracy_tracker = AccuracyTracker(runtime_base_dir)
+            
+            # Update the sessions view if it exists
+            if hasattr(self, 'sessions_tree'):
+                # Clear existing items
+                for item in self.sessions_tree.get_children():
+                    self.sessions_tree.delete(item)
+                # Repopulate with fresh data
+                self.update_sessions_list()
+            
+            # Update any other accuracy displays
+            self.root.update_idletasks()
+            
+        except Exception as e:
+            print(f"Error refreshing accuracy data: {e}")
     
     def export_accuracy_data(self):
         """Export accuracy data to CSV"""
@@ -3391,6 +3424,8 @@ This will help keep your inbox focused on actionable items only."""
                 self.summary_text.insert(tk.END, "\n", "content_text")
         
         self.summary_text.insert(tk.END, "\n", "content_text")
+
+    def _display_newsletters(self, items):
         """Display newsletter summaries with dismiss functionality"""
         if len(items) > 1:
             # Combined newsletter highlights
@@ -3425,21 +3460,23 @@ This will help keep your inbox focused on actionable items only."""
             self.summary_text.window_create(tk.END, window=dismiss_newsletter_button)
             self.summary_text.insert(tk.END, "\n", "content_text")
             
-            # Add View in Outlook link for each task item
-            email_data = item.get("email_data", {})
-            if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
-                link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
-                link_end = self.summary_text.index(tk.END)
-                
-                # Create unique tag for this email link
-                email_link_tag = f"email_link_{hash(str(email_data))}"
-                self.summary_text.tag_add(email_link_tag, link_start, link_end)
-                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
-                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
-                                         lambda e, data=email_data: self.open_email_in_browser(data))
-                self.summary_text.insert(tk.END, "\n", "content_text")
+            # Add View in Outlook link for last newsletter item
+            if items:
+                last_item = items[-1]
+                email_data = last_item.get("email_data", {})
+                if email_data:
+                    self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                    link_start = self.summary_text.index(tk.END)
+                    self.summary_text.insert(tk.END, "View in Outlook", "link")
+                    link_end = self.summary_text.index(tk.END)
+                    
+                    # Create unique tag for this email link
+                    email_link_tag = f"email_link_{hash(str(email_data))}"
+                    self.summary_text.tag_add(email_link_tag, link_start, link_end)
+                    self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+                    self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                             lambda e, data=email_data: self.open_email_in_browser(data))
+                    self.summary_text.insert(tk.END, "\n", "content_text")
         
         self.summary_text.insert(tk.END, "\n", "content_text")
     
@@ -3786,6 +3823,50 @@ This will help keep your inbox focused on actionable items only."""
         except Exception as e:
             self.status_var.set(f"Error loading tasks: {str(e)}")
             messagebox.showerror("Error", f"Failed to load outstanding tasks:\n{str(e)}")
+    def check_and_enable_tabs_with_data(self):
+        """Check if tabs should be enabled based on existing data"""
+        try:
+            # Check if accuracy data exists and enable accuracy tab
+            session_data = self.accuracy_tracker.get_session_comparison_data()
+            if len(session_data) > 0:
+                self.notebook.tab(3, state="normal")  # Enable accuracy dashboard
+                print(f"✅ Enabled Accuracy Dashboard - found {len(session_data)} sessions")
+            
+            # Check if outstanding tasks exist and populate summary
+            outstanding_tasks = self.task_persistence.load_outstanding_tasks()
+            total_tasks = sum(len(tasks) for tasks in outstanding_tasks.values() if isinstance(tasks, list))
+            if total_tasks > 0:
+                print(f"✅ Found {total_tasks} outstanding tasks for summary")
+                # Pre-load summary data
+                self.summary_sections = self.task_persistence.get_comprehensive_summary({})
+        except Exception as e:
+            print(f"Warning: Could not check existing data: {e}")
+    
+    def on_tab_changed(self, event):
+        """Handle tab selection changes to ensure data is loaded when needed"""
+        try:
+            selected_tab = event.widget.index("current")
+            tab_text = event.widget.tab("current", "text")
+            
+            # Load data when accuracy dashboard tab is selected
+            if "Accuracy Dashboard" in tab_text or selected_tab == 3:
+                self.refresh_accuracy_data()
+            
+            # Load outstanding tasks when summary tab is selected
+            elif "Summary" in tab_text or selected_tab == 2:
+                if not hasattr(self, 'summary_sections') or not self.summary_sections:
+                    # Load outstanding tasks from persistence to show in summary
+                    outstanding_tasks = self.task_persistence.load_outstanding_tasks()
+                    if outstanding_tasks:
+                        # Get comprehensive summary to show existing tasks
+                        self.summary_sections = self.task_persistence.get_comprehensive_summary({})
+                        if self.summary_sections:
+                            self.display_formatted_summary_in_app(self.summary_sections)
+                elif hasattr(self, 'summary_sections') and self.summary_sections:
+                    # Refresh display if we have data but it's not showing
+                    self.display_formatted_summary_in_app(self.summary_sections)
+        except Exception as e:
+            print(f"Error in tab change handler: {e}")
     
     def run(self):
         self.root.mainloop()

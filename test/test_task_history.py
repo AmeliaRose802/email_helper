@@ -161,6 +161,8 @@ try:
                 ('dismissed_task', 'dismissed', 'Dismissed task', 5)
             ]
             
+            # Create all tasks first
+            all_tasks = []
             for task_id, res_type, description, age_days in resolutions:
                 # Create task with specific age
                 first_seen = (datetime.now() - timedelta(days=age_days)).strftime('%Y-%m-%d %H:%M:%S')
@@ -171,14 +173,18 @@ try:
                     'first_seen': first_seen,
                     '_entry_ids': [f'entry_{task_id}']
                 }
-                
-                persistence.save_outstanding_tasks({
-                    'required_actions': [test_task],
-                    'team_actions': [], 'completed_team_actions': [],
-                    'optional_actions': [], 'job_listings': [],
-                    'optional_events': [], 'fyi_notices': [], 'newsletters': []
-                })
-                
+                all_tasks.append(test_task)
+            
+            # Save all tasks at once
+            persistence.save_outstanding_tasks({
+                'required_actions': all_tasks,
+                'team_actions': [], 'completed_team_actions': [],
+                'optional_actions': [], 'job_listings': [],
+                'optional_events': [], 'fyi_notices': [], 'newsletters': []
+            })
+            
+            # Now resolve each task
+            for task_id, res_type, description, age_days in resolutions:
                 persistence.record_task_resolution(task_id, res_type, f'{description} resolution')
             
             # Get statistics

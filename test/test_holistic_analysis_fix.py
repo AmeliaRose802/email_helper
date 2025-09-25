@@ -45,7 +45,6 @@ class TestHolisticAnalysisFix(unittest.TestCase):
             parsed = json.loads(repaired)
             self.assertIn("truly_relevant_actions", parsed)
             self.assertTrue(len(parsed["truly_relevant_actions"]) > 0)
-            print("✅ Unterminated string repair test passed")
         except json.JSONDecodeError as e:
             self.fail(f"Repaired JSON is still invalid: {e}")
     
