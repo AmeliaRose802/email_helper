@@ -661,7 +661,13 @@ class TaskPersistence:
             first_seen = task_data.get('first_seen', '')
             if first_seen:
                 first_seen_date = datetime.strptime(first_seen, '%Y-%m-%d %H:%M:%S')
-                return (datetime.now() - first_seen_date).days
+                time_diff = datetime.now() - first_seen_date
+                age_days = time_diff.days
+                
+                # If the difference is less than a full day but more than 0, round up to 1 day
+                if age_days == 0 and time_diff.total_seconds() > 0:
+                    age_days = 1
+                return age_days
         except:
             pass
         return 0

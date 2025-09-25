@@ -30,6 +30,7 @@ class TestFrontendImprovements(unittest.TestCase):
         # Configure mocks
         self.mock_ai_processor.azure_config = {'endpoint': 'test', 'key': 'test'}
         self.mock_email_processor.get_action_items_data.return_value = {}
+        self.mock_outlook.get_emails_with_full_conversations.return_value = []
     
     def test_custom_count_validation(self):
         """Test A3: Custom email count auto-selection and validation"""
@@ -208,7 +209,7 @@ class TestFrontendImprovements(unittest.TestCase):
             gui.custom_count_entry.insert(0, "150")
             
             # Mock the processing methods to avoid actual email processing
-            with patch.object(gui, '_process_emails_in_background') as mock_process:
+            with patch.object(gui, 'process_emails_background') as mock_process:
                 gui.start_email_processing()
                 # Should not show warning and should call processing
                 self.assertTrue(mock_process.called)
