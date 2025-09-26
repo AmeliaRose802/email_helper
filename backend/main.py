@@ -134,6 +134,10 @@ app.include_router(emails.router, prefix="/api", tags=["emails"])
 from backend.api import ai
 app.include_router(ai.router, prefix="/api", tags=["ai"])
 
+# Import and include task router (T4)
+from backend.api import tasks
+app.include_router(tasks.router, prefix="/api", tags=["tasks"])
+
 
 # Service factory integration for existing services
 def get_service_factory():
