@@ -180,9 +180,21 @@ def get_email_provider_instance() -> EmailProvider:
     global _email_provider
     
     if _email_provider is None:
-        # For now, use mock provider
-        # TODO: Implement Graph API provider selection based on config
-        _email_provider = MockEmailProvider()
+        # Check if Graph API credentials are configured
+        if (settings.graph_client_id and 
+            settings.graph_client_secret and 
+            settings.graph_tenant_id):
+            # Use Graph API provider in production
+            from backend.services.graph_email_provider import GraphEmailProvider
+            _email_provider = GraphEmailProvider(
+                client_id=settings.graph_client_id,
+                client_secret=settings.graph_client_secret,
+                tenant_id=settings.graph_tenant_id,
+                redirect_uri=settings.graph_redirect_uri
+            )
+        else:
+            # Use mock provider for development/testing
+            _email_provider = MockEmailProvider()
     
     return _email_provider
 
