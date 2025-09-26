@@ -1,28 +1,28 @@
-# React Native Conversion Plan - AI Agent Parallel Execution
+# Web App Conversion Plan - AI Agent Parallel Execution
 
-**Project:** Email Helper React Native MVP  
-**Timeline:** 6 weeks (AI-accelerated development)  
+**Project:** Email Helper Web Application MVP  
+**Timeline:** 4-5 weeks (AI-accelerated development)  
 **Approach:** Parallel agent execution with conflict-aware task grouping  
-**Architecture:** FastAPI backend + React Native frontend
+**Architecture:** FastAPI backend + React web frontend
 
 ## Summary
 
-- **Feature:** Convert Tkinter desktop app to React Native mobile app with cloud backend
-- **In scope:** Core email processing, AI classification, task management, mobile UI
+- **Feature:** Convert Tkinter desktop app to modern web application with cloud backend
+- **In scope:** Core email processing, AI classification, task management, responsive web UI
 - **Out of scope:** Advanced reporting, multi-user support, desktop app parity
 
 ## Repo Forecast
 
-- **Likely components/dirs:** `backend/`, `mobile/`, `shared/`, `deployment/`
+- **Likely components/dirs:** `backend/`, `frontend/`, `shared/`, `deployment/`
 - **Predicted file touches (with rationale):**
-  - `backend/api/*.py` — FastAPI REST endpoints
-  - `backend/services/*.py` — Refactored business logic services
-  - `mobile/src/screens/*.tsx` — React Native UI screens
-  - `mobile/src/services/*.ts` — API client and state management
+  - `backend/api/*.py` — FastAPI REST endpoints (already complete)
+  - `backend/services/*.py` — Refactored business logic services (already complete)
+  - `frontend/src/pages/*.tsx` — React web pages and components
+  - `frontend/src/services/*.ts` — API client and state management
   - `shared/types/*.ts` — Shared TypeScript interfaces
-- **Related tests:** `backend/tests/`, `mobile/__tests__/`
-- **CI jobs:** `lint`, `typecheck`, `test-backend`, `test-mobile`, `build-mobile`
-- **CODEOWNERS:** `backend/` → `@backend-agents`, `mobile/` → `@frontend-agents`
+- **Related tests:** `backend/tests/`, `frontend/__tests__/`
+- **CI jobs:** `lint`, `typecheck`, `test-backend`, `test-frontend`, `build-frontend`
+- **CODEOWNERS:** `backend/` → `@backend-agents`, `frontend/` → `@frontend-agents`
 
 ## Tasks
 
@@ -103,69 +103,74 @@
     - **Labels:** `feat`, `backend`, `tasks`
     - **Issue body:** Implement complete task management REST API using existing TaskPersistence and database schema
 
-- **T5. React Native Project Setup** — _Purpose:_ Initialize mobile app with navigation and state
+- **T5. React Web App Setup** — _Purpose:_ Initialize modern web application with routing and state management
   - **Acceptance criteria:**
-    - React Native app runs on iOS/Android simulators
+    - React web app runs in browser with hot reload
     - TypeScript configured with strict mode
-    - React Navigation with tab/stack navigation
+    - React Router for client-side navigation
     - Redux Toolkit with RTK Query for API calls
-  - **Predicted file touches:** `mobile/package.json`, `mobile/src/navigation/`, `mobile/src/store/`
+    - Responsive design with Tailwind CSS or Material-UI
+    - Vite for fast development and building
+  - **Predicted file touches:** `frontend/package.json`, `frontend/src/router/`, `frontend/src/store/`
   - **Risk:** Low
   - **Surface:** safe-isolated
   - **Owner hints:** frontend
   - **GitHub artifacts:**
-    - **Branch:** `feat/rn-setup-t5`
-    - **PR title:** `[feat] Mobile: React Native project initialization`
-    - **Labels:** `feat`, `mobile`, `setup`
-    - **Issue body:** Set up React Native project with TypeScript, navigation, and state management
+    - **Branch:** `feat/web-setup-t5`
+    - **PR title:** `[feat] Web: React web application initialization`
+    - **Labels:** `feat`, `frontend`, `setup`
+    - **Issue body:** Set up React web app with TypeScript, routing, and state management
 
-- **T6. Authentication Flow** — _Purpose:_ Login/logout with secure token storage
+- **T6. Authentication Flow** — _Purpose:_ Login/logout with secure token storage for web
   - **Acceptance criteria:**
-    - Login screen with email/password fields
-    - JWT tokens stored securely in Keychain/Keystore
-    - Auth state persists across app restarts
-    - Logout clears all stored credentials
-  - **Predicted file touches:** `mobile/src/screens/AuthScreen.tsx`, `mobile/src/services/auth.ts`
+    - Login page with email/password fields and validation
+    - JWT tokens stored securely in localStorage/sessionStorage
+    - Auth state persists across browser sessions
+    - Logout clears all stored credentials and redirects to login
+    - Protected routes redirect to login when unauthenticated
+  - **Predicted file touches:** `frontend/src/pages/LoginPage.tsx`, `frontend/src/services/auth.ts`
   - **Risk:** Medium
   - **Surface:** safe-isolated
   - **Owner hints:** frontend
   - **GitHub artifacts:**
     - **Branch:** `feat/auth-flow-t6`
-    - **PR title:** `[feat] Mobile: Authentication flow with secure storage`
-    - **Labels:** `feat`, `mobile`, `auth`
-    - **Issue body:** Implement secure authentication flow with token storage
+    - **PR title:** `[feat] Web: Authentication flow with secure storage`
+    - **Labels:** `feat`, `frontend`, `auth`
+    - **Issue body:** Implement secure web authentication flow with token storage
 
-- **T7. Email List Interface** — _Purpose:_ Display and manage emails in mobile UI
+- **T7. Email List Interface** — _Purpose:_ Display and manage emails in responsive web UI
   - **Acceptance criteria:**
-    - FlatList shows emails with infinite scroll
-    - Swipe gestures for quick actions (archive, delete)
-    - Pull-to-refresh triggers email sync
-    - Search and category filtering functional
-  - **Predicted file touches:** `mobile/src/screens/EmailListScreen.tsx`, `mobile/src/components/EmailItem.tsx`
+    - Email list with virtual scrolling for performance
+    - Hover actions and context menus for quick actions (archive, delete)
+    - Refresh button and auto-refresh triggers email sync
+    - Search bar and category filtering functional
+    - Responsive design works on desktop and tablet
+  - **Predicted file touches:** `frontend/src/pages/EmailListPage.tsx`, `frontend/src/components/EmailItem.tsx`
   - **Risk:** Medium
   - **Surface:** safe-isolated
   - **Owner hints:** frontend
   - **GitHub artifacts:**
     - **Branch:** `feat/email-list-t7`
-    - **PR title:** `[feat] Mobile: Email list with gestures and filtering`
-    - **Labels:** `feat`, `mobile`, `ui`
-    - **Issue body:** Create email list interface with touch gestures and filtering
+    - **PR title:** `[feat] Web: Email list with actions and filtering`
+    - **Labels:** `feat`, `frontend`, `ui`
+    - **Issue body:** Create responsive email list interface with web-optimized interactions
 
-- **T8. Task Management Interface** — _Purpose:_ Mobile task management with touch interactions
+- **T8. Task Management Interface** — _Purpose:_ Web-based task management with rich interactions
   - **Acceptance criteria:**
-    - Task list with swipe-to-complete gestures
-    - Task creation modal from email actions
-    - Due date picker and priority selection
-    - Task filtering by status and category
-  - **Predicted file touches:** `mobile/src/screens/TaskScreen.tsx`, `mobile/src/components/TaskItem.tsx`
+    - Task list with drag-and-drop reordering and bulk actions
+    - Task creation modal/form from email actions and standalone
+    - Date picker component and priority selection dropdown
+    - Advanced filtering by status, category, due date, and priority
+    - Keyboard shortcuts for power users
+  - **Predicted file touches:** `frontend/src/pages/TaskPage.tsx`, `frontend/src/components/TaskItem.tsx`
   - **Risk:** Medium
   - **Surface:** safe-isolated
   - **Owner hints:** frontend
   - **GitHub artifacts:**
     - **Branch:** `feat/task-ui-t8`
-    - **PR title:** `[feat] Mobile: Task management interface`
-    - **Labels:** `feat`, `mobile`, `tasks`
-    - **Issue body:** Build mobile task management with touch-optimized interactions
+    - **PR title:** `[feat] Web: Task management interface`
+    - **Labels:** `feat`, `frontend`, `tasks`
+    - **Issue body:** Build comprehensive web task management with rich interactions
 
 - **T9. Email Processing Pipeline** — _Purpose:_ Background email processing with real-time updates
   - **Acceptance criteria:**
@@ -201,26 +206,26 @@
 
 ## Dependencies (DAG)
 
-- `T1 → T2` — Email service needs API foundation
-- `T1 → T3` — AI service needs API foundation  
-- `T1 → T4` — Task API needs API foundation
+- ✅ `T1 → T2` — Email service needs API foundation (COMPLETE)
+- ✅ `T1 → T3` — AI service needs API foundation (COMPLETE)  
+- ✅ `T1 → T4` — Task API needs API foundation (COMPLETE)
 - `T2 → T9` — Email processing needs email service
 - `T3 → T9` — Email processing needs AI service
-- `T5 → T6` — Auth flow needs RN project setup
-- `T5 → T7` — Email UI needs RN project setup
-- `T5 → T8` — Task UI needs RN project setup
+- `T5 → T6` — Auth flow needs web app setup
+- `T5 → T7` — Email UI needs web app setup  
+- `T5 → T8` — Task UI needs web app setup
 
 ## Parallel Blocks
 
-- **Block A - Backend Foundation** _(run in parallel with other Blocks; conflict risk: Low)_
+- **Block A - Backend Foundation** _(COMPLETE ✅)_
   - **Rationale:** Core API services with minimal shared dependencies
-  - **Tasks:** `T1`, `T2`, `T3`, `T4` (T1 must complete first, then T2-T4 in parallel)
-  - **Notes:** T1 creates foundation, then T2-T4 can run simultaneously
+  - **Tasks:** ✅ `T1`, `T2`, `T3`, `T4` (T1 completed first, then T2-T4 completed in parallel)
+  - **Notes:** All backend APIs are now functional and ready for web frontend
 
-- **Block B - React Native Foundation** _(run in parallel with Block A; conflict risk: Low)_
-  - **Rationale:** Mobile app setup independent of backend details
+- **Block B - Web App Foundation** _(ready to start)_
+  - **Rationale:** Web app setup independent of backend details
   - **Tasks:** `T5`, `T6`, `T7`, `T8` (T5 must complete first, then T6-T8 in parallel)
-  - **Notes:** T5 creates RN foundation, then mobile screens can be built simultaneously
+  - **Notes:** T5 creates React web foundation, then web components can be built simultaneously
 
 - **Block C - Integration Layer** _(depends on Blocks A+B; conflict risk: Medium)_
   - **Rationale:** Requires both backend and frontend to be functional
@@ -234,16 +239,16 @@
 
 ## Scheduling Plan
 
-- **Day-0 startables:** `T1` (API Foundation), `T5` (RN Setup), `T10` (Deployment Config)
+- **Completed:** ✅ `T1` (API Foundation), ✅ `T2`, ✅ `T3`, ✅ `T4` (Backend complete)
+- **Ready to start:** `T5` (Web App Setup), `T10` (Deployment Config)
 - **Gated tasks:** 
-  - `T2`, `T3`, `T4` (depends on `T1`, gate: API foundation)
-  - `T6`, `T7`, `T8` (depends on `T5`, gate: RN foundation)
-  - `T9` (depends on `T2`, `T3`, gate: email and AI services)
+  - `T6`, `T7`, `T8` (depends on `T5`, gate: Web app foundation)
+  - `T9` (depends on `T2`, `T3`, gate: email and AI services - ready to start)
 - **Agent allocation:** 
-  - Block A (2 agents: 1 for T1, then split T2-T4)
-  - Block B (2 agents: 1 for T5, then split T6-T8)
-  - Block C (1 agent: T9 integration work)
-  - Block D (1 agent: T10 deployment)
+  - Block A (COMPLETE ✅): T1-T4 backend APIs functional
+  - Block B (ready): 2 agents for T5 setup, then split T6-T8 components
+  - Block C (ready): 1 agent for T9 integration work (backend ready)
+  - Block D (ready): 1 agent for T10 deployment
 
 ## Risks & Mitigations
 
@@ -261,32 +266,34 @@
 - **Microsoft Graph API** - Replace Outlook COM
 
 ### Frontend  
-- **React Native** with **TypeScript**
+- **React** with **TypeScript** - Modern web framework
+- **Vite** - Fast build tool and dev server
 - **Redux Toolkit + RTK Query** - State and API management
-- **React Navigation** - Mobile navigation
-- **Native UI components** - Platform-specific look/feel
+- **React Router** - Web app navigation
+- **Tailwind CSS** or **Material-UI** - Responsive styling
 
 ### Deployment
 - **Docker** containers for backend
 - **Railway/Render** for quick cloud deployment
-- **Expo** for mobile app distribution (faster than app stores)
+- **Vercel/Netlify** for web app deployment (static hosting)
 
 ## Timeline Summary
 
-| Week | Block A (Backend) | Block B (Mobile) | Block C (Integration) | Block D (Deploy) |
+| Week | Block A (Backend) | Block B (Web App) | Block C (Integration) | Block D (Deploy) |
 |------|------------------|------------------|---------------------|------------------|
-| **1** | T1: API Foundation | T5: RN Setup | - | T10: Docker Config |
-| **2** | T2,T3,T4: Services | T6,T7,T8: UI Screens | - | Continue T10 |
-| **3** | Continue T2-T4 | Continue T6-T8 | - | Deploy staging |
-| **4** | Testing & Polish | Testing & Polish | T9: Integration | Deploy production |
-| **5** | Bug fixes | Bug fixes | Testing | User migration |
-| **6** | **MVP COMPLETE** | **MVP COMPLETE** | **MVP COMPLETE** | **MVP COMPLETE** |
+| **1** | ✅ T1: API Foundation | T5: Web App Setup | - | T10: Docker Config |
+| **2** | ✅ T2,T3,T4: Services | T6,T7,T8: Web Components | T9: Integration | Continue T10 |
+| **3** | ✅ COMPLETE | Continue T6-T8 | Continue T9 | Deploy staging |
+| **4** | ✅ COMPLETE | Testing & Polish | Testing | Deploy production |
+| **5** | ✅ COMPLETE | Bug fixes | Bug fixes | User migration |
+| **6** | ✅ **COMPLETE** | **MVP COMPLETE** | **MVP COMPLETE** | **MVP COMPLETE** |
 
 **Total Duration: 6 weeks for fully functional MVP**
 
 ## Success Metrics
 
-- **Week 2:** Backend API serves email data, Mobile app displays emails
+- **Week 1:** ✅ Backend API serves email data (COMPLETE)
+- **Week 2:** Web app displays emails, Authentication working
 - **Week 4:** End-to-end email processing working, Task management functional  
 - **Week 6:** Production deployment, first users migrated from desktop app
 
@@ -332,7 +339,7 @@
 - **Week 4:** MVP feature complete, deployment readiness check
 
 ### Success Gates
-- **Week 1:** API foundation serving health checks, RN app building successfully
+- **Week 1:** ✅ API foundation serving health checks, Web app building successfully
 - **Week 2:** Email data flowing through API, Mobile screens displaying sample data  
 - **Week 3:** Full email processing pipeline, Task management UI functional
 - **Week 4:** End-to-end integration, WebSocket real-time updates working
