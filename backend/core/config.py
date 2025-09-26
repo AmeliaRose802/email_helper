@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     azure_openai_deployment: str = "gpt-4o"
     azure_openai_api_version: str = "2024-02-01"
     
+    # Microsoft Graph API settings
+    graph_client_id: Optional[str] = None
+    graph_client_secret: Optional[str] = None
+    graph_tenant_id: Optional[str] = None
+    graph_redirect_uri: str = "http://localhost:8000/auth/callback"
+    
     model_config = {
         "env_file": ".env",
         "case_sensitive": False
