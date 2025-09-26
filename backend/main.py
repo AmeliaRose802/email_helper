@@ -130,6 +130,10 @@ app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 from backend.api import emails
 app.include_router(emails.router, prefix="/api", tags=["emails"])
 
+# Import and include AI router (T3)
+from backend.api import ai
+app.include_router(ai.router, prefix="/api", tags=["ai"])
+
 
 # Service factory integration for existing services
 def get_service_factory():
