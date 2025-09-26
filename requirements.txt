@@ -15,6 +15,9 @@ azure-identity>=1.15.0         # Azure authentication using DefaultAzureCredenti
 # nltk>=3.8                     # Natural language processing
 # scikit-learn>=1.3.0          # Machine learning for classification enhancement
 
+# Visualization
+matplotlib>=3.7.0              # Chart visualization for accuracy dashboard
+
 # Development and testing
 pytest>=7.0.0                  # Testing framework
 pytest-mock>=3.10.0           # Enhanced mocking capabilities

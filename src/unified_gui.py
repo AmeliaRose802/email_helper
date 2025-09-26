@@ -36,6 +36,19 @@ import webbrowser
 import sys
 import re
 
+# Matplotlib imports for chart visualization
+try:
+    import matplotlib
+    matplotlib.use('TkAgg')  # Use TkAgg backend for tkinter integration
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+    from matplotlib.figure import Figure
+    import matplotlib.dates as mdates
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+    print("⚠️ Matplotlib not available. Charts will show placeholder text.")
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from outlook_manager import OutlookManager
@@ -596,16 +609,45 @@ class UnifiedEmailGUI:
         ttk.Button(controls_frame, text="Update Chart", 
                   command=self.update_trends_chart).pack(side=tk.LEFT, padx=20)
         
-        # Chart area placeholder
+        # Chart area
         self.trends_chart_frame = ttk.LabelFrame(self.trends_frame, text="Accuracy Trends Over Time", padding="10")
         self.trends_chart_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
-        self.trends_chart_label = ttk.Label(self.trends_chart_frame, 
-                                           text="📈 Chart will appear here after clicking 'Update Chart'\n\n" +
-                                                "This will show accuracy trends over time with configurable granularity.",
-                                           font=("Segoe UI", 11),
-                                           anchor="center")
-        self.trends_chart_label.pack(expand=True)
+        # Initialize chart placeholder
+        self.chart_canvas = None
+        self.chart_toolbar = None
+        
+        if MATPLOTLIB_AVAILABLE:
+            # Create matplotlib figure
+            self.trends_figure = Figure(figsize=(10, 6), dpi=100)
+            self.trends_plot = self.trends_figure.add_subplot(111)
+            
+            # Create canvas for matplotlib
+            self.chart_canvas = FigureCanvasTkAgg(self.trends_figure, self.trends_chart_frame)
+            self.chart_canvas.draw()
+            self.chart_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            
+            # Add navigation toolbar
+            toolbar_frame = ttk.Frame(self.trends_chart_frame)
+            toolbar_frame.pack(fill=tk.X, pady=(5, 0))
+            self.chart_toolbar = NavigationToolbar2Tk(self.chart_canvas, toolbar_frame)
+            self.chart_toolbar.update()
+            
+            # Initial empty chart
+            self.trends_plot.text(0.5, 0.5, 'Click "Update Chart" to display accuracy trends', 
+                                 horizontalalignment='center', verticalalignment='center', 
+                                 transform=self.trends_plot.transAxes, fontsize=12)
+            self.trends_plot.set_title('Accuracy Trends Over Time')
+            self.trends_figure.tight_layout()
+        else:
+            # Fallback to label if matplotlib not available
+            self.trends_chart_label = ttk.Label(self.trends_chart_frame, 
+                                               text="📈 Chart will appear here after clicking 'Update Chart'\n\n" +
+                                                    "This will show accuracy trends over time with configurable granularity.\n\n" +
+                                                    "⚠️ Matplotlib not available for chart visualization.",
+                                               font=("Segoe UI", 11),
+                                               anchor="center")
+            self.trends_chart_label.pack(expand=True)
     
     def create_categories_view(self):
         """Create the category performance view"""
@@ -1252,7 +1294,7 @@ class UnifiedEmailGUI:
             self.activity_text.insert(tk.END, f"Error loading metrics: {str(e)}")
     
     def update_trends_chart(self, event=None):
-        """Update the trends chart (placeholder for now)"""
+        """Update the trends chart with matplotlib visualization"""
         try:
             if not hasattr(self, 'accuracy_tracker'):
                 self.refresh_accuracy_data()
@@ -1280,22 +1322,98 @@ class UnifiedEmailGUI:
             # Get time series data
             ts_data = self.accuracy_tracker.get_time_series_data(start_date, end_date, granularity)
             
-            # Update chart placeholder
-            if ts_data.empty:
-                chart_text = f"📈 No data available for {time_range} with {granularity} granularity\n\n" + \
-                           "Process some emails to generate accuracy trends data."
+            if MATPLOTLIB_AVAILABLE and hasattr(self, 'trends_plot'):
+                # Clear previous plot
+                self.trends_plot.clear()
+                
+                if ts_data.empty:
+                    # Show no data message
+                    self.trends_plot.text(0.5, 0.5, f'📈 No data available for {time_range}\nwith {granularity} granularity\n\nProcess some emails to generate accuracy trends data.', 
+                                         horizontalalignment='center', verticalalignment='center', 
+                                         transform=self.trends_plot.transAxes, fontsize=12)
+                    self.trends_plot.set_title('Accuracy Trends Over Time - No Data')
+                else:
+                    # Create the accuracy trend chart
+                    dates = ts_data.index
+                    accuracy_rates = ts_data['accuracy_rate']
+                    
+                    # Plot accuracy trend line
+                    self.trends_plot.plot(dates, accuracy_rates, marker='o', linewidth=2, markersize=6, 
+                                         color='#2E86AB', markerfacecolor='#A23B72', markeredgecolor='white', markeredgewidth=1)
+                    
+                    # Fill area under the curve for visual appeal
+                    self.trends_plot.fill_between(dates, accuracy_rates, alpha=0.3, color='#2E86AB')
+                    
+                    # Customize the plot
+                    self.trends_plot.set_title(f'Accuracy Trends - {time_range} ({granularity})', fontsize=14, fontweight='bold', pad=20)
+                    self.trends_plot.set_ylabel('Accuracy Rate (%)', fontsize=12)
+                    self.trends_plot.set_xlabel('Date', fontsize=12)
+                    
+                    # Format y-axis to show percentages
+                    self.trends_plot.set_ylim(max(0, accuracy_rates.min() - 5), min(100, accuracy_rates.max() + 5))
+                    self.trends_plot.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0f}%'))
+                    
+                    # Format x-axis dates
+                    if granularity == 'daily':
+                        self.trends_plot.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+                        self.trends_plot.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, len(dates)//10)))
+                    elif granularity == 'weekly':
+                        self.trends_plot.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+                        self.trends_plot.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
+                    else:  # monthly
+                        self.trends_plot.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+                        self.trends_plot.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+                    
+                    # Rotate date labels for better readability
+                    plt.setp(self.trends_plot.xaxis.get_majorticklabels(), rotation=45, ha='right')
+                    
+                    # Add grid for better readability
+                    self.trends_plot.grid(True, alpha=0.3, linestyle='--')
+                    
+                    # Add data point annotations for small datasets
+                    if len(dates) <= 10:
+                        for i, (date, rate) in enumerate(zip(dates, accuracy_rates)):
+                            self.trends_plot.annotate(f'{rate:.1f}%', 
+                                                     (date, rate), 
+                                                     textcoords="offset points", 
+                                                     xytext=(0,10), 
+                                                     ha='center', fontsize=9)
+                    
+                    # Add statistics text box
+                    stats_text = f'Data Points: {len(ts_data)}\nRange: {accuracy_rates.min():.1f}% - {accuracy_rates.max():.1f}%\nAverage: {accuracy_rates.mean():.1f}%'
+                    self.trends_plot.text(0.02, 0.98, stats_text, transform=self.trends_plot.transAxes, 
+                                         verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+                
+                # Apply tight layout and refresh canvas
+                self.trends_figure.tight_layout()
+                self.chart_canvas.draw()
+                
             else:
-                chart_text = f"📈 Trends for {time_range} ({granularity} granularity)\n\n" + \
-                           f"Data Points: {len(ts_data)}\n" + \
-                           f"Accuracy Range: {ts_data['accuracy_rate'].min():.1f}% - {ts_data['accuracy_rate'].max():.1f}%\n" + \
-                           f"Average: {ts_data['accuracy_rate'].mean():.1f}%\n\n" + \
-                           "📊 Chart visualization requires matplotlib integration\n" + \
-                           "(Coming in next phase of development)"
-            
-            self.trends_chart_label.config(text=chart_text)
+                # Fallback for when matplotlib is not available
+                if hasattr(self, 'trends_chart_label'):
+                    if ts_data.empty:
+                        chart_text = f"📈 No data available for {time_range} with {granularity} granularity\n\n" + \
+                                   "Process some emails to generate accuracy trends data."
+                    else:
+                        chart_text = f"📈 Trends for {time_range} ({granularity} granularity)\n\n" + \
+                                   f"Data Points: {len(ts_data)}\n" + \
+                                   f"Accuracy Range: {ts_data['accuracy_rate'].min():.1f}% - {ts_data['accuracy_rate'].max():.1f}%\n" + \
+                                   f"Average: {ts_data['accuracy_rate'].mean():.1f}%\n\n" + \
+                                   "⚠️ Matplotlib not available for chart visualization"
+                    
+                    self.trends_chart_label.config(text=chart_text)
             
         except Exception as e:
-            self.trends_chart_label.config(text=f"Error loading trends: {str(e)}")
+            error_msg = f"Error loading trends: {str(e)}"
+            if MATPLOTLIB_AVAILABLE and hasattr(self, 'trends_plot'):
+                self.trends_plot.clear()
+                self.trends_plot.text(0.5, 0.5, f'❌ Error loading chart:\n{str(e)}', 
+                                     horizontalalignment='center', verticalalignment='center', 
+                                     transform=self.trends_plot.transAxes, fontsize=12, color='red')
+                self.trends_plot.set_title('Chart Error')
+                self.chart_canvas.draw()
+            elif hasattr(self, 'trends_chart_label'):
+                self.trends_chart_label.config(text=error_msg)
     
     def update_category_analysis(self, event=None):
         """Update the category performance analysis"""
