@@ -332,6 +332,12 @@ class UnifiedEmailGUI:
         ttk.Button(control_frame, text="Mark Tasks Complete", 
                   command=self.show_task_completion_dialog).pack(side=tk.LEFT, padx=5)
         
+        ttk.Button(control_frame, text="Clear Newsletters", 
+                  command=self._dismiss_all_newsletters).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(control_frame, text="Clear Optional Events", 
+                  command=self._dismiss_all_optional_events).pack(side=tk.LEFT, padx=5)
+        
         ttk.Button(control_frame, text="Process New Batch", 
                   command=self.start_new_session).pack(side=tk.LEFT, padx=5)
         
@@ -3592,6 +3598,20 @@ This will help keep your inbox focused on actionable items only."""
                 self._refresh_summary_after_dismiss()
             else:
                 messagebox.showinfo("No Items", "No newsletter items to clear.")
+    
+    def _dismiss_all_optional_events(self):
+        """Dismiss all optional event items from persistent storage and refresh summary"""
+        result = messagebox.askyesno("Clear Optional Events", 
+                                   "Clear all optional event items?\n\n"
+                                   "This will remove all optional events from your summary.")
+        if result:
+            cleared_count = self.task_persistence.clear_optional_events()
+            if cleared_count > 0:
+                messagebox.showinfo("Optional Events Cleared", f"Cleared {cleared_count} optional event items.")
+                # Refresh the summary to show the changes - use outstanding tasks only
+                self._refresh_summary_after_dismiss()
+            else:
+                messagebox.showinfo("No Items", "No optional event items to clear.")
     
     def _refresh_summary_after_dismiss(self):
         """Refresh summary display after dismissing items"""

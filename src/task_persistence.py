@@ -476,6 +476,25 @@ class TaskPersistence:
         
         return cleared_count
     
+    def clear_optional_events(self) -> int:
+        """Clear all optional event items from persistent storage"""
+        outstanding_tasks = self.load_outstanding_tasks()
+        cleared_count = len(outstanding_tasks.get('optional_events', []))
+        
+        if cleared_count > 0:
+            outstanding_tasks['optional_events'] = []
+            
+            # Save updated tasks
+            batch_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self._save_tasks_to_file(self.tasks_file, {
+                'last_updated': batch_timestamp,
+                'tasks': outstanding_tasks
+            })
+            
+            print(f"🗑️ Cleared {cleared_count} optional event items from persistent storage")
+        
+        return cleared_count
+    
     def clear_both_fyi_and_newsletters(self) -> tuple:
         """Clear both FYI and newsletter items from persistent storage"""
         outstanding_tasks = self.load_outstanding_tasks()
