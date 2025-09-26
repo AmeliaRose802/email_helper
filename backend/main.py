@@ -126,6 +126,10 @@ async def root():
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 
+# Import and include email router
+from backend.api import emails
+app.include_router(emails.router, prefix="/api", tags=["emails"])
+
 
 # Service factory integration for existing services
 def get_service_factory():
