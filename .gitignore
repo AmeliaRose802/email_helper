@@ -30,6 +30,22 @@ test/test_data/*/
 azure_credentials.json
 azure_config.json
 
+# Frontend build output
+frontend/dist/
+frontend/build/
+
+# Frontend dependencies
+frontend/node_modules/
+
+# Frontend local config
+frontend/.env.local
+frontend/.env.production.local
+
+# Playwright test results and artifacts
+/tmp/playwright-logs/
+frontend/test-results/
+frontend/playwright-report/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -78,7 +94,7 @@ htmlcov/
 nosetests.xml
 coverage.xml
 *.cover
-*.py.cover
+*.py,cover
 .hypothesis/
 .pytest_cache/
 cover/
