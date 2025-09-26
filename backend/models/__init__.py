@@ -8,6 +8,12 @@ from .graph_email import (
     GraphEmailBody, EmailNormalizer, GraphAuthResponse, GraphAuthRequest, 
     GraphErrorResponse
 )
+from .ai_models import (
+    EmailClassificationRequest, EmailClassificationResponse,
+    ActionItemRequest, ActionItemResponse,
+    SummaryRequest, SummaryResponse,
+    AIErrorResponse, AvailableTemplatesResponse
+)
 
 __all__ = [
     "User", "UserCreate", "UserLogin", "UserInDB", "Token", "TokenData",
@@ -16,5 +22,9 @@ __all__ = [
     "Task", "TaskCreate", "TaskUpdate", "TaskInDB",
     "GraphMessage", "GraphMailFolder", "GraphEmailAddress", "GraphRecipient",
     "GraphEmailBody", "EmailNormalizer", "GraphAuthResponse", "GraphAuthRequest",
-    "GraphErrorResponse"
+    "GraphErrorResponse",
+    "EmailClassificationRequest", "EmailClassificationResponse",
+    "ActionItemRequest", "ActionItemResponse",
+    "SummaryRequest", "SummaryResponse",
+    "AIErrorResponse", "AvailableTemplatesResponse"
 ]
