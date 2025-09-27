@@ -108,6 +108,32 @@ export const taskApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    // Move task to different status (for drag-and-drop)
+    moveTask: builder.mutation<Task, { id: string; status: 'todo' | 'in-progress' | 'review' | 'done' }>({
+      query: ({ id, status }) => ({
+        url: `/api/tasks/${id}/status`,
+        method: 'PUT',
+        body: { status },
+      }),
+      // Optimistic update for immediate UI feedback
+      onQueryStarted({ id, status }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          taskApi.util.updateQueryData('getTasks', {}, (draft) => {
+            const task = draft.tasks.find(t => t.id === id);
+            if (task) {
+              task.status = status;
+            }
+          })
+        );
+        queryFulfilled.catch(patchResult.undo);
+      },
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'Task', id },
+        { type: 'Task', id: 'LIST' },
+        { type: 'Task', id: 'STATS' },
+      ],
+    }),
+
     // Create task from email
     createTaskFromEmail: builder.mutation<
       Task,
@@ -141,5 +167,6 @@ export const {
   useGetTaskStatsQuery,
   useBatchUpdateTasksMutation,
   useCompleteTaskMutation,
+  useMoveTaskMutation,
   useCreateTaskFromEmailMutation,
 } = taskApi;
