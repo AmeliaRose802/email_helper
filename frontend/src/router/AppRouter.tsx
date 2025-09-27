@@ -5,6 +5,7 @@ import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import Dashboard from '@/pages/Dashboard';
 import EmailList from '@/pages/EmailList';
+import EmailDetail from '@/pages/EmailDetail';
 import TaskList from '@/pages/TaskList';
 import Login from '@/pages/Login';
 import Settings from '@/pages/Settings';
@@ -32,7 +33,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'emails/:id',
-        element: <div>Email Detail (T7)</div>, // Placeholder for T7
+        element: <EmailDetail />,
       },
       {
         path: 'tasks',
