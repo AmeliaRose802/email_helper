@@ -4,7 +4,7 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'todo' | 'in-progress' | 'review' | 'done';
   priority: 'high' | 'medium' | 'low';
   category: 'required_action' | 'team_action' | 'job_listing' | 'optional_event' | 'fyi';
   due_date?: string;
@@ -13,6 +13,7 @@ export interface Task {
   email_id?: string;
   metadata?: Record<string, unknown>;
   tags?: string[];
+  progress?: number; // Progress percentage 0-100
 }
 
 export interface TaskCreate {
@@ -29,21 +30,24 @@ export interface TaskCreate {
 export interface TaskUpdate {
   title?: string;
   description?: string;
-  status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  status?: 'todo' | 'in-progress' | 'review' | 'done';
   priority?: 'high' | 'medium' | 'low';
   due_date?: string;
   metadata?: Record<string, unknown>;
   tags?: string[];
+  progress?: number;
 }
 
 export interface TaskFilter {
-  status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  status?: 'todo' | 'in-progress' | 'review' | 'done';
   priority?: 'high' | 'medium' | 'low';
   category?: 'required_action' | 'team_action' | 'job_listing' | 'optional_event' | 'fyi';
   due_date_from?: string;
   due_date_to?: string;
   email_id?: string;
   tags?: string[];
+  search?: string;
+  overdue?: boolean;
 }
 
 export interface TaskListResponse {
