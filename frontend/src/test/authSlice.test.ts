@@ -9,7 +9,6 @@ import authReducer, {
   initializeAuth 
 } from '@/store/authSlice';
 import { tokenStorage } from '@/services/tokenStorage';
-import type { AuthState } from '@/types/auth';
 
 // Mock the token storage
 vi.mock('@/services/tokenStorage', () => ({
@@ -64,7 +63,7 @@ describe('authSlice', () => {
 
   describe('initial state', () => {
     it('should initialize with unauthenticated state when no valid tokens', () => {
-      const state = store.getState().auth;
+      const state = (store.getState() as any).auth;
       expect(state.isAuthenticated).toBe(false);
       expect(state.user).toBeNull();
       expect(state.token).toBeNull();
@@ -95,7 +94,7 @@ describe('authSlice', () => {
         }
       }));
 
-      const state = store.getState().auth;
+      const state = (store.getState() as any).auth;
       expect(state.isAuthenticated).toBe(true);
       expect(state.token).toBe(mockTokens.accessToken);
       expect(state.refreshToken).toBe(mockTokens.refreshToken);
@@ -105,7 +104,7 @@ describe('authSlice', () => {
   describe('synchronous actions', () => {
     it('should handle loginStart', () => {
       store.dispatch(loginStart());
-      const state = store.getState().auth;
+      const state = (store.getState() as any).auth;
       
       expect(state.isLoading).toBe(true);
       expect(state.error).toBeNull();
@@ -117,7 +116,7 @@ describe('authSlice', () => {
         tokens: mockTokens, 
         remember: true 
       }));
-      const state = store.getState().auth;
+      const state = (store.getState() as any).auth;
       
       expect(state.user).toEqual(mockUser);
       expect(state.token).toBe(mockTokens.access_token);
@@ -151,7 +150,7 @@ describe('authSlice', () => {
     it('should handle loginFailure', () => {
       const errorMessage = 'Invalid credentials';
       store.dispatch(loginFailure(errorMessage));
-      const state = store.getState().auth;
+      const state = (store.getState() as any).auth;
       
       expect(state.user).toBeNull();
       expect(state.token).toBeNull();
@@ -170,7 +169,7 @@ describe('authSlice', () => {
       
       // Then logout
       store.dispatch(logout());
-      const state = store.getState().auth;
+      const state = (store.getState() as any).auth;
       
       expect(state.user).toBeNull();
       expect(state.token).toBeNull();
@@ -201,10 +200,10 @@ describe('authSlice', () => {
         json: () => Promise.resolve(mockUser),
       } as Response);
 
-      const result = await store.dispatch(initializeAuth());
+      const result = await (store.dispatch as any)(initializeAuth());
       expect(result.type).toBe('auth/initialize/fulfilled');
       
-      const state = store.getState().auth;
+      const state = (store.getState() as any).auth;
       expect(state.isAuthenticated).toBe(true);
       expect(state.user).toEqual(mockUser);
       expect(state.isLoading).toBe(false);
@@ -218,11 +217,11 @@ describe('authSlice', () => {
       });
       vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
 
-      const result = await store.dispatch(initializeAuth());
+      const result = await (store.dispatch as any)(initializeAuth());
       expect(result.type).toBe('auth/initialize/fulfilled');
       expect(result.payload).toBeNull();
       
-      const state = store.getState().auth;
+      const state = (store.getState() as any).auth;
       expect(state.isAuthenticated).toBe(false);
       expect(tokenStorage.clearTokens).toHaveBeenCalled();
     });
@@ -230,11 +229,11 @@ describe('authSlice', () => {
     it('should handle initialization with no tokens', async () => {
       vi.mocked(tokenStorage.getTokens).mockReturnValue(null);
 
-      const result = await store.dispatch(initializeAuth());
+      const result = await (store.dispatch as any)(initializeAuth());
       expect(result.type).toBe('auth/initialize/fulfilled');
       expect(result.payload).toBeNull();
       
-      const state = store.getState().auth;
+      const state = (store.getState() as any).auth;
       expect(state.isAuthenticated).toBe(false);
     });
 
@@ -250,11 +249,11 @@ describe('authSlice', () => {
         status: 401,
       } as Response);
 
-      const result = await store.dispatch(initializeAuth());
+      const result = await (store.dispatch as any)(initializeAuth());
       expect(result.type).toBe('auth/initialize/fulfilled');
       expect(result.payload).toBeNull();
       
-      const state = store.getState().auth;
+      const state = (store.getState() as any).auth;
       expect(state.isAuthenticated).toBe(false);
       expect(tokenStorage.clearTokens).toHaveBeenCalled();
     });
@@ -268,10 +267,10 @@ describe('authSlice', () => {
       
       vi.mocked(global.fetch).mockRejectedValue(new Error('Network error'));
 
-      const result = await store.dispatch(initializeAuth());
+      const result = await (store.dispatch as any)(initializeAuth());
       expect(result.type).toBe('auth/initialize/rejected');
       
-      const state = store.getState().auth;
+      const state = (store.getState() as any).auth;
       expect(state.isAuthenticated).toBe(false);
       expect(state.error).toBe('Session initialization failed');
       expect(tokenStorage.clearTokens).toHaveBeenCalled();
