@@ -15,6 +15,10 @@ const router = createBrowserRouter([
     element: <Login />,
   },
   {
+    path: '/demo-tasks',
+    element: <TaskList />, // Temporary unprotected route for demo
+  },
+  {
     path: '/',
     element: (
       <ProtectedRoute>
