@@ -1,18 +1,14 @@
 // Main layout component with navigation
 import React from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAppSelector, useAppDispatch } from '@/hooks/redux';
-import { logout } from '@/store/authSlice';
+import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 const Layout: React.FC = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, logout } = useAuth();
 
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate('/login');
+  const handleLogout = async () => {
+    await logout();
   };
 
   const isActiveRoute = (path: string) => {
@@ -31,7 +27,12 @@ const Layout: React.FC = () => {
             {user && (
               <>
                 <span className="user-greeting">Welcome, {user.username}</span>
-                <button onClick={handleLogout} className="logout-button">
+                <button 
+                  onClick={handleLogout} 
+                  className="logout-button"
+                  type="button"
+                  aria-label="Sign out"
+                >
                   Logout
                 </button>
               </>
