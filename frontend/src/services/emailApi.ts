@@ -26,6 +26,21 @@ export const emailApi = apiSlice.injectEndpoints({
           : [{ type: 'Email', id: 'LIST' }],
     }),
 
+    // Search emails
+    searchEmails: builder.query<EmailListResponse, { query: string; page?: number; per_page?: number }>({
+      query: ({ query, page = 1, per_page = 20 }) => ({
+        url: '/api/emails/search',
+        params: { q: query, page, per_page },
+      }),
+      providesTags: (result) =>
+        result?.emails
+          ? [
+              ...result.emails.map(({ id }) => ({ type: 'Email' as const, id })),
+              { type: 'Email', id: 'SEARCH' },
+            ]
+          : [{ type: 'Email', id: 'SEARCH' }],
+    }),
+
     // Get individual email by ID
     getEmailById: builder.query<Email, string>({
       query: (id) => `/api/emails/${id}`,
@@ -98,6 +113,7 @@ export const emailApi = apiSlice.injectEndpoints({
 
 export const {
   useGetEmailsQuery,
+  useSearchEmailsQuery,
   useGetEmailByIdQuery,
   useGetEmailStatsQuery,
   useBatchEmailOperationMutation,
