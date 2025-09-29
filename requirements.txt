@@ -18,8 +18,14 @@ azure-identity>=1.15.0         # Azure authentication using DefaultAzureCredenti
 # Visualization
 matplotlib>=3.7.0              # Chart visualization for accuracy dashboard
 
+# Background processing and real-time updates
+celery>=5.3.0                  # Background job processing
+redis>=5.0.0                   # Job queue and caching
+websockets>=12.0               # Real-time WebSocket communication
+
 # Development and testing
 pytest>=7.0.0                  # Testing framework
 pytest-mock>=3.10.0           # Enhanced mocking capabilities
 pytest-cov>=4.0.0             # Coverage reporting
+pytest-asyncio>=0.21.0        # Async testing support
 black>=23.0.0                  # Code formatting (optional)

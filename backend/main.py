@@ -138,6 +138,10 @@ app.include_router(ai.router, prefix="/api", tags=["ai"])
 from backend.api import tasks
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 
+# Import and include processing router (T9)
+from backend.api import processing
+app.include_router(processing.router, prefix="/api", tags=["processing"])
+
 
 # Service factory integration for existing services
 def get_service_factory():
