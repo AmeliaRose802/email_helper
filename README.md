@@ -1,5 +1,7 @@
 # Email Helper - AI-Powered Email Management System
 
+This repo is an experiment in vibe codign with no human intervention. Please do not take it as reflective of my general code quality practices
+
 An intelligent email classification and management system designed for professionals with ADHD who need focused, actionable email summaries.
 
 ## 🚀 Quick Setup
