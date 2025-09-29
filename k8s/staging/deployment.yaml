@@ -1,0 +1,156 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: email-helper-staging
+  labels:
+    name: email-helper-staging
+    environment: staging
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: email-helper-secrets
+  namespace: email-helper-staging
+type: Opaque
+stringData:
+  # Staging secrets
+  database-url: "postgresql://user:password@postgres-service:5432/email_helper_staging"
+  redis-url: "redis://redis-service:6379"
+  azure-openai-endpoint: "https://your-resource.openai.azure.com/"
+  azure-openai-key: "your-azure-openai-key"
+  graph-client-id: "your-client-id"
+  graph-client-secret: "your-client-secret"
+  graph-tenant-id: "your-tenant-id"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: email-helper-api
+  namespace: email-helper-staging
+  labels:
+    app: email-helper-api
+    tier: backend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: email-helper-api
+  template:
+    metadata:
+      labels:
+        app: email-helper-api
+        tier: backend
+    spec:
+      containers:
+      - name: api
+        image: ghcr.io/ameliarose802/email_helper:IMAGE_TAG
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: APP_NAME
+          value: "Email Helper API - Staging"
+        - name: DEBUG
+          value: "true"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: email-helper-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: email-helper-secrets
+              key: redis-url
+        - name: AZURE_OPENAI_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: email-helper-secrets
+              key: azure-openai-endpoint
+        - name: AZURE_OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: email-helper-secrets
+              key: azure-openai-key
+        - name: GRAPH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: email-helper-secrets
+              key: graph-client-id
+        - name: GRAPH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: email-helper-secrets
+              key: graph-client-secret
+        - name: GRAPH_TENANT_ID
+          valueFrom:
+            secretKeyRef:
+              name: email-helper-secrets
+              key: graph-tenant-id
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "125m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      imagePullSecrets:
+      - name: ghcr-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: email-helper-api-service
+  namespace: email-helper-staging
+spec:
+  type: ClusterIP
+  selector:
+    app: email-helper-api
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: email-helper-ingress
+  namespace: email-helper-staging
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: staging-api.emailhelper.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: email-helper-api-service
+            port:
+              number: 8000
