@@ -4,12 +4,35 @@ An intelligent email classification and management system designed for professio
 
 ## 🚀 Quick Setup
 
-### 1. Install Dependencies
+### For Web Application (Recommended)
+
+```bash
+# 1. Clone repository
+git clone https://github.com/AmeliaRose802/email_helper.git
+cd email_helper
+
+# 2. Set up environment
+cp .env.docker .env
+# Edit .env with your configuration
+
+# 3. Start with Docker Compose
+docker-compose up -d
+
+# 4. Access the application
+# Frontend: http://localhost
+# API Docs: http://localhost:8000/docs
+```
+
+**See**: [QUICKSTART.md](./QUICKSTART.md) for detailed setup instructions.
+
+### For Desktop Application (Legacy)
+
+#### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure Azure Authentication
+#### 2. Configure Azure Authentication
 Choose your preferred authentication method:
 
 **Option A: Azure CLI (Recommended - Most Secure)**
@@ -24,7 +47,7 @@ cp .env.template .env
 # Edit .env with your Azure OpenAI details
 ```
 
-### 3. Set Up Personal Configuration
+#### 3. Set Up Personal Configuration
 ```bash
 # Create user-specific data directory (if not exists)
 mkdir user_specific_data
@@ -36,7 +59,7 @@ cp job_skill_summery.md.template user_specific_data/job_skill_summery.md
 # Edit the files with your job context and skills
 ```
 
-### 4. Run the Application
+#### 4. Run the Application
 ```bash
 python email_manager_main.py
 ```
@@ -137,8 +160,43 @@ This is a personal productivity tool, but improvements are welcome! Please ensur
 - Security best practices maintained  
 - Documentation updated for changes
 
+## 🐳 Production Deployment
+
+### Quick Deployment
+
+```bash
+# Using Makefile
+make setup    # Initial setup
+make up       # Start services
+make health   # Check status
+
+# Or using scripts
+./deployment/scripts/deploy.sh dev      # Local
+./deployment/scripts/deploy.sh staging  # Staging
+./deployment/scripts/deploy.sh production  # Production
+```
+
+### Deployment Resources
+
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete deployment guide
+- **[QUICKSTART.md](./QUICKSTART.md)** - 5-minute setup guide
+- **[deployment/PRODUCTION_DEPLOYMENT.md](./deployment/PRODUCTION_DEPLOYMENT.md)** - Production checklist
+- **[deployment/MONITORING.md](./deployment/MONITORING.md)** - Monitoring and alerting
+
+### Architecture
+
+The application is now a full-stack web application:
+
+- **Backend**: FastAPI REST API with JWT authentication
+- **Frontend**: React web application with TypeScript
+- **Database**: SQLite (dev) or PostgreSQL (prod)
+- **Cache/Queue**: Redis for background processing
+- **AI**: Azure OpenAI integration
+- **Deployment**: Docker containers, Azure App Service
+
 ## ⚠️ Important Notes
 
 - **Never commit personal data** - The `.gitignore` protects you, but double-check
 - **Review summaries before sharing** - Generated content may contain sensitive information
 - **Keep authentication secure** - Use `az login` when possible, rotate API keys regularly
+- **Production deployment** - Follow the deployment guides for secure production setup

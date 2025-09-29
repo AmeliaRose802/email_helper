@@ -21,6 +21,18 @@ test/test_data/*/
 .env.production
 .env.staging
 
+# Terraform state files - DO NOT COMMIT
+deployment/terraform/*.tfstate
+deployment/terraform/*.tfstate.*
+deployment/terraform/.terraform/
+deployment/terraform/.terraform.lock.hcl
+deployment/terraform/terraform.tfvars
+
+# Docker volumes
+postgres_data/
+redis_data/
+backend_data/
+
 # Azure credentials and secrets - SECURITY SENSITIVE
 *.pem
 *.key

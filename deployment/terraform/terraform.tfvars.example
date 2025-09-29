@@ -1,0 +1,10 @@
+# Development environment
+environment = "dev"
+location    = "eastus"
+
+# Docker images - update these with your actual images
+backend_image  = "ghcr.io/ameliarose802/email_helper/backend:latest"
+frontend_image = "ghcr.io/ameliarose802/email_helper/frontend:latest"
+
+# Registry
+docker_registry_url = "ghcr.io"

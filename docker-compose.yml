@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (production-ready alternative to SQLite)
+  database:
+    image: postgres:15-alpine
+    container_name: email-helper-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-email_helper}
+      POSTGRES_USER: ${POSTGRES_USER:-emailhelper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - email-helper-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-emailhelper}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and job queue
+  redis:
+    image: redis:7-alpine
+    container_name: email-helper-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - email-helper-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: email-helper-backend
+    restart: unless-stopped
+    environment:
+      # App settings
+      DEBUG: ${DEBUG:-false}
+      HOST: 0.0.0.0
+      PORT: 8000
+      
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-change-this-secret-key-in-production}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-30}
+      
+      # Database - Using SQLite for simplicity, change to PostgreSQL for production
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///./runtime_data/email_helper_history.db}
+      # For PostgreSQL: DATABASE_URL=postgresql://emailhelper:changeme@database:5432/email_helper
+      
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000", "http://localhost:80"]}
+      
+      # Azure OpenAI
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-gpt-4o}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-02-01}
+      
+      # Microsoft Graph API
+      GRAPH_CLIENT_ID: ${GRAPH_CLIENT_ID}
+      GRAPH_CLIENT_SECRET: ${GRAPH_CLIENT_SECRET}
+      GRAPH_TENANT_ID: ${GRAPH_TENANT_ID}
+      
+      # Redis
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    volumes:
+      - ./backend:/app/backend
+      - ./src:/app/src
+      - backend_data:/app/runtime_data
+    ports:
+      - "8000:8000"
+    networks:
+      - email-helper-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      # Uncomment when using PostgreSQL
+      # database:
+      #   condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Celery Worker for background tasks
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: email-helper-worker
+    restart: unless-stopped
+    command: celery -A backend.workers.celery_app worker --loglevel=info
+    environment:
+      # Same environment as backend
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///./runtime_data/email_helper_history.db}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-gpt-4o}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-02-01}
+    volumes:
+      - ./backend:/app/backend
+      - ./src:/app/src
+      - backend_data:/app/runtime_data
+    networks:
+      - email-helper-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: email-helper-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - email-helper-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health.html"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+networks:
+  email-helper-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_data:
+    driver: local
