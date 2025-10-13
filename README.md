@@ -4,7 +4,15 @@ An intelligent email classification and management system designed for professio
 
 ## 🚀 Quick Setup
 
-### 1. Install Dependencies
+### Option 1: One-Command Start (Recommended)
+```bash
+npm start
+```
+This will start both the React frontend and API backend automatically!
+
+### Option 2: Manual Setup
+
+#### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
@@ -130,12 +138,25 @@ your_username
 ### Customizing Prompts
 All AI prompts are in the `prompts/` directory using Microsoft Prompty format. Edit these files to customize the AI behavior for your specific needs.
 
+## 📚 Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+- **[Complete Documentation Index](docs/README.md)** - Start here for all documentation
+- **[Quick Start Guide](QUICK_START.md)** - Get up and running quickly
+- **[User Setup](docs/setup/USER_SETUP.md)** - Detailed setup instructions
+- **[Feature Guides](docs/features/)** - Learn about specific features
+- **[Technical Documentation](docs/technical/)** - Architecture and design details
+- **[Test Documentation](test/TEST_ORGANIZATION.md)** - Testing guide and organization
+
 ## 🤝 Contributing
 
 This is a personal productivity tool, but improvements are welcome! Please ensure:
 - No personal data in commits
 - Security best practices maintained  
 - Documentation updated for changes
+- Tests written and passing (see `test/TEST_ORGANIZATION.md`)
+- Follow guidelines in `.github/copilot-instructions.md`
 
 ## ⚠️ Important Notes
 

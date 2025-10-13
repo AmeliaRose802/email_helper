@@ -143,8 +143,39 @@ class TaskPersistence:
         
         print(f"💾 Saved {self._count_total_tasks(merged_tasks)} outstanding tasks to persistent storage")
     
-    def load_outstanding_tasks(self) -> Dict[str, List[Dict]]:
-        """Load outstanding tasks from persistent storage"""
+    def _is_event_expired(self, event: Dict) -> bool:
+        """Check if an optional event has passed its date"""
+        try:
+            event_date_str = event.get('date', '')
+            if not event_date_str:
+                return False  # No date means we can't determine expiration
+            
+            # Handle various date formats
+            # Try YYYY-MM-DD format first
+            try:
+                event_date = datetime.strptime(event_date_str, '%Y-%m-%d')
+            except ValueError:
+                # Try other common formats
+                try:
+                    event_date = datetime.strptime(event_date_str, '%m/%d/%Y')
+                except ValueError:
+                    # If we can't parse it, don't expire it
+                    return False
+            
+            # Event is expired if the date has passed
+            current_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            return event_date < current_date
+            
+        except Exception as e:
+            print(f"Warning: Could not check expiration for event: {e}")
+            return False
+    
+    def load_outstanding_tasks(self, auto_clean_expired=True) -> Dict[str, List[Dict]]:
+        """Load outstanding tasks from persistent storage
+        
+        Args:
+            auto_clean_expired: If True, automatically remove expired optional events
+        """
         if not os.path.exists(self.tasks_file):
             return {
                 'required_actions': [],
@@ -178,6 +209,9 @@ class TaskPersistence:
                 
                 # Validate and clean task data
                 cleaned_tasks = {}
+                expired_events_count = 0
+                auto_completed_actions_count = 0
+                
                 for section_key, task_list in tasks.items():
                     cleaned_tasks[section_key] = []
                     if not isinstance(task_list, list):
@@ -190,6 +224,25 @@ class TaskPersistence:
                             if 'task_id' not in task:
                                 print(f"Warning: Task missing task_id: {task}")
                                 continue
+                            
+                            # Auto-filter expired optional events
+                            if auto_clean_expired and section_key == 'optional_events':
+                                if self._is_event_expired(task):
+                                    expired_events_count += 1
+                                    print(f"🗑️ Auto-removing expired event: {task.get('subject', 'Unknown')}")
+                                    continue  # Skip adding this expired event
+                            
+                            # Auto-move completed team actions to completed section
+                            if auto_clean_expired and section_key == 'team_actions':
+                                if task.get('completion_status') == 'completed':
+                                    auto_completed_actions_count += 1
+                                    print(f"✅ Auto-moving completed team action: {task.get('subject', 'Unknown')}")
+                                    # Ensure completed_team_actions section exists
+                                    if 'completed_team_actions' not in cleaned_tasks:
+                                        cleaned_tasks['completed_team_actions'] = []
+                                    cleaned_tasks['completed_team_actions'].append(task)
+                                    continue  # Skip adding to regular team_actions
+                            
                             # Ensure sender field exists (fallback to email_sender if needed)
                             if 'sender' not in task and 'email_sender' in task:
                                 task['sender'] = task['email_sender']
@@ -198,6 +251,17 @@ class TaskPersistence:
                             cleaned_tasks[section_key].append(task)
                         else:
                             print(f"Warning: Invalid task format (not a dict): {task}")
+                
+                # If we cleaned up expired/completed items, save the updated tasks
+                if auto_clean_expired and (expired_events_count > 0 or auto_completed_actions_count > 0):
+                    if expired_events_count > 0:
+                        print(f"✅ Removed {expired_events_count} expired optional events")
+                    if auto_completed_actions_count > 0:
+                        print(f"✅ Moved {auto_completed_actions_count} completed team actions to completed section")
+                    self._save_tasks_to_file(self.tasks_file, {
+                        'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'tasks': cleaned_tasks
+                    })
                 
                 return cleaned_tasks
                 

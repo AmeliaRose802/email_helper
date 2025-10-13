@@ -34,7 +34,6 @@ import threading
 import os
 import webbrowser
 import sys
-import re
 
 # Matplotlib imports for chart visualization
 try:
@@ -59,6 +58,17 @@ from modern_email_processor import EmailProcessor
 from task_persistence import TaskPersistence
 from accuracy_tracker import AccuracyTracker
 from database.migrations import DatabaseMigrations
+from gui.theme import ModernTheme
+from gui.helpers import (
+    calculate_task_age,
+    clean_email_formatting,
+    create_descriptive_link_text,
+    find_urls_in_text,
+    format_task_dates,
+    open_url,
+)
+from gui.tabs.processing_tab import ProcessingTab
+from gui.tabs.editing_tab import EditingTab
 
 
 class UnifiedEmailGUI:
@@ -87,6 +97,30 @@ class UnifiedEmailGUI:
         summary_sections (dict): Generated summary sections for display
         processing_cancelled (bool): Flag for cancelling long-running operations
     """
+    
+    CATEGORY_MAPPING = {
+        "Required Personal Action": "required_personal_action",
+        "Team Action": "team_action",
+        "Optional Action": "optional_action",
+        "Job Listing": "job_listing",
+        "Optional Event": "optional_event",
+        "FYI Notice": "fyi",
+        "Newsletter": "newsletter",
+        "Work Relevant": "work_relevant",
+        "Spam To Delete": "spam_to_delete"
+    }
+    
+    CATEGORY_PRIORITY = {
+        'required_personal_action': 1,
+        'team_action': 2,
+        'optional_action': 3,
+        'job_listing': 4,
+        'optional_event': 5,
+        'work_relevant': 6,
+        'fyi': 7,
+        'newsletter': 8,
+        'spam_to_delete': 9
+    }
     
     def __init__(self, service_factory=None):
         # Use dependency injection for cleaner architecture
@@ -122,6 +156,11 @@ class UnifiedEmailGUI:
         window_size = f"{config.get('ui.default_width', 1200)}x{config.get('ui.default_height', 800)}"
         self.root.geometry(window_size)
         self.root.minsize(1000, 700)
+        self.root.configure(bg=ModernTheme.BACKGROUND)
+        
+        # Apply modern theme styling
+        self.style = ttk.Style()
+        ModernTheme.configure_ttk_style(self.style)
         
         # Create GUI components
         self.create_widgets()
@@ -135,177 +174,78 @@ class UnifiedEmailGUI:
     def create_widgets(self):
         # Create notebook for tabs
         self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=ModernTheme.SPACING_MEDIUM, 
+                          pady=ModernTheme.SPACING_MEDIUM)
         
         # Bind tab selection event to load data when needed
         self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
         
         # Tab 1: Email Processing
         self.processing_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.processing_frame, text="1. Process Emails")
+        self.notebook.add(self.processing_frame, text="Process Emails")
         self.create_processing_tab()
         
         # Tab 2: Email Review & Editing
         self.editing_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.editing_frame, text="2. Review & Edit")
+        self.notebook.add(self.editing_frame, text="Review & Edit")
         self.create_editing_tab()
         
         # Tab 3: Summary Generation & Viewing
         self.summary_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.summary_frame, text="3. Summary & Results")
+        self.notebook.add(self.summary_frame, text="Summary & Tasks")
         self.create_summary_tab()
         
         # Tab 4: Accuracy Dashboard
         self.accuracy_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.accuracy_frame, text="4. Accuracy Dashboard")
+        self.notebook.add(self.accuracy_frame, text="Accuracy Dashboard")
         self.create_accuracy_tab()
         
-        # Create status bar
+        # Create modern status bar
+        status_frame = ttk.Frame(self.root, relief=tk.FLAT)
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=ModernTheme.SPACING_SMALL, 
+                         pady=(0, ModernTheme.SPACING_SMALL))
+        
         self.status_var = tk.StringVar(value="Ready")
-        status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
-        status_bar.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=(0, 5))
+        status_bar = ttk.Label(status_frame, textvariable=self.status_var, 
+                             font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_SMALL),
+                             foreground=ModernTheme.TEXT_SECONDARY,
+                             background=ModernTheme.SURFACE,
+                             padding=(ModernTheme.SPACING_SMALL, ModernTheme.SPACING_TINY))
+        status_bar.pack(fill=tk.X)
         
         # Initially disable tabs 1, 3 (enable summary tab immediately for task viewing)
         self.notebook.tab(1, state="disabled")  # Review & Edit tab - requires email processing
         self.notebook.tab(3, state="disabled")  # Accuracy Dashboard - requires email processing
     
     def create_processing_tab(self):
-        # Email count selection
-        self.email_count_var = tk.StringVar(value="50")
-        email_count_frame = ttk.Frame(self.processing_frame)
-        email_count_frame.pack(pady=20)
+        # Delegate to ProcessingTab class
+        self.processing_tab = ProcessingTab(self.processing_frame, self)
         
-        ttk.Label(email_count_frame, text="Number of emails:").pack(side=tk.LEFT)
-        for count in [25, 50, 100, 200]:
-            ttk.Radiobutton(email_count_frame, text=str(count), variable=self.email_count_var, 
-                           value=str(count)).pack(side=tk.LEFT, padx=5)
-        
-        # Other option with custom entry
-        ttk.Radiobutton(email_count_frame, text="Other:", variable=self.email_count_var, 
-                       value="other").pack(side=tk.LEFT, padx=5)
-        
-        self.custom_count_entry = ttk.Entry(email_count_frame, width=10)
-        self.custom_count_entry.pack(side=tk.LEFT, padx=(5, 0))
-        
-        # Bind events to auto-select "Other" option when typing in custom field
-        self.custom_count_entry.bind('<KeyPress>', self._on_custom_count_keypress)
-        self.custom_count_entry.bind('<FocusIn>', self._on_custom_count_focus)
-        
-        # Processing controls
-        control_frame = ttk.Frame(self.processing_frame)
-        control_frame.pack(pady=20)
-        
-        self.start_processing_btn = ttk.Button(control_frame, text="Start Processing", 
-                                              command=self.start_email_processing)
-        self.start_processing_btn.pack(side=tk.LEFT, padx=5)
-        
-        self.cancel_processing_btn = ttk.Button(control_frame, text="Cancel", 
-                                               command=self.cancel_processing, 
-                                               state=tk.DISABLED)
-        self.cancel_processing_btn.pack(side=tk.LEFT, padx=5)
-        
-        # Accuracy Dashboard access button
-        self.accuracy_btn = ttk.Button(control_frame, text="📊 Accuracy Dashboard", 
-                                      command=self.open_accuracy_dashboard)
-        self.accuracy_btn.pack(side=tk.LEFT, padx=5)
-        
-        # Progress section
-        self.progress_var = tk.DoubleVar()
-        self.progress_bar = ttk.Progressbar(self.processing_frame, variable=self.progress_var, 
-                                          maximum=100)
-        self.progress_bar.pack(pady=10, fill=tk.X, padx=20)
-        
-        self.progress_text = scrolledtext.ScrolledText(self.processing_frame, height=15, 
-                                                      state=tk.DISABLED, wrap=tk.WORD)
-        self.progress_text.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        # Keep references to widgets for compatibility
+        self.email_count_var = self.processing_tab.email_count_var
+        self.custom_count_entry = self.processing_tab.custom_count_entry
+        self.start_processing_btn = self.processing_tab.start_btn
+        self.cancel_processing_btn = self.processing_tab.cancel_btn
+        self.progress_var = self.processing_tab.progress_var
+        self.progress_bar = self.processing_tab.progress_bar
+        self.progress_text = self.processing_tab.progress_text
     
     def create_editing_tab(self):
-        # Main container
-        main_frame = ttk.Frame(self.editing_frame, padding="10")
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        # Delegate to EditingTab class
+        self.editing_tab = EditingTab(self.editing_frame, self)
         
-        main_frame.columnconfigure(1, weight=1)
-        main_frame.rowconfigure(1, weight=1)
-        
-        # Create email list
-        tree_frame = ttk.Frame(main_frame)
-        tree_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
-        tree_frame.columnconfigure(0, weight=1)
-        tree_frame.rowconfigure(0, weight=1)
-        
-        columns = ('Subject', 'From', 'Category', 'AI Summary', 'Date')
-        self.email_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', height=12)
-        
-        # Initialize sorting state
-        self.sort_column = None
-        self.sort_reverse = False
-        
-        # Configure columns with sorting
-        for col in columns:
-            self.email_tree.heading(col, text=col, command=lambda c=col: self.sort_by_column(c))
-            
-        self.email_tree.column('Subject', width=250)
-        self.email_tree.column('From', width=150)
-        self.email_tree.column('Category', width=150)
-        self.email_tree.column('AI Summary', width=300)
-        self.email_tree.column('Date', width=100)
-        
-        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.email_tree.yview)
-        self.email_tree.configure(yscrollcommand=scrollbar.set)
-        
-        self.email_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        self.email_tree.bind('<<TreeviewSelect>>', self.on_email_select)
-        
-        # Details panel
-        details_frame = ttk.LabelFrame(main_frame, text="Email Details", padding="10")
-        details_frame.grid(row=1, column=2, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(10, 0))
-        details_frame.columnconfigure(1, weight=1)
-        details_frame.rowconfigure(4, weight=1)
-        
-        ttk.Label(details_frame, text="Category:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.category_var = tk.StringVar()
-        self.category_combo = ttk.Combobox(details_frame, textvariable=self.category_var, 
-                                          values=self.get_category_display_names(), 
-                                          state="readonly")
-        self.category_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
-        ttk.Label(details_frame, text="Category:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.category_var = tk.StringVar()
-        self.category_combo = ttk.Combobox(details_frame, textvariable=self.category_var, 
-                                          values=self.get_category_display_names(), 
-                                          state="readonly")
-        self.category_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
-        self.category_combo.bind('<<ComboboxSelected>>', self.on_category_change)
-        
-        # Add info label about auto-apply
-        info_label = ttk.Label(details_frame, text="ℹ️ Changes apply automatically when category changes or switching emails", 
-                              font=('Segoe UI', 8), foreground="#666666")
-        info_label.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(0, 5))
-        
-        ttk.Label(details_frame, text="Reason (optional):").grid(row=2, column=0, sticky=tk.W, pady=2)
-        self.explanation_var = tk.StringVar()
-        self.explanation_entry = ttk.Entry(details_frame, textvariable=self.explanation_var)
-        self.explanation_entry.grid(row=2, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
-        
-        self.apply_btn = ttk.Button(details_frame, text="Manual Apply", 
-                                   command=self.apply_category_change, state=tk.DISABLED)
-        self.apply_btn.grid(row=3, column=1, sticky=tk.E, pady=5, padx=(5, 0))
-        
-        self.preview_text = scrolledtext.ScrolledText(details_frame, height=8, wrap=tk.WORD, state=tk.DISABLED)
-        self.preview_text.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(5, 0))
-        
-        self.current_email_index = None
-        self.original_category = None
-        
-        # Controls
-        button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=2, column=0, columnspan=3, pady=(15, 0))
-        
-        ttk.Button(button_frame, text="Apply to Outlook", 
-                  command=self.apply_to_outlook).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Button(button_frame, text="Generate Summary", 
-                  command=self.proceed_to_summary).pack(side=tk.LEFT, padx=5)
+        # Keep references for compatibility
+        self.email_tree = self.editing_tab.email_tree
+        self.sort_column = self.editing_tab.sort_column
+        self.sort_reverse = self.editing_tab.sort_reverse
+        self.category_var = self.editing_tab.category_var
+        self.category_combo = self.editing_tab.category_combo
+        self.explanation_var = self.editing_tab.explanation_var
+        self.explanation_entry = self.editing_tab.explanation_entry
+        self.apply_btn = self.editing_tab.apply_btn
+        self.preview_text = self.editing_tab.preview_text
+        self.current_email_index = self.editing_tab.current_email_index
+        self.original_category = self.editing_tab.original_category
     
     def create_summary_tab(self):
         main_frame = ttk.Frame(self.summary_frame, padding="15")
@@ -316,7 +256,8 @@ class UnifiedEmailGUI:
         control_frame.pack(pady=(0, 20))
         
         self.generate_summary_btn = ttk.Button(control_frame, text="Generate Summary", 
-                                              command=self.generate_summary)
+                                              command=self.generate_summary,
+                                              style="Accent.TButton")
         self.generate_summary_btn.pack(side=tk.LEFT, padx=5)
         
         # View Outstanding Tasks button for accessing persistent tasks without email processing
@@ -329,19 +270,16 @@ class UnifiedEmailGUI:
         ttk.Button(control_frame, text="Task Statistics", 
                   command=self.show_task_statistics).pack(side=tk.LEFT, padx=5)
         
-        ttk.Button(control_frame, text="Mark Tasks Complete", 
+        ttk.Button(control_frame, text="✅ Mark Complete", 
                   command=self.show_task_completion_dialog).pack(side=tk.LEFT, padx=5)
         
-        ttk.Button(control_frame, text="Clear Newsletters", 
-                  command=self._dismiss_all_newsletters).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Button(control_frame, text="Clear Optional Events", 
-                  command=self._dismiss_all_optional_events).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="🗑️ Clear Non-Essential", 
+                  command=self._clear_all_non_essential).pack(side=tk.LEFT, padx=10)
         
         ttk.Button(control_frame, text="Process New Batch", 
                   command=self.start_new_session).pack(side=tk.LEFT, padx=5)
         
-        # Enhanced summary text widget with rich formatting
+        # Enhanced summary text widget
         self.summary_text = scrolledtext.ScrolledText(main_frame, wrap=tk.WORD, 
                                                      height=20, state=tk.DISABLED,
                                                      font=('Segoe UI', 10))
@@ -351,54 +289,54 @@ class UnifiedEmailGUI:
         self._configure_summary_text_tags()
     
     def _configure_summary_text_tags(self):
-        """Configure rich text formatting tags for beautiful summary display"""
+        """Configure rich text formatting tags for clean summary display"""
         # Main title
         self.summary_text.tag_configure("main_title", 
-                                       font=("Segoe UI", 16, "bold"), 
-                                       foreground="#007acc",
+                                       font=("Segoe UI", 14, "bold"), 
+                                       foreground="#0078D4",
                                        justify="center")
         
         # Subtitle
         self.summary_text.tag_configure("subtitle", 
-                                       font=("Segoe UI", 12), 
-                                       foreground="#666666",
+                                       font=("Segoe UI", 10), 
+                                       foreground="#605E5C",
                                        justify="center")
         
         # Overview stats
         self.summary_text.tag_configure("overview_title", 
-                                       font=("Segoe UI", 14, "bold"), 
-                                       foreground="#005a8b")
+                                       font=("Segoe UI", 12, "bold"), 
+                                       foreground="#0078D4")
         
         self.summary_text.tag_configure("overview_stats", 
-                                       font=("Segoe UI", 11), 
-                                       background="#e8f4fd",
-                                       foreground="#005a8b")
+                                       font=("Segoe UI", 10), 
+                                       background="#F3F9FD",
+                                       foreground="#201F1E")
         
-        # Section headers with different colors
+        # Section headers with subtle backgrounds
         self.summary_text.tag_configure("section_required", 
-                                       font=("Segoe UI", 13, "bold"), 
-                                       foreground="#dc3545",
-                                       background="#ffe6e6")
+                                       font=("Segoe UI", 11, "bold"), 
+                                       foreground="#D13438",
+                                       background="#FDF3F4")
         
         self.summary_text.tag_configure("section_team", 
-                                       font=("Segoe UI", 13, "bold"), 
-                                       foreground="#856404",
-                                       background="#fff3cd")
+                                       font=("Segoe UI", 11, "bold"), 
+                                       foreground="#CA5010",
+                                       background="#FFF9F5")
         
         self.summary_text.tag_configure("section_optional", 
-                                       font=("Segoe UI", 13, "bold"), 
-                                       foreground="#0c5460",
-                                       background="#d1ecf1")
+                                       font=("Segoe UI", 11, "bold"), 
+                                       foreground="#0078D4",
+                                       background="#F3F9FD")
         
         self.summary_text.tag_configure("section_jobs", 
-                                       font=("Segoe UI", 13, "bold"), 
-                                       foreground="#155724",
-                                       background="#d4edda")
+                                       font=("Segoe UI", 11, "bold"), 
+                                       foreground="#107C10",
+                                       background="#F1FAF1")
         
         self.summary_text.tag_configure("section_events", 
-                                       font=("Segoe UI", 13, "bold"), 
-                                       foreground="#4c1d95",
-                                       background="#f8e8ff")
+                                       font=("Segoe UI", 11, "bold"), 
+                                       foreground="#8764B8",
+                                       background="#F9F5FC")
         
         self.summary_text.tag_configure("section_fyi", 
                                        font=("Segoe UI", 13, "bold"), 
@@ -461,7 +399,8 @@ class UnifiedEmailGUI:
                                        font=("Segoe UI", 9, "italic"), 
                                        foreground="#555555")
         
-        # Configure link click behavior
+        # Configure link click behavior for generic "link" tags
+        # Individual links may also create their own unique tags with specific handlers
         self.summary_text.tag_bind("link", "<Button-1>", self._on_summary_link_click)
         self.summary_text.tag_bind("link", "<Enter>", lambda e: self.summary_text.config(cursor="hand2"))
         self.summary_text.tag_bind("link", "<Leave>", lambda e: self.summary_text.config(cursor=""))
@@ -1333,65 +1272,150 @@ class UnifiedEmailGUI:
                 self.trends_plot.clear()
                 
                 if ts_data.empty:
-                    # Show no data message
-                    self.trends_plot.text(0.5, 0.5, f'📈 No data available for {time_range}\nwith {granularity} granularity\n\nProcess some emails to generate accuracy trends data.', 
-                                         horizontalalignment='center', verticalalignment='center', 
-                                         transform=self.trends_plot.transAxes, fontsize=12)
-                    self.trends_plot.set_title('Accuracy Trends Over Time - No Data')
+                    # Show no data message with modern styling
+                    self.trends_plot.text(0.5, 0.5, 
+                                         f'📈 No data available for {time_range}\nwith {granularity} granularity\n\nProcess some emails to generate accuracy trends data.', 
+                                         horizontalalignment='center', 
+                                         verticalalignment='center', 
+                                         transform=self.trends_plot.transAxes, 
+                                         fontsize=12,
+                                         color=ModernTheme.TEXT_SECONDARY,
+                                         fontfamily=ModernTheme.FONT_FAMILY)
+                    self.trends_plot.set_title('Accuracy Trends Over Time', 
+                                              fontsize=14, 
+                                              fontweight='bold',
+                                              fontfamily=ModernTheme.FONT_FAMILY,
+                                              color=ModernTheme.TEXT,
+                                              pad=20)
+                    self.trends_plot.set_facecolor(ModernTheme.BACKGROUND)
                 else:
-                    # Create the accuracy trend chart
+                    # Create the accuracy trend chart with modern styling
                     dates = ts_data.index
                     accuracy_rates = ts_data['accuracy_rate']
                     
-                    # Plot accuracy trend line
-                    self.trends_plot.plot(dates, accuracy_rates, marker='o', linewidth=2, markersize=6, 
-                                         color='#2E86AB', markerfacecolor='#A23B72', markeredgecolor='white', markeredgewidth=1)
+                    # Plot accuracy trend line with modern colors - cleaner, simpler
+                    self.trends_plot.plot(dates, accuracy_rates, 
+                                         marker='o', 
+                                         linewidth=2, 
+                                         markersize=5, 
+                                         color=ModernTheme.PRIMARY, 
+                                         markerfacecolor=ModernTheme.PRIMARY, 
+                                         markeredgecolor=ModernTheme.BACKGROUND, 
+                                         markeredgewidth=1.5,
+                                         label='Accuracy Rate',
+                                         zorder=3)
                     
-                    # Fill area under the curve for visual appeal
-                    self.trends_plot.fill_between(dates, accuracy_rates, alpha=0.3, color='#2E86AB')
+                    # Fill area under the curve with subtle gradient effect
+                    self.trends_plot.fill_between(dates, accuracy_rates, 
+                                                  alpha=0.1, 
+                                                  color=ModernTheme.PRIMARY,
+                                                  zorder=1)
                     
-                    # Customize the plot
-                    self.trends_plot.set_title(f'Accuracy Trends - {time_range} ({granularity})', fontsize=14, fontweight='bold', pad=20)
-                    self.trends_plot.set_ylabel('Accuracy Rate (%)', fontsize=12)
-                    self.trends_plot.set_xlabel('Date', fontsize=12)
+                    # Modern styling
+                    self.trends_plot.set_facecolor(ModernTheme.BACKGROUND)
+                    self.trends_figure.patch.set_facecolor(ModernTheme.BACKGROUND)
                     
-                    # Format y-axis to show percentages
-                    self.trends_plot.set_ylim(max(0, accuracy_rates.min() - 5), min(100, accuracy_rates.max() + 5))
-                    self.trends_plot.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0f}%'))
+                    # Title and labels - clean and simple
+                    title_text = f'Accuracy Trends'
+                    subtitle_text = f'{time_range} | {granularity}'
+                    self.trends_plot.set_title(title_text, 
+                                              fontsize=13, 
+                                              fontweight='bold', 
+                                              fontfamily=ModernTheme.FONT_FAMILY,
+                                              color=ModernTheme.TEXT,
+                                              pad=15,
+                                              loc='left')
+                    # Add subtitle as text
+                    self.trends_plot.text(0.0, 1.05, subtitle_text,
+                                         transform=self.trends_plot.transAxes,
+                                         fontsize=9,
+                                         color=ModernTheme.TEXT_SECONDARY,
+                                         fontfamily=ModernTheme.FONT_FAMILY)
                     
-                    # Format x-axis dates
+                    self.trends_plot.set_ylabel('Accuracy Rate (%)', 
+                                               fontsize=10,
+                                               fontfamily=ModernTheme.FONT_FAMILY,
+                                               color=ModernTheme.TEXT_SECONDARY)
+                    self.trends_plot.set_xlabel('Date', 
+                                               fontsize=10,
+                                               fontfamily=ModernTheme.FONT_FAMILY,
+                                               color=ModernTheme.TEXT_SECONDARY)
+                    
+                    # Format y-axis with better range
+                    y_min = max(0, accuracy_rates.min() - 10)
+                    y_max = min(100, accuracy_rates.max() + 10)
+                    self.trends_plot.set_ylim(y_min, y_max)
+                    self.trends_plot.yaxis.set_major_formatter(
+                        plt.FuncFormatter(lambda y, _: f'{y:.0f}%'))
+                    
+                    # Format x-axis dates properly
                     if granularity == 'daily':
-                        self.trends_plot.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
-                        self.trends_plot.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, len(dates)//10)))
+                        if len(dates) <= 7:
+                            self.trends_plot.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+                            self.trends_plot.xaxis.set_major_locator(mdates.DayLocator())
+                        else:
+                            self.trends_plot.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+                            self.trends_plot.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, len(dates)//7)))
                     elif granularity == 'weekly':
                         self.trends_plot.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
                         self.trends_plot.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
                     else:  # monthly
-                        self.trends_plot.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-                        self.trends_plot.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+                        self.trends_plot.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+                        self.trends_plot.xaxis.set_major_locator(mdates.MonthLocator())
                     
-                    # Rotate date labels for better readability
-                    plt.setp(self.trends_plot.xaxis.get_majorticklabels(), rotation=45, ha='right')
+                    # Rotate and align date labels
+                    plt.setp(self.trends_plot.xaxis.get_majorticklabels(), 
+                            rotation=45, 
+                            ha='right',
+                            fontsize=9,
+                            color=ModernTheme.TEXT_SECONDARY)
                     
-                    # Add grid for better readability
-                    self.trends_plot.grid(True, alpha=0.3, linestyle='--')
+                    # Customize tick colors
+                    self.trends_plot.tick_params(axis='both', 
+                                                colors=ModernTheme.TEXT_SECONDARY,
+                                                labelsize=9)
                     
-                    # Add data point annotations for small datasets
-                    if len(dates) <= 10:
+                    # Modern grid with subtle lines
+                    self.trends_plot.grid(True, 
+                                         alpha=0.2, 
+                                         linestyle='--', 
+                                         linewidth=0.5,
+                                         color=ModernTheme.BORDER)
+                    
+                    # Add data point annotations ONLY for very small datasets (5 or fewer points)
+                    # And only show them on hover or not at all to avoid clutter
+                    if len(dates) <= 5:
                         for i, (date, rate) in enumerate(zip(dates, accuracy_rates)):
-                            self.trends_plot.annotate(f'{rate:.1f}%', 
+                            # Simple, small annotation without box
+                            self.trends_plot.annotate(f'{rate:.0f}%', 
                                                      (date, rate), 
                                                      textcoords="offset points", 
-                                                     xytext=(0,10), 
-                                                     ha='center', fontsize=9)
+                                                     xytext=(0, 8), 
+                                                     ha='center', 
+                                                     fontsize=8,
+                                                     color=ModernTheme.TEXT_SECONDARY,
+                                                     alpha=0.7)
                     
-                    # Add statistics text box
-                    stats_text = f'Data Points: {len(ts_data)}\nRange: {accuracy_rates.min():.1f}% - {accuracy_rates.max():.1f}%\nAverage: {accuracy_rates.mean():.1f}%'
-                    self.trends_plot.text(0.02, 0.98, stats_text, transform=self.trends_plot.transAxes, 
-                                         verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+                    # Statistics as subtitle below chart - cleaner than overlay box
+                    stats_text = (f'Points: {len(ts_data)}  |  '
+                                f'Range: {accuracy_rates.min():.1f}%-{accuracy_rates.max():.1f}%  |  '
+                                f'Avg: {accuracy_rates.mean():.1f}%')
+                    self.trends_plot.text(0.5, -0.15, stats_text, 
+                                         transform=self.trends_plot.transAxes, 
+                                         horizontalalignment='center',
+                                         verticalalignment='top',
+                                         fontsize=8,
+                                         fontfamily=ModernTheme.FONT_FAMILY,
+                                         color=ModernTheme.TEXT_SECONDARY)
+                    
+                    # Remove top and right spines for cleaner look
+                    self.trends_plot.spines['top'].set_visible(False)
+                    self.trends_plot.spines['right'].set_visible(False)
+                    self.trends_plot.spines['left'].set_color(ModernTheme.BORDER)
+                    self.trends_plot.spines['bottom'].set_color(ModernTheme.BORDER)
                 
                 # Apply tight layout and refresh canvas
-                self.trends_figure.tight_layout()
+                self.trends_figure.tight_layout(pad=2.0)
                 self.chart_canvas.draw()
                 
             else:
@@ -1413,10 +1437,18 @@ class UnifiedEmailGUI:
             error_msg = f"Error loading trends: {str(e)}"
             if MATPLOTLIB_AVAILABLE and hasattr(self, 'trends_plot'):
                 self.trends_plot.clear()
-                self.trends_plot.text(0.5, 0.5, f'❌ Error loading chart:\n{str(e)}', 
-                                     horizontalalignment='center', verticalalignment='center', 
-                                     transform=self.trends_plot.transAxes, fontsize=12, color='red')
-                self.trends_plot.set_title('Chart Error')
+                self.trends_plot.text(0.5, 0.5, 
+                                     f'❌ Error loading chart:\n{str(e)}', 
+                                     horizontalalignment='center', 
+                                     verticalalignment='center', 
+                                     transform=self.trends_plot.transAxes, 
+                                     fontsize=11, 
+                                     color=ModernTheme.ERROR,
+                                     fontfamily=ModernTheme.FONT_FAMILY)
+                self.trends_plot.set_title('Chart Error',
+                                          fontsize=12,
+                                          color=ModernTheme.ERROR)
+                self.trends_plot.set_facecolor(ModernTheme.ERROR_LIGHT)
                 self.chart_canvas.draw()
             elif hasattr(self, 'trends_chart_label'):
                 self.trends_chart_label.config(text=error_msg)
@@ -1551,81 +1583,82 @@ class UnifiedEmailGUI:
         except Exception as e:
             messagebox.showerror("Export Error", f"Failed to export data:\n{str(e)}")
 
+    def _configure_clickable_link(self, tag_name, url_or_handler, is_email_handler=False):
+        """Configure a clickable link tag with proper styling and behavior"""
+        # Configure visual styling
+        self.summary_text.tag_configure(tag_name, foreground="#007acc", underline=True)
+        
+        # Configure click behavior
+        if is_email_handler:
+            # url_or_handler is actually an email handler function
+            self.summary_text.tag_bind(tag_name, "<Button-1>", url_or_handler)
+        else:
+            # url_or_handler is a URL string
+            self.summary_text.tag_bind(tag_name, "<Button-1>",
+                                     lambda e, url=url_or_handler: open_url(url))
+        
+        # Configure hover effects
+        self.summary_text.tag_bind(tag_name, "<Enter>", lambda e: self.summary_text.config(cursor="hand2"))
+        self.summary_text.tag_bind(tag_name, "<Leave>", lambda e: self.summary_text.config(cursor=""))
+        
+        # Debug logging
+        print(f"Configured clickable link: {tag_name} -> {'email_handler' if is_email_handler else url_or_handler}")
+
     def _on_summary_link_click(self, event):
-        """Handle link clicks in the summary display"""
-        # Get the tag at the click position
-        tags = self.summary_text.tag_names(tk.CURRENT)
-        for tag in tags:
-            if tag.startswith("link_"):
-                # Extract URL from tag
-                url = tag.replace("link_", "", 1)
-                try:
-                    import webbrowser
-                    webbrowser.open(url)
-                except Exception as e:
-                    messagebox.showwarning("Error Opening Link", f"Could not open URL: {url}\n\nError: {str(e)}")
-                break
+        """Handle link clicks in the summary display - fallback for generic link tags"""
+        messagebox.showinfo("Link Access", 
+                          "For clickable links, please use the 'Open in Browser' button to view the full HTML summary with working links.\n\nThe HTML version has fully functional clickable links.")
     
-    def get_category_display_names(self):
-        return [
-            "Required Personal Action",
-            "Team Action", 
-            "Optional Action", 
-            "Job Listing",
-            "Optional Event",
-            "FYI Notice",
-            "Newsletter",
-            "Work Relevant",
-            "Spam To Delete"
-        ]
-        return [
-            "Required Personal Action",
-            "Team Action", 
-            "Optional Action", 
-            "Job Listing",
-            "Optional Event",
-            "FYI Notice",
-            "Newsletter",
-            "Work Relevant",
-            "Spam To Delete"
-        ]
+    def _insert_email_link(self, email_data, label="View in Outlook"):
+        """Insert a clickable email link into the summary text widget"""
+        if not email_data:
+            return
+        
+        self.summary_text.insert(tk.END, "   Email: ", "content_label")
+        link_start = self.summary_text.index(tk.END)
+        self.summary_text.insert(tk.END, label, "link")
+        link_end = self.summary_text.index(tk.END)
+        
+        email_link_tag = f"email_link_{hash(str(email_data))}"
+        self.summary_text.tag_add(email_link_tag, link_start, link_end)
+        self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
+        self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
+                                 lambda e, data=email_data: self.open_email_in_browser(data))
+        self.summary_text.insert(tk.END, "\n", "content_text")
+    
+    def _insert_first_seen_age(self, item):
+        """Insert first_seen age information if available"""
+        if item.get('first_seen'):
+            try:
+                first_seen = datetime.strptime(item['first_seen'], '%Y-%m-%d %H:%M:%S')
+                days_old = (datetime.now() - first_seen).days
+                if days_old > 0:
+                    self.summary_text.insert(tk.END, f"  |  First seen: {days_old} days ago", "item_meta")
+            except:
+                pass
     
     def get_category_internal_name(self, display_name):
-        mapping = {
-            "Required Personal Action": "required_personal_action",
-            "Team Action": "team_action",
-            "Optional Action": "optional_action",
-            "Job Listing": "job_listing",
-            "Optional Event": "optional_event",
-            "FYI Notice": "fyi",
-            "Newsletter": "newsletter",
-            "Work Relevant": "work_relevant",
-            "Spam To Delete": "spam_to_delete"
-        }
-        return mapping.get(display_name, display_name.lower().replace(" ", "_"))
+        return self.CATEGORY_MAPPING.get(display_name, display_name.lower().replace(" ", "_"))
     
     def start_email_processing(self):
-        # Get email count
+        # Get and validate email count
         selected_option = self.email_count_var.get()
-        if selected_option == "other":
-            # Use custom count entry
-            if self.custom_count_entry.get().strip():
-                try:
-                    max_emails = int(self.custom_count_entry.get().strip())
-                    if max_emails <= 0:
-                        messagebox.showwarning("Invalid Input", 
-                                             "Please enter a positive number for email count.")
-                        return
-                except ValueError:
-                    messagebox.showwarning("Invalid Input", 
-                                         "Please enter a valid number for email count.")
+        try:
+            if selected_option == "other":
+                custom_value = self.custom_count_entry.get().strip()
+                if not custom_value:
+                    messagebox.showwarning("Missing Input", "Please enter a number in the custom count field.")
                     return
+                max_emails = int(custom_value)
             else:
-                messagebox.showwarning("Missing Input", 
-                                     "Please enter a number in the custom count field.")
+                max_emails = int(selected_option)
+            
+            if max_emails <= 0:
+                messagebox.showwarning("Invalid Input", "Please enter a positive number for email count.")
                 return
-        else:
-            max_emails = int(selected_option)
+        except ValueError:
+            messagebox.showwarning("Invalid Input", "Please enter a valid number for email count.")
+            return
         
         # Reset processing state
         self.processing_cancelled = False
@@ -1636,11 +1669,17 @@ class UnifiedEmailGUI:
         self.progress_text.delete(1.0, tk.END)
         self.progress_text.config(state=tk.DISABLED)
         
+        # Add welcome message and processing info
+        self.update_progress_text("🚀 Starting Email Helper Processing...")
+        self.update_progress_text(f"📊 Processing up to {max_emails} emails")
+        self.update_progress_text("🔍 Connecting to Outlook and retrieving conversations...")
         self.update_progress(5, "Retrieving conversations...")
         
         conversation_data = self.outlook_manager.get_emails_with_full_conversations(
             days_back=None, max_emails=max_emails)
         
+        self.update_progress_text(f"✅ Retrieved {len(conversation_data)} conversations from Outlook")
+        self.update_progress_text("📝 Enriching conversations with email content...")
         
         enriched_conversation_data = []
         
@@ -1670,6 +1709,8 @@ class UnifiedEmailGUI:
         
         conversation_data = enriched_conversation_data
         
+        self.update_progress_text(f"✅ Enriched {len(conversation_data)} conversations with email bodies")
+        self.update_progress_text("🤖 Initializing AI analysis pipeline...")
         self.update_progress(15, f"Found {len(conversation_data)} conversations. Starting AI analysis...")
         
         # Now start background thread with the retrieved data
@@ -1678,45 +1719,71 @@ class UnifiedEmailGUI:
         processing_thread.start()
     
     def process_emails_background(self, conversation_data):
+        self.update_progress_text("🔧 Initializing email processor...")
         self.email_processor._reset_data_storage()
+        
+        self.update_progress_text("📚 Loading AI learning data...")
         learning_data = self.ai_processor.load_learning_data()
         
         total_conversations = len(conversation_data)
+        self.update_progress_text(f"🎯 Starting accuracy tracking session for {total_conversations} conversations")
         self.ai_processor.start_accuracy_session(total_conversations)
         
         for i, (conversation_id, conv_info) in enumerate(conversation_data, 1):
             if self.processing_cancelled:
+                self.update_progress_text("❌ Processing cancelled by user")
                 return
                 
             progress = 25 + (70 * i / total_conversations)
+            
+            # Get conversation details for logging
+            trigger_subject = conv_info.get('trigger_subject', 'Unknown')
+            trigger_sender = conv_info.get('trigger_sender', 'Unknown')
+            email_count = len(conv_info.get('emails_with_body', []))
+            
+            self.update_progress_text(f"📧 [{i}/{total_conversations}] Processing: '{trigger_subject[:60]}{'...' if len(trigger_subject) > 60 else ''}' from {trigger_sender} ({email_count} emails)")
             self.update_progress(progress, f"Processing {i}/{total_conversations}")
             
             self.process_single_conversation(conversation_id, conv_info, i, total_conversations, learning_data)
         
         # Store results
+        self.update_progress_text("💾 Storing AI analysis results...")
         self.email_suggestions = self.email_processor.get_email_suggestions()
+        self.update_progress_text(f"✅ Generated {len(self.email_suggestions)} email suggestions")
         
         # Apply holistic inbox analysis to refine suggestions
+        self.update_progress_text("🧠 Applying holistic intelligence to refine classifications...")
         self.update_progress(95, "Applying holistic intelligence...")
         self.email_suggestions = self._apply_holistic_inbox_analysis(self.email_suggestions)
         
         # Reprocess action items after holistic modifications
+        self.update_progress_text("🔄 Reprocessing action items with holistic insights...")
         self._reprocess_action_items_after_holistic_changes()
         
         # Synchronize GUI's action_items_data with the updated email processor data
+        self.update_progress_text("🔄 Synchronizing action items data...")
         self.action_items_data = self.email_processor.action_items_data.copy()
-        print(f"📊 Final sync complete. Action items categories: {list(self.action_items_data.keys())}")
+        action_categories = list(self.action_items_data.keys())
+        self.update_progress_text(f"📊 Synchronized action items in categories: {', '.join(action_categories)}")
         
         # Finalize accuracy tracking session
         total_emails_processed = len(self.email_suggestions)
         categories_used = set(suggestion['ai_suggestion'] for suggestion in self.email_suggestions)
-        print(f"🎯 FINALIZING ACCURACY SESSION: {total_emails_processed} emails, {len(categories_used)} categories")
+        self.update_progress_text(f"🎯 Finalizing accuracy session: {total_emails_processed} emails processed using {len(categories_used)} categories")
         self.ai_processor.finalize_accuracy_session(
             success_count=total_emails_processed, 
             error_count=0, 
             categories_used=categories_used
         )
-        print("✅ Accuracy session finalized!")
+        self.update_progress_text("✅ Accuracy session finalized and recorded!")
+        
+        # Final summary
+        self.update_progress_text("")
+        self.update_progress_text("🎉 EMAIL PROCESSING COMPLETE!")
+        self.update_progress_text(f"📧 Processed: {total_emails_processed} emails")
+        self.update_progress_text(f"📁 Categories: {len(categories_used)} different types")
+        self.update_progress_text(f"⚡ Action Items: {sum(len(items) for items in self.action_items_data.values())} total tasks identified")
+        self.update_progress_text("🔍 Ready for review and editing in the next tab!")
         
         self.update_progress(100, "Processing complete")
         self.root.after(0, self.on_processing_complete)
@@ -1745,8 +1812,21 @@ class UnifiedEmailGUI:
             email_content['body'] += f"\n\n--- CONVERSATION THREAD CONTEXT ---\n{thread_context}"
         
         # Generate AI summary and classify
-        ai_summary = self.ai_processor.generate_email_summary(email_content)
-        initial_suggestion = self.ai_processor.classify_email(email_content, learning_data)
+        try:
+            ai_summary = self.ai_processor.generate_email_summary(email_content)
+        except Exception as e:
+            error_msg = f"⚠️  AI summary failed for email '{email_content.get('subject', 'Unknown')[:50]}...': {e}"
+            print(error_msg)
+            self.update_progress_text(error_msg)
+            ai_summary = f"Summary unavailable - {email_content.get('subject', 'Unknown')[:50]}"
+        
+        try:
+            initial_suggestion = self.ai_processor.classify_email(email_content, learning_data)
+        except Exception as e:
+            error_msg = f"⚠️  AI classification failed for email '{email_content.get('subject', 'Unknown')[:50]}...': {e}"
+            print(error_msg)
+            self.update_progress_text(error_msg)
+            initial_suggestion = 'fyi'  # Safe default category
         
         # Apply intelligent post-processing based on thread context and content
         final_suggestion, processing_notes = self._apply_intelligent_processing(
@@ -1785,10 +1865,14 @@ class UnifiedEmailGUI:
         
         # 1. Check if team action has been resolved by someone else in the thread
         if initial_classification == 'team_action' and thread_context:
-            is_resolved, resolution_details = self.ai_processor.detect_resolved_team_action(email_content, thread_context)
-            if is_resolved:
-                final_classification = 'fyi'
-                processing_notes.append(f"Team action reclassified as FYI: {resolution_details}")
+            try:
+                is_resolved, resolution_details = self.ai_processor.detect_resolved_team_action(email_content, thread_context)
+                if is_resolved:
+                    final_classification = 'fyi'
+                    processing_notes.append(f"Team action reclassified as FYI: {resolution_details}")
+            except Exception as e:
+                print(f"⚠️  AI team action resolution detection failed: {e}")
+                # Continue with original classification
                 print(f"🔄 Intelligent Reclassification: Team action → FYI")
                 print(f"   Reason: {resolution_details}")
         
@@ -1801,12 +1885,16 @@ class UnifiedEmailGUI:
             except:
                 action_details = {}
             
-            is_expired, deadline_details = self.ai_processor.check_optional_item_deadline(email_content, action_details)
-            if is_expired:
-                final_classification = 'spam_to_delete'
-                processing_notes.append(f"Optional item marked for deletion: {deadline_details}")
-                print(f"🗑️ Intelligent Cleanup: {initial_classification} → Delete")
-                print(f"   Reason: {deadline_details}")
+            try:
+                is_expired, deadline_details = self.ai_processor.check_optional_item_deadline(email_content, action_details)
+                if is_expired:
+                    final_classification = 'spam_to_delete'
+                    processing_notes.append(f"Optional item marked for deletion: {deadline_details}")
+                    print(f"🗑️ Intelligent Cleanup: {initial_classification} → Delete")
+                    print(f"   Reason: {deadline_details}")
+            except Exception as e:
+                print(f"⚠️  AI deadline checking failed: {e}")
+                # Continue with original classification
         
         # 3. Future: Add more intelligent processing rules here
         # - Check for duplicate requests
@@ -1995,8 +2083,18 @@ class UnifiedEmailGUI:
         }
         
         if category in ['required_personal_action', 'optional_action', 'team_action']:
-            context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
-            action_details = self.ai_processor.extract_action_item_details(email_content, context)
+            try:
+                context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+                action_details = self.ai_processor.extract_action_item_details(email_content, context)
+            except Exception as e:
+                print(f"⚠️  AI action extraction failed for email '{email_data['subject'][:50]}...': {e}")
+                action_details = {
+                    'action_required': 'Review email manually - AI processing failed',
+                    'due_date': 'No deadline',
+                    'explanation': 'AI processing unavailable',
+                    'relevance': 'Manual review needed',
+                    'links': []
+                }
             
             action_item = {
                 'action': action_details.get('action_required', 'Review email'),
@@ -2009,8 +2107,12 @@ class UnifiedEmailGUI:
             self.email_processor.action_items_data[category].append(action_item)
             
         elif category == 'optional_event':
-            relevance = self.ai_processor.assess_event_relevance(
-                email_data['subject'], email_data['body'], self.ai_processor.get_job_context())
+            try:
+                relevance = self.ai_processor.assess_event_relevance(
+                    email_data['subject'], email_data['body'], self.ai_processor.get_job_context())
+            except Exception as e:
+                print(f"⚠️  AI relevance assessment failed for email '{email_data['subject'][:50]}...': {e}")
+                relevance = "Unable to assess relevance - continuing with processing"
             
             event_item = {
                 'relevance': relevance,
@@ -2022,8 +2124,12 @@ class UnifiedEmailGUI:
             self.email_processor.action_items_data[category].append(event_item)
         
         elif category == 'fyi':
-            context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
-            fyi_summary = self.ai_processor.generate_fyi_summary(email_content, context)
+            try:
+                context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+                fyi_summary = self.ai_processor.generate_fyi_summary(email_content, context)
+            except Exception as e:
+                print(f"⚠️  AI FYI summary failed for email '{email_data['subject'][:50]}...': {e}")
+                fyi_summary = f"• Summary unavailable - {email_data['subject'][:80]}"
             
             fyi_item = {
                 'summary': fyi_summary,
@@ -2035,7 +2141,8 @@ class UnifiedEmailGUI:
             self.email_processor.action_items_data[category].append(fyi_item)
             
         elif category == 'newsletter':
-            context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}"
+            # Enhanced context with full job role information for better relevance filtering
+            context = f"Job Context: {self.ai_processor.get_job_context()}\nSkills Profile: {self.ai_processor.get_job_skills()}\nRole Details: {self.ai_processor.get_job_role_context()}"
             newsletter_summary = self.ai_processor.generate_newsletter_summary(email_content, context)
             
             newsletter_item = {
@@ -2064,13 +2171,10 @@ class UnifiedEmailGUI:
     def cancel_processing(self):
         self.processing_cancelled = True
     
-    def reset_processing_ui(self):
-        self.cancel_processing_btn.config(state=tk.DISABLED)
-    
     def on_processing_complete(self):
         self.notebook.tab(1, state="normal")
         self.notebook.tab(3, state="normal")  # Enable accuracy dashboard tab
-        self.load_processed_emails()
+        self.refresh_email_tree()
         self.notebook.select(1)
         
         # Automatically select and display the first email for faster review
@@ -2086,10 +2190,6 @@ class UnifiedEmailGUI:
             self.email_tree.focus(first_item)
             # Display its details
             self.display_email_details(0)
-        
-    def load_processed_emails(self):
-        """Load processed emails into the tree view"""
-        self.refresh_email_tree()
     
     def sort_by_column(self, col):
         """Sort the email tree by the specified column"""
@@ -2121,28 +2221,12 @@ class UnifiedEmailGUI:
             elif col == 'From':
                 sort_key = email_data.get('sender_name', email_data.get('sender', '')).lower()
             elif col == 'Category':
-                # Sort by category priority: required_personal_action, team_action, etc.
-                category_priority = {
-                    'required_personal_action': 1,
-                    'team_action': 2,
-                    'optional_action': 3,
-                    'job_listing': 4,
-                    'optional_event': 5,
-                    'work_relevant': 6,
-                    'fyi': 7,
-                    'newsletter': 8,
-                    'spam_to_delete': 9
-                }
-                sort_key = category_priority.get(suggestion.get('ai_suggestion', ''), 99)
+                sort_key = self.CATEGORY_PRIORITY.get(suggestion.get('ai_suggestion', ''), 99)
             elif col == 'AI Summary':
                 sort_key = suggestion.get('ai_summary', '').lower()
             elif col == 'Date':
-                # Sort by date (most recent first when not reversed)
                 received_time = email_data.get('received_time')
-                if hasattr(received_time, 'timestamp'):
-                    sort_key = received_time.timestamp()
-                else:
-                    sort_key = 0
+                sort_key = received_time.timestamp() if hasattr(received_time, 'timestamp') else 0
             else:
                 sort_key = ''
             
@@ -2352,8 +2436,7 @@ class UnifiedEmailGUI:
                                        font=("Arial", 9, "bold"), 
                                        foreground="#f39c12")
         
-        # Configure link click behavior
-        self.preview_text.tag_bind("link", "<Button-1>", self._on_link_click)
+        # Configure hover feedback; individual links attach their own click handlers
         self.preview_text.tag_bind("link", "<Enter>", lambda e: self.preview_text.config(cursor="hand2"))
         self.preview_text.tag_bind("link", "<Leave>", lambda e: self.preview_text.config(cursor=""))
     
@@ -2363,101 +2446,39 @@ class UnifiedEmailGUI:
         if len(body) > 10000:
             body = body[:10000] + "\n\n[... content truncated for readability ...]"
         
-        # Clean up common email formatting issues
-        body = self._clean_email_formatting(body)
-        
-        # Find all URLs in the text
-        url_pattern = r'http[s]?://[^\s<>"\'\[\](){}|\\^`]+'
-        urls = []
-        
-        # Store URLs and their positions
-        for match in re.finditer(url_pattern, body):
-            urls.append({
-                'start': match.start(),
-                'end': match.end(),
-                'url': match.group(),
-                'display_url': self._create_display_url(match.group())
-            })
-        
+        # Clean up formatting and identify URLs
+        body = clean_email_formatting(body)
+        urls = find_urls_in_text(body)
+
         # Insert text with clickable links
         last_pos = 0
-        for url_info in urls:
+        for idx, url_info in enumerate(urls):
             # Insert text before the URL
             text_before = body[last_pos:url_info['start']]
-            self.preview_text.insert(tk.END, text_before, "body")
-            
-            # Insert clickable URL
+            if text_before:
+                self.preview_text.insert(tk.END, text_before, "body")
+
+            # Insert clickable URL with dedicated tag
             link_start = self.preview_text.index(tk.END)
             self.preview_text.insert(tk.END, url_info['display_url'], "link")
             link_end = self.preview_text.index(tk.END)
-            
-            # Store the actual URL for click handling
-            self.preview_text.tag_add(f"url_{url_info['start']}", link_start, link_end)
-            self.preview_text.tag_configure(f"url_{url_info['start']}", 
-                                          foreground="#3498db", 
-                                          underline=True)
-            self.preview_text.tag_bind(f"url_{url_info['start']}", "<Button-1>", 
-                                     lambda e, url=url_info['url']: self._open_url(url))
-            
+
+            tag_name = f"url_{idx}"
+            self.preview_text.tag_add(tag_name, link_start, link_end)
+            self.preview_text.tag_configure(tag_name, foreground="#3498db", underline=True)
+            self.preview_text.tag_bind(tag_name, "<Button-1>",
+                                     lambda e, target_url=url_info['url']: open_url(target_url))
+            self.preview_text.tag_bind(tag_name, "<Enter>",
+                                     lambda e: self.preview_text.config(cursor="hand2"))
+            self.preview_text.tag_bind(tag_name, "<Leave>",
+                                     lambda e: self.preview_text.config(cursor=""))
+
             last_pos = url_info['end']
-        
+
         # Insert remaining text
         remaining_text = body[last_pos:]
-        self.preview_text.insert(tk.END, remaining_text, "body")
-    
-    def _clean_email_formatting(self, body):
-        """Clean up common email formatting issues for better readability"""
-        # Remove excessive blank lines
-        body = re.sub(r'\n{3,}', '\n\n', body)
-        
-        # Clean up outlook-style forwarded/reply headers
-        body = re.sub(r'_{10,}', '\n' + '─' * 40 + '\n', body)
-        
-        # Clean up common email signatures separators
-        body = re.sub(r'-{5,}', '─' * 25, body)
-        
-        # Remove excessive spaces while preserving intentional formatting
-        lines = body.split('\n')
-        cleaned_lines = []
-        for line in lines:
-            # Clean up excessive spaces but preserve indentation
-            cleaned_line = re.sub(r'[ \t]{2,}', ' ', line.rstrip())
-            cleaned_lines.append(cleaned_line)
-        
-        return '\n'.join(cleaned_lines)
-    
-    def _create_display_url(self, url):
-        """Create a more readable display version of the URL"""
-        # Truncate very long URLs for better readability
-        if len(url) > 60:
-            # Try to show meaningful part of URL
-            from urllib.parse import urlparse
-            try:
-                parsed = urlparse(url)
-                domain = parsed.netloc
-                path = parsed.path[:30] + '...' if len(parsed.path) > 30 else parsed.path
-                return f"{domain}{path}"
-            except:
-                # Fallback: simple truncation
-                return url[:50] + "..."
-        return url
-    
-    def _on_link_click(self, event):
-        """Handle link clicks in the text widget"""
-        # Get the tag at the click position
-        tags = self.preview_text.tag_names(tk.CURRENT)
-        for tag in tags:
-            if tag.startswith("url_"):
-                # This will be handled by the specific URL tag binding
-                break
-    
-    def _open_url(self, url):
-        """Open URL in default browser"""
-        import webbrowser
-        try:
-            webbrowser.open(url)
-        except Exception as e:
-            messagebox.showwarning("Error Opening Link", f"Could not open URL: {url}\n\nError: {str(e)}")
+        if remaining_text:
+            self.preview_text.insert(tk.END, remaining_text, "body")
     
     def open_email_in_browser(self, email_data):
         """Open specific email in Outlook (or web fallback)"""
@@ -2504,163 +2525,6 @@ class UnifiedEmailGUI:
             except:
                 pass
     
-    def _on_custom_count_keypress(self, event):
-        """Auto-select 'Other' radio button when typing in custom count field"""
-        # Use after_idle to ensure the character is processed first
-        self.root.after_idle(self._validate_and_select_other)
-    
-    def _on_custom_count_focus(self, event):
-        """Auto-select 'Other' radio button when focusing on custom count field"""
-        current_value = self.custom_count_entry.get().strip()
-        if current_value:
-            self._validate_and_select_other()
-    
-    def _validate_and_select_other(self):
-        """Validate custom count input and auto-select 'Other' option"""
-        try:
-            current_value = self.custom_count_entry.get().strip()
-            if current_value:
-                # Try to parse as integer to validate
-                count = int(current_value)
-                if count > 0:
-                    # Valid number, select "other" option
-                    self.email_count_var.set("other")
-                else:
-                    # Invalid number, show validation message
-                    messagebox.showwarning("Invalid Input", 
-                                         "Please enter a positive number for email count.")
-                    self.custom_count_entry.delete(0, tk.END)
-        except ValueError:
-            # Not a valid number yet, but don't show error until they finish typing
-            # Only auto-select if there's content
-            if self.custom_count_entry.get().strip():
-                self.email_count_var.set("other")
-    
-    def _generate_email_links(self, email_data):
-        """Generate descriptive email links for tasks and summaries"""
-        links = []
-        
-        # Add View in Outlook link
-        outlook_link = {
-            'text': 'View in Outlook',
-            'action': lambda: self.open_email_in_browser(email_data)
-        }
-        links.append(outlook_link)
-        
-        return links
-    
-    def _create_descriptive_link_text(self, url, context='general'):
-        """Create descriptive text for a URL based on context"""
-        import urllib.parse
-        
-        try:
-            parsed = urllib.parse.urlparse(url.lower())
-            domain = parsed.netloc
-            path = parsed.path
-            
-            # Context-specific link descriptions
-            if context == 'job':
-                if 'apply' in url.lower() or 'application' in url.lower():
-                    return 'Apply Now'
-                elif 'career' in domain or 'jobs' in domain:
-                    return 'Job Details'
-                else:
-                    return 'View Job'
-            
-            elif context == 'event':
-                if 'register' in url.lower() or 'signup' in url.lower():
-                    return 'Register'
-                elif 'calendar' in url.lower() or 'event' in url.lower():
-                    return 'Event Details'
-                else:
-                    return 'View Event'
-            
-            elif context == 'newsletter':
-                if 'unsubscribe' in url.lower():
-                    return 'Unsubscribe'
-                elif 'archive' in url.lower():
-                    return 'View Archive'
-                else:
-                    return 'Read More'
-            
-            # Domain-based descriptions (check more specific patterns first)
-            if 'forms.' in domain or 'survey' in url.lower():
-                return 'Complete Survey'
-            elif 'github.com' in domain:
-                return 'View on GitHub'
-            elif 'linkedin.com' in domain:
-                return 'View on LinkedIn'
-            elif 'teams.microsoft.com' in domain:
-                return 'Join Teams Meeting'
-            elif 'docs.' in domain or 'documentation' in url.lower():
-                return 'View Documentation'
-            elif any(word in domain for word in ['zoom', 'meet', 'webex']):
-                return 'Join Meeting'
-            elif 'calendar' in url.lower():
-                return 'Add to Calendar'
-            elif 'outlook.com' in domain or (domain.endswith('office.com') and not domain.startswith('forms.')):
-                return 'View in Outlook'
-            
-            # Fallback to generic but still descriptive
-            if len(domain) > 30:
-                return f"Visit {domain[:25]}..."
-            else:
-                return f"Visit {domain}"
-                
-        except:
-            return 'View Link'
-    
-    def _format_task_dates(self, item):
-        """Format date(s) for task listing - single date or range for multi-email tasks"""
-        try:
-            # Check if this is a multi-email task (thread)
-            thread_data = item.get('thread_data', {})
-            if thread_data and thread_data.get('thread_count', 1) > 1:
-                # Multi-email task - show date range
-                all_emails = thread_data.get('all_emails_data', [])
-                if all_emails and len(all_emails) > 1:
-                    dates = []
-                    for email_data in all_emails:
-                        email_date = email_data.get('received_time')
-                        if hasattr(email_date, 'strftime'):
-                            dates.append(email_date)
-                    
-                    if dates:
-                        dates.sort()
-                        start_date = dates[0]
-                        end_date = dates[-1]
-                        
-                        # If same day, show single date
-                        if start_date.date() == end_date.date():
-                            return start_date.strftime('%b %d, %Y')
-                        else:
-                            # Show concise range
-                            if start_date.year == end_date.year:
-                                if start_date.month == end_date.month:
-                                    return f"{start_date.strftime('%b %d')}–{end_date.strftime('%d, %Y')}"
-                                else:
-                                    return f"{start_date.strftime('%b %d')}–{end_date.strftime('%b %d, %Y')}"
-                            else:
-                                return f"{start_date.strftime('%b %d, %Y')}–{end_date.strftime('%b %d, %Y')}"
-            
-            # Single email task - show single date
-            email_date = item.get('received_time') or item.get('email_date')
-            if email_date and hasattr(email_date, 'strftime'):
-                return email_date.strftime('%B %d, %Y at %I:%M %p')
-            
-            # Fallback to first_seen or unknown
-            if item.get('first_seen'):
-                try:
-                    first_seen = datetime.strptime(item['first_seen'], '%Y-%m-%d %H:%M:%S')
-                    return first_seen.strftime('%B %d, %Y')
-                except:
-                    pass
-            
-            return 'Unknown date'
-            
-        except Exception as e:
-            return 'Unknown date'
-    
     def on_category_change(self, event):
         if self.current_email_index is not None:
             current_category = self.get_category_internal_name(self.category_var.get())
@@ -2700,7 +2564,7 @@ class UnifiedEmailGUI:
         # Update UI
         self.apply_btn.config(state=tk.DISABLED)
         self.explanation_var.set("")
-        self.load_processed_emails()  # Refresh list
+        self.refresh_email_tree()  # Refresh list
         
     def edit_suggestion(self, email_index, new_category, user_explanation):
         if email_index >= len(self.email_suggestions):
@@ -2768,15 +2632,10 @@ class UnifiedEmailGUI:
             messagebox.showwarning("No Data", "No email suggestions to apply.")
             return
         
-        # NOW perform detailed AI analysis on finalized classifications
-        print("\n🚀 Starting detailed processing of finalized email classifications...")
-        try:
-            self.action_items_data = self.email_processor.process_detailed_analysis(self.email_suggestions)
-            print("✅ Detailed processing completed successfully")
-        except Exception as e:
-            print(f"❌ Error during detailed processing: {e}")
-            messagebox.showerror("Processing Error", f"Failed to complete detailed analysis: {e}")
-            return
+        # FAST PATH: Just apply the categorization without detailed analysis
+        # Detailed analysis will be done when user clicks "Generate Summary" button
+        print("\n🚀 Applying email categorization to Outlook (fast mode)...")
+        print("💡 Tip: Detailed summaries will be generated when you click 'Generate Summary'")
         
         # Calculate folder distribution for user preview
         inbox_categories = {'required_personal_action', 'optional_action', 'job_listing', 'work_relevant'}
@@ -2831,13 +2690,20 @@ This will help keep your inbox focused on actionable items only."""
     
     def generate_summary(self):
         self.generate_summary_btn.config(state=tk.DISABLED)
+        self.update_progress_text("🤖 Starting detailed AI processing for summary generation...")
         
-        # Ensure detailed processing is completed before generating summary
-        if self.email_suggestions and not self.action_items_data.get('required_personal_action') and not self.action_items_data.get('fyi'):
-            print("\n🔍 Performing detailed processing for summary generation...")
+        # ALWAYS perform detailed processing to generate comprehensive summaries
+        # This is the slow operation that we moved here from apply_to_outlook
+        if self.email_suggestions:
+            print("\n🔍 Performing detailed AI processing for comprehensive summaries...")
             try:
+                # Show progress message
+                self.update_progress_text("📊 Extracting action items and generating detailed summaries...")
+                self.update_progress_text("⏱️ This may take a minute - creating rich summaries for all emails...")
+                
                 self.action_items_data = self.email_processor.process_detailed_analysis(self.email_suggestions)
                 print("✅ Detailed processing completed for summary")
+                self.update_progress_text("✅ Detailed AI processing complete!")
             except Exception as e:
                 print(f"❌ Error during detailed processing: {e}")
                 messagebox.showerror("Processing Error", f"Failed to complete detailed analysis: {e}")
@@ -2978,17 +2844,10 @@ This will help keep your inbox focused on actionable items only."""
             self.summary_text.insert(tk.END, f"   From: {item["sender"]}", "item_meta")
             
             # Add sent date(s) using the new formatting function
-            sent_date = self._format_task_dates(item)
+            sent_date = format_task_dates(item)
             self.summary_text.insert(tk.END, f"  |  Sent: {sent_date}", "item_meta")
             
-            if item.get("first_seen"):
-                try:
-                    first_seen = datetime.strptime(item["first_seen"], "%Y-%m-%d %H:%M:%S")
-                    days_old = (datetime.now() - first_seen).days
-                    if days_old > 0:
-                        self.summary_text.insert(tk.END, f"  |  First seen: {days_old} days ago", "item_meta")
-                except:
-                    pass
+            self._insert_first_seen_age(item)
             self.summary_text.insert(tk.END, "\n", "item_meta")
             
             # Action details
@@ -3030,20 +2889,7 @@ This will help keep your inbox focused on actionable items only."""
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
             # Add View in Outlook link for each task item
-            email_data = item.get("email_data", {})
-            if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
-                link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
-                link_end = self.summary_text.index(tk.END)
-                
-                # Create unique tag for this email link
-                email_link_tag = f"email_link_{hash(str(email_data))}"
-                self.summary_text.tag_add(email_link_tag, link_start, link_end)
-                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
-                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
-                                         lambda e, data=email_data: self.open_email_in_browser(data))
-                self.summary_text.insert(tk.END, "\n", "content_text")
+            self._insert_email_link(item.get("email_data", {}))
             
             # Links
             if item.get('links'):
@@ -3058,26 +2904,11 @@ This will help keep your inbox focused on actionable items only."""
                     link_tag = f"link_{hash(link)}"
                     self.summary_text.tag_add(link_tag, link_start, link_end)
                     self.summary_text.tag_configure(link_tag, foreground="#007acc", underline=True)
-                    self.summary_text.tag_bind(link_tag, "<Button-1>", lambda e, url=link: self._open_url(url))
+                    self.summary_text.tag_bind(link_tag, "<Button-1>",
+                                             lambda e, url=link: open_url(url))
                     
                     if j < min(len(item['links']), 2) - 1:
                         self.summary_text.insert(tk.END, " | ", "content_text")
-                self.summary_text.insert(tk.END, "\n", "content_text")
-            
-            # Add View in Outlook link for each task item
-            email_data = item.get("email_data", {})
-            if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
-                link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
-                link_end = self.summary_text.index(tk.END)
-                
-                # Create unique tag for this email link
-                email_link_tag = f"email_link_{hash(str(email_data))}"
-                self.summary_text.tag_add(email_link_tag, link_start, link_end)
-                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
-                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
-                                         lambda e, data=email_data: self.open_email_in_browser(data))
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
             self.summary_text.insert(tk.END, "\n", "content_text")
@@ -3106,14 +2937,7 @@ This will help keep your inbox focused on actionable items only."""
             
             # Metadata
             self.summary_text.insert(tk.END, f"   From: {item['sender']}", "item_meta")
-            if item.get('first_seen'):
-                try:
-                    first_seen = datetime.strptime(item['first_seen'], '%Y-%m-%d %H:%M:%S')
-                    days_old = (datetime.now() - first_seen).days
-                    if days_old > 0:
-                        self.summary_text.insert(tk.END, f"  |  First seen: {days_old} days ago", "item_meta")
-                except:
-                    pass
+            self._insert_first_seen_age(item)
             self.summary_text.insert(tk.END, "\n", "item_meta")
             
             # Original action details (for reference)
@@ -3131,20 +2955,7 @@ This will help keep your inbox focused on actionable items only."""
             self.summary_text.insert(tk.END, "\n", "content_text")
             
             # Add View in Outlook link for each task item
-            email_data = item.get("email_data", {})
-            if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
-                link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
-                link_end = self.summary_text.index(tk.END)
-                
-                # Create unique tag for this email link
-                email_link_tag = f"email_link_{hash(str(email_data))}"
-                self.summary_text.tag_add(email_link_tag, link_start, link_end)
-                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
-                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
-                                         lambda e, data=email_data: self.open_email_in_browser(data))
-                self.summary_text.insert(tk.END, "\n", "content_text")
+            self._insert_email_link(item.get("email_data", {}))
 
     def _display_optional_actions(self, items):
         """Display optional action items with relevance context"""
@@ -3207,27 +3018,11 @@ This will help keep your inbox focused on actionable items only."""
                 
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
-            # Add View in Outlook link for each task item
-            email_data = item.get("email_data", {})
-            if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
-                link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
-                link_end = self.summary_text.index(tk.END)
-                
-                # Create unique tag for this email link
-                email_link_tag = f"email_link_{hash(str(email_data))}"
-                self.summary_text.tag_add(email_link_tag, link_start, link_end)
-                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
-                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
-                                         lambda e, data=email_data: self.open_email_in_browser(data))
-                self.summary_text.insert(tk.END, "\n", "content_text")
-            
-            # Links
+            # Links with descriptive text
             if item.get('links'):
-                self.summary_text.insert(tk.END, "   Links: ", "content_label")
+                self.summary_text.insert(tk.END, "   Related: ", "content_label")
                 for j, link in enumerate(item['links'][:2]):
-                    link_text = f"Link {j+1}"
+                    link_text = create_descriptive_link_text(link, 'general')
                     link_start = self.summary_text.index(tk.END)
                     self.summary_text.insert(tk.END, link_text, "link")
                     link_end = self.summary_text.index(tk.END)
@@ -3236,18 +3031,19 @@ This will help keep your inbox focused on actionable items only."""
                     link_tag = f"link_{hash(link)}"
                     self.summary_text.tag_add(link_tag, link_start, link_end)
                     self.summary_text.tag_configure(link_tag, foreground="#007acc", underline=True)
-                    self.summary_text.tag_bind(link_tag, "<Button-1>", lambda e, url=link: self._open_url(url))
+                    self.summary_text.tag_bind(link_tag, "<Button-1>",
+                                             lambda e, url=link: open_url(url))
                     
                     if j < min(len(item['links']), 2) - 1:
                         self.summary_text.insert(tk.END, " | ", "content_text")
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
-            # Add View in Outlook link for each task item
+            # View in Outlook link
             email_data = item.get("email_data", {})
             if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                self.summary_text.insert(tk.END, "   📧 ", "content_label")
                 link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                self.summary_text.insert(tk.END, "Open Email in Outlook", "link")
                 link_end = self.summary_text.index(tk.END)
                 
                 # Create unique tag for this email link
@@ -3259,22 +3055,6 @@ This will help keep your inbox focused on actionable items only."""
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
             self.summary_text.insert(tk.END, "\n", "content_text")
-            
-            # Add View in Outlook link for each task item
-            email_data = item.get("email_data", {})
-            if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
-                link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
-                link_end = self.summary_text.index(tk.END)
-                
-                # Create unique tag for this email link
-                email_link_tag = f"email_link_{hash(str(email_data))}"
-                self.summary_text.tag_add(email_link_tag, link_start, link_end)
-                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
-                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
-                                         lambda e, data=email_data: self.open_email_in_browser(data))
-                self.summary_text.insert(tk.END, "\n", "content_text")
     
     def _display_job_listings(self, items):
         """Display job listings with qualification match"""
@@ -3334,27 +3114,11 @@ This will help keep your inbox focused on actionable items only."""
                 
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
-            # Add View in Outlook link for each task item
-            email_data = item.get("email_data", {})
-            if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
-                link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
-                link_end = self.summary_text.index(tk.END)
-                
-                # Create unique tag for this email link
-                email_link_tag = f"email_link_{hash(str(email_data))}"
-                self.summary_text.tag_add(email_link_tag, link_start, link_end)
-                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
-                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
-                                         lambda e, data=email_data: self.open_email_in_browser(data))
-                self.summary_text.insert(tk.END, "\n", "content_text")
-            
-            # Links
+            # Application links with descriptive text
             if item.get('links'):
-                self.summary_text.insert(tk.END, "   Apply: ", "content_label")
+                self.summary_text.insert(tk.END, "   💼 ", "content_label")
                 for j, link in enumerate(item['links'][:2]):
-                    link_text = f"Apply {j+1}"
+                    link_text = create_descriptive_link_text(link, 'job')
                     link_start = self.summary_text.index(tk.END)
                     self.summary_text.insert(tk.END, link_text, "link")
                     link_end = self.summary_text.index(tk.END)
@@ -3363,18 +3127,19 @@ This will help keep your inbox focused on actionable items only."""
                     link_tag = f"link_{hash(link)}"
                     self.summary_text.tag_add(link_tag, link_start, link_end)
                     self.summary_text.tag_configure(link_tag, foreground="#007acc", underline=True)
-                    self.summary_text.tag_bind(link_tag, "<Button-1>", lambda e, url=link: self._open_url(url))
+                    self.summary_text.tag_bind(link_tag, "<Button-1>",
+                                             lambda e, url=link: open_url(url))
                     
                     if j < min(len(item['links']), 2) - 1:
                         self.summary_text.insert(tk.END, " | ", "content_text")
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
-            # Add View in Outlook link for each task item
+            # View in Outlook link
             email_data = item.get("email_data", {})
             if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                self.summary_text.insert(tk.END, "   📧 ", "content_label")
                 link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                self.summary_text.insert(tk.END, "Open Email in Outlook", "link")
                 link_end = self.summary_text.index(tk.END)
                 
                 # Create unique tag for this email link
@@ -3386,22 +3151,6 @@ This will help keep your inbox focused on actionable items only."""
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
             self.summary_text.insert(tk.END, "\n", "content_text")
-            
-            # Add View in Outlook link for each task item
-            email_data = item.get("email_data", {})
-            if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
-                link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
-                link_end = self.summary_text.index(tk.END)
-                
-                # Create unique tag for this email link
-                email_link_tag = f"email_link_{hash(str(email_data))}"
-                self.summary_text.tag_add(email_link_tag, link_start, link_end)
-                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
-                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
-                                         lambda e, data=email_data: self.open_email_in_browser(data))
-                self.summary_text.insert(tk.END, "\n", "content_text")
     
     def _display_events(self, items):
         """Display optional events with relevance"""
@@ -3421,9 +3170,9 @@ This will help keep your inbox focused on actionable items only."""
             
             # Links
             if item.get('links'):
-                self.summary_text.insert(tk.END, "   Register: ", "content_label")
+                self.summary_text.insert(tk.END, "   📅 ", "content_label")
                 for j, link in enumerate(item['links'][:2]):
-                    link_text = self._create_descriptive_link_text(link, "event")
+                    link_text = create_descriptive_link_text(link, "event")
                     link_start = self.summary_text.index(tk.END)
                     self.summary_text.insert(tk.END, link_text, "link")
                     link_end = self.summary_text.index(tk.END)
@@ -3432,18 +3181,19 @@ This will help keep your inbox focused on actionable items only."""
                     link_tag = f"link_{hash(link)}"
                     self.summary_text.tag_add(link_tag, link_start, link_end)
                     self.summary_text.tag_configure(link_tag, foreground="#007acc", underline=True)
-                    self.summary_text.tag_bind(link_tag, "<Button-1>", lambda e, url=link: self._open_url(url))
+                    self.summary_text.tag_bind(link_tag, "<Button-1>",
+                                             lambda e, url=link: open_url(url))
                     
                     if j < min(len(item['links']), 2) - 1:
                         self.summary_text.insert(tk.END, " | ", "content_text")
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
-            # Add View in Outlook link for each task item
+            # View in Outlook link
             email_data = item.get("email_data", {})
             if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
+                self.summary_text.insert(tk.END, "   📧 ", "content_label")
                 link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
+                self.summary_text.insert(tk.END, "Open Email in Outlook", "link")
                 link_end = self.summary_text.index(tk.END)
                 
                 # Create unique tag for this email link
@@ -3452,25 +3202,29 @@ This will help keep your inbox focused on actionable items only."""
                 self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
                 self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
                                          lambda e, data=email_data: self.open_email_in_browser(data))
+                self.summary_text.insert(tk.END, "\n", "content_text")
+            
+            # Individual dismiss button for this event
+            if item.get('task_id'):
+                self.summary_text.insert(tk.END, "   ", "content_text")
+                
+                dismiss_button = tk.Button(
+                    self.summary_text,
+                    text="🗑️ Not Interested",
+                    command=lambda task_id=item['task_id']: self._dismiss_single_event(task_id),
+                    bg="#f8d7da",
+                    fg="#721c24",
+                    font=("Arial", 8, "bold"),
+                    relief="raised",
+                    padx=5,
+                    pady=2,
+                    cursor="hand2"
+                )
+                
+                self.summary_text.window_create(tk.END, window=dismiss_button)
                 self.summary_text.insert(tk.END, "\n", "content_text")
             
             self.summary_text.insert(tk.END, "\n", "content_text")
-            
-            # Add View in Outlook link for each task item
-            email_data = item.get("email_data", {})
-            if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
-                link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
-                link_end = self.summary_text.index(tk.END)
-                
-                # Create unique tag for this email link
-                email_link_tag = f"email_link_{hash(str(email_data))}"
-                self.summary_text.tag_add(email_link_tag, link_start, link_end)
-                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
-                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
-                                         lambda e, data=email_data: self.open_email_in_browser(data))
-                self.summary_text.insert(tk.END, "\n", "content_text")
     
     def _display_fyi_notices(self, items):
         """Display FYI notices as bullet points with dismiss functionality"""
@@ -3485,7 +3239,7 @@ This will help keep your inbox focused on actionable items only."""
             dismiss_fyi_button = tk.Button(
                 self.summary_text,
                 text="🗑️ Clear All FYI Items",
-                command=self._dismiss_all_fyi_items,
+                command=lambda: self._dismiss_category('fyi', 'FYI Items', self.task_persistence.clear_fyi_items),
                 bg="#f8d7da",
                 fg="#721c24",
                 font=("Arial", 8, "bold"),
@@ -3496,23 +3250,7 @@ This will help keep your inbox focused on actionable items only."""
             )
             
             self.summary_text.window_create(tk.END, window=dismiss_fyi_button)
-            self.summary_text.insert(tk.END, "\n", "content_text")
-            
-            # Add View in Outlook link for each task item
-            email_data = item.get("email_data", {})
-            if email_data:
-                self.summary_text.insert(tk.END, "   Email: ", "content_label")
-                link_start = self.summary_text.index(tk.END)
-                self.summary_text.insert(tk.END, "View in Outlook", "link")
-                link_end = self.summary_text.index(tk.END)
-                
-                # Create unique tag for this email link
-                email_link_tag = f"email_link_{hash(str(email_data))}"
-                self.summary_text.tag_add(email_link_tag, link_start, link_end)
-                self.summary_text.tag_configure(email_link_tag, foreground="#007acc", underline=True)
-                self.summary_text.tag_bind(email_link_tag, "<Button-1>", 
-                                         lambda e, data=email_data: self.open_email_in_browser(data))
-                self.summary_text.insert(tk.END, "\n", "content_text")
+            self.summary_text.insert(tk.END, "\n\n", "content_text")
         
         self.summary_text.insert(tk.END, "\n", "content_text")
 
@@ -3538,7 +3276,7 @@ This will help keep your inbox focused on actionable items only."""
             dismiss_newsletter_button = tk.Button(
                 self.summary_text,
                 text="🗑️ Clear All Newsletters",
-                command=self._dismiss_all_newsletters,
+                command=lambda: self._dismiss_category('newsletter', 'Newsletter Items', self.task_persistence.clear_newsletter_items),
                 bg="#fff3cd",
                 fg="#856404",
                 font=("Arial", 8, "bold"),
@@ -3571,47 +3309,48 @@ This will help keep your inbox focused on actionable items only."""
         
         self.summary_text.insert(tk.END, "\n", "content_text")
     
-    def _dismiss_all_fyi_items(self):
-        """Dismiss all FYI items from persistent storage and refresh summary"""
-        result = messagebox.askyesno("Clear FYI Items", 
-                                   "Clear all FYI items?\n\n"
-                                   "This will remove all FYI notices from your summary.")
+    def _dismiss_category(self, category_name, display_name, clear_method):
+        """Generic method to dismiss items from a category"""
+        result = messagebox.askyesno(f"Clear {display_name}", 
+                                   f"Clear all {display_name.lower()}?\n\n"
+                                   f"This will remove all {display_name.lower()} from your summary.")
         if result:
-            cleared_count = self.task_persistence.clear_fyi_items()
+            cleared_count = clear_method()
             if cleared_count > 0:
-                messagebox.showinfo("FYI Items Cleared", f"Cleared {cleared_count} FYI items.")
-                # Refresh the summary to show the changes - use outstanding tasks only
+                messagebox.showinfo(f"{display_name} Cleared", f"Cleared {cleared_count} {display_name.lower()}.")
                 self._refresh_summary_after_dismiss()
             else:
-                messagebox.showinfo("No Items", "No FYI items to clear.")
+                messagebox.showinfo("No Items", f"No {display_name.lower()} to clear.")
     
-    def _dismiss_all_newsletters(self):
-        """Dismiss all newsletter items from persistent storage and refresh summary"""
-        result = messagebox.askyesno("Clear Newsletter Items", 
-                                   "Clear all newsletter items?\n\n"
-                                   "This will remove all newsletter summaries from your summary.")
-        if result:
-            cleared_count = self.task_persistence.clear_newsletter_items()
-            if cleared_count > 0:
-                messagebox.showinfo("Newsletter Items Cleared", f"Cleared {cleared_count} newsletter items.")
-                # Refresh the summary to show the changes - use outstanding tasks only
+    def _dismiss_single_event(self, task_id):
+        """Dismiss a single optional event by task_id"""
+        # Load outstanding tasks
+        outstanding_tasks = self.task_persistence.load_outstanding_tasks()
+        
+        # Find and remove the specific event
+        if 'optional_events' in outstanding_tasks:
+            original_count = len(outstanding_tasks['optional_events'])
+            outstanding_tasks['optional_events'] = [
+                event for event in outstanding_tasks['optional_events'] 
+                if event.get('task_id') != task_id
+            ]
+            new_count = len(outstanding_tasks['optional_events'])
+            
+            if original_count > new_count:
+                # Save the updated tasks
+                self.task_persistence._save_tasks_to_file(
+                    self.task_persistence.tasks_file,
+                    {
+                        'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'tasks': outstanding_tasks
+                    }
+                )
+                
+                print(f"🗑️ Dismissed optional event: {task_id}")
+                # Refresh the summary display
                 self._refresh_summary_after_dismiss()
             else:
-                messagebox.showinfo("No Items", "No newsletter items to clear.")
-    
-    def _dismiss_all_optional_events(self):
-        """Dismiss all optional event items from persistent storage and refresh summary"""
-        result = messagebox.askyesno("Clear Optional Events", 
-                                   "Clear all optional event items?\n\n"
-                                   "This will remove all optional events from your summary.")
-        if result:
-            cleared_count = self.task_persistence.clear_optional_events()
-            if cleared_count > 0:
-                messagebox.showinfo("Optional Events Cleared", f"Cleared {cleared_count} optional event items.")
-                # Refresh the summary to show the changes - use outstanding tasks only
-                self._refresh_summary_after_dismiss()
-            else:
-                messagebox.showinfo("No Items", "No optional event items to clear.")
+                print(f"⚠️ Could not find event to dismiss: {task_id}")
     
     def _refresh_summary_after_dismiss(self):
         """Refresh summary display after dismissing items"""
@@ -3756,7 +3495,7 @@ This will help keep your inbox focused on actionable items only."""
                             'subject': task.get('subject', 'No subject'),
                             'sender': task.get('sender', task.get('email_sender', 'Unknown')),
                             'section': section_key.replace('_', ' ').title(),
-                            'days_old': self._calculate_task_age(task)
+                            'days_old': calculate_task_age(task)
                         }
                         all_tasks.append(task_entry)
                     except Exception as e:
@@ -3873,23 +3612,6 @@ This will help keep your inbox focused on actionable items only."""
         else:
             pass  # User cancelled
     
-    def cleanup_old_tasks(self):
-        """Clean up old completed tasks"""
-        result = messagebox.askyesno("Clean Up", 
-                                   "Remove completed tasks older than 30 days?\n\n"
-                                   "This will permanently delete old completed task records.")
-        if result:
-            self.task_persistence.cleanup_old_completed_tasks(days_to_keep=30)
-            messagebox.showinfo("Cleanup Complete", "Old completed tasks have been removed.")
-    
-    def _calculate_task_age(self, task):
-        """Calculate how many days old a task is"""
-        try:
-            first_seen = datetime.strptime(task.get('first_seen', ''), '%Y-%m-%d %H:%M:%S')
-            return (datetime.now() - first_seen).days
-        except:
-            return 0
-    
     def view_outstanding_tasks_only(self):
         """Load and display outstanding tasks without processing new emails"""
         try:
@@ -3973,14 +3695,8 @@ This will help keep your inbox focused on actionable items only."""
         except Exception as e:
             print(f"Error in tab change handler: {e}")
     
-    def run(self):
-        self.root.mainloop()
-
-
-def main():
-    app = UnifiedEmailGUI()
-    app.run()
 
 
 if __name__ == "__main__":
-    main()
+    app = UnifiedEmailGUI()
+    app.root.mainloop()

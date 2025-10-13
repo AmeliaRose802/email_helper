@@ -358,24 +358,81 @@ class SummaryGenerator:
             return None
     
     def _remove_duplicate_items(self, summary_sections, ai_processor):
-        """Remove duplicate action items, FYIs, etc. from final summary sections using content similarity"""
+        """Remove duplicate action items, FYIs, etc. from final summary sections using advanced AI deduplication"""
         duplicates_removed = 0
         
         # Process action-oriented sections that benefit from duplicate detection
-        action_sections = ['required_actions', 'team_actions', 'optional_actions', 'fyi_notices']
+        action_sections = ['required_actions', 'team_actions', 'optional_actions']
         
         for section_name in action_sections:
             if section_name not in summary_sections or len(summary_sections[section_name]) <= 1:
                 continue
-                
+            
+            print(f"🔍 Applying advanced AI deduplication to {section_name}...")
             items = summary_sections[section_name]
+            
+            # Use advanced AI deduplication for action items
+            if ai_processor and hasattr(ai_processor, 'advanced_deduplicate_action_items'):
+                original_count = len(items)
+                deduplicated_items = ai_processor.advanced_deduplicate_action_items(items)
+                items_removed = original_count - len(deduplicated_items)
+                duplicates_removed += items_removed
+                summary_sections[section_name] = deduplicated_items
+            else:
+                # Fallback to legacy approach if advanced method unavailable
+                unique_items = []
+                
+                for item in items:
+                    # Check if this item is a duplicate of any item already in unique_items
+                    is_duplicate = False
+                    
+                    # First try content-based similarity if email_analyzer is available
+                    if hasattr(ai_processor, 'email_analyzer') and ai_processor.email_analyzer:
+                        for unique_item in unique_items:
+                            is_similar, similarity_score = ai_processor.email_analyzer.calculate_content_similarity(
+                                item, unique_item, threshold=0.75
+                            )
+                            
+                            if is_similar:
+                                # Merge information from duplicate into unique item
+                                self._merge_summary_items(unique_item, item, similarity_score)
+                                is_duplicate = True
+                                duplicates_removed += 1
+                                
+                                item_subject = (item.get('subject', item.get('summary', 'unknown')))[:40]
+                                unique_subject = (unique_item.get('subject', unique_item.get('summary', 'unknown')))[:40]
+                                print(f"🤖 Merged duplicate {section_name[:-1]}: '{item_subject}...' → '{unique_subject}...' (similarity: {similarity_score:.2f})")
+                                break
+                    
+                    # Fallback to AI-powered detection if content similarity didn't catch it
+                    if not is_duplicate and ai_processor:
+                        is_ai_duplicate, duplicate_of = self._ai_detect_duplicate_intent(
+                            item, unique_items, ai_processor
+                        )
+                        
+                        if is_ai_duplicate:
+                            is_duplicate = True
+                            duplicates_removed += 1
+                            
+                            item_subject = (item.get('subject', item.get('summary', 'unknown')))[:40]
+                            duplicate_subject = (duplicate_of.get('subject', duplicate_of.get('summary', 'unknown')))[:40] if duplicate_of else 'unknown item'
+                            print(f"🤖 AI detected duplicate {section_name[:-1]}: '{item_subject}...' → similar to '{duplicate_subject}...'")
+                    
+                    if not is_duplicate:
+                        unique_items.append(item)
+                
+                # Update the section with deduplicated items
+                summary_sections[section_name] = unique_items
+        
+        # Apply simpler deduplication to FYI notices (legacy approach)
+        if 'fyi_notices' in summary_sections and len(summary_sections['fyi_notices']) > 1:
+            items = summary_sections['fyi_notices']
             unique_items = []
             
             for item in items:
-                # Check if this item is a duplicate of any item already in unique_items
                 is_duplicate = False
                 
-                # First try content-based similarity if email_analyzer is available
+                # Check similarity against existing unique items
                 if hasattr(ai_processor, 'email_analyzer') and ai_processor.email_analyzer:
                     for unique_item in unique_items:
                         is_similar, similarity_score = ai_processor.email_analyzer.calculate_content_similarity(
@@ -383,35 +440,15 @@ class SummaryGenerator:
                         )
                         
                         if is_similar:
-                            # Merge information from duplicate into unique item
                             self._merge_summary_items(unique_item, item, similarity_score)
                             is_duplicate = True
                             duplicates_removed += 1
-                            
-                            item_subject = (item.get('subject', item.get('summary', 'unknown')))[:40]
-                            unique_subject = (unique_item.get('subject', unique_item.get('summary', 'unknown')))[:40]
-                            print(f"🤖 Merged duplicate {section_name[:-1]}: '{item_subject}...' → '{unique_subject}...' (similarity: {similarity_score:.2f})")
                             break
-                
-                # Fallback to AI-powered detection if content similarity didn't catch it
-                if not is_duplicate and ai_processor:
-                    is_ai_duplicate, duplicate_of = self._ai_detect_duplicate_intent(
-                        item, unique_items, ai_processor
-                    )
-                    
-                    if is_ai_duplicate:
-                        is_duplicate = True
-                        duplicates_removed += 1
-                        
-                        item_subject = (item.get('subject', item.get('summary', 'unknown')))[:40]
-                        duplicate_subject = (duplicate_of.get('subject', duplicate_of.get('summary', 'unknown')))[:40] if duplicate_of else 'unknown item'
-                        print(f"🤖 AI detected duplicate {section_name[:-1]}: '{item_subject}...' → similar to '{duplicate_subject}...'")
                 
                 if not is_duplicate:
                     unique_items.append(item)
             
-            # Update the section with deduplicated items
-            summary_sections[section_name] = unique_items
+            summary_sections['fyi_notices'] = unique_items
         
         if duplicates_removed > 0:
             print(f"📋 Final summary: {duplicates_removed} duplicate items removed")

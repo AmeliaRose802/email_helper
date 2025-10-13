@@ -315,13 +315,74 @@ class AIProcessor:
                 raise RuntimeError(f"Prompty library unavailable: {e}")
                 
         except Exception as e:
-            print(f"\n🚨 PROMPTY EXECUTION FAILED")
-            print(f"Error: {e}")
-            print(f"Prompty file: {prompty_file}")
-            print(f"Azure config: {azure_config}")
-            print(f"Inputs: {inputs}")
-            raise RuntimeError(f"Prompty execution failed: {e}")
+            # Check if this is a content filter error
+            error_str = str(e).lower()
+            is_content_filter = any(phrase in error_str for phrase in [
+                'content_filter', 'content management policy', 'responsibleaipolicyviolation',
+                'jailbreak', 'filtered', 'badrequeesterror'
+            ])
+            
+            # Also check the error type
+            error_type = type(e).__name__.lower()
+            is_wrapped_openai_error = 'wrappedopenaierror' in error_type
+            
+            if is_content_filter or is_wrapped_openai_error:
+                print(f"\n⚠️  CONTENT FILTER BLOCKED: {prompty_file}")
+                print(f"Reason: Azure OpenAI content policy violation")
+                print(f"Error details: {str(e)[:200]}...")
+                # Return a safe fallback response instead of crashing
+                return self._get_content_filter_fallback(prompty_file, inputs)
+            else:
+                print(f"\n🚨 PROMPTY EXECUTION FAILED")
+                print(f"Error: {e}")
+                print(f"Prompty file: {prompty_file}")
+                print(f"Azure config: {azure_config}")
+                print(f"Inputs: {inputs}")
+                # Return fallback instead of raising exception
+                return self._get_execution_error_fallback(prompty_file, inputs)
     
+    def _get_content_filter_fallback(self, prompty_file, inputs):
+        """Return appropriate fallback response when content filter blocks the request"""
+        if 'email_one_line_summary' in prompty_file:
+            subject = inputs.get('subject', 'Email')
+            return f"Summary blocked by content filter - {subject[:80]}"
+        elif 'event_relevance_assessment' in prompty_file:
+            return "Unable to assess relevance - content filter triggered"
+        elif 'email_classifier' in prompty_file:
+            return '{"category": "fyi", "explanation": "Classification blocked by content filter"}'
+        elif 'fyi_summary' in prompty_file:
+            subject = inputs.get('subject', 'Email')
+            return f"• Summary blocked by content filter - {subject[:80]}"
+        elif 'newsletter_summary' in prompty_file:
+            return "Newsletter summary blocked by content filter"
+        elif 'summerize_action_item' in prompty_file:
+            return '{"action_required": "Review email manually", "due_date": "No deadline", "explanation": "Content filter blocked analysis", "relevance": "Manual review needed", "links": []}'
+        elif 'holistic_inbox_analyzer' in prompty_file:
+            return '{"truly_relevant_actions": [], "superseded_actions": [], "duplicate_groups": [], "expired_items": []}'
+        else:
+            return "Content filter blocked - manual review required"
+    
+    def _get_execution_error_fallback(self, prompty_file, inputs):
+        """Return appropriate fallback response when AI execution fails"""
+        if 'email_one_line_summary' in prompty_file:
+            subject = inputs.get('subject', 'Email')
+            return f"AI unavailable - {subject[:80]}"
+        elif 'event_relevance_assessment' in prompty_file:
+            return "Unable to assess relevance - AI service unavailable"
+        elif 'email_classifier' in prompty_file:
+            return '{"category": "fyi", "explanation": "AI service unavailable for classification"}'
+        elif 'fyi_summary' in prompty_file:
+            subject = inputs.get('subject', 'Email')
+            return f"• AI unavailable - {subject[:80]}"
+        elif 'newsletter_summary' in prompty_file:
+            return "Newsletter summary unavailable - AI service error"
+        elif 'summerize_action_item' in prompty_file:
+            return '{"action_required": "Review email manually", "due_date": "No deadline", "explanation": "AI service unavailable", "relevance": "Manual review needed", "links": []}'
+        elif 'holistic_inbox_analyzer' in prompty_file:
+            return '{"truly_relevant_actions": [], "superseded_actions": [], "duplicate_groups": [], "expired_items": []}'
+        else:
+            return "AI processing unavailable"
+
     def get_job_context(self):
         if os.path.exists(self.job_summary_file):
             return self.parse_prompty_file(self.job_summary_file)
@@ -340,7 +401,7 @@ class AIProcessor:
         return "Job role context unavailable"
     
     def get_standard_context(self) -> str:
-        return f"Job Context: {self.get_job_context()}\nSkills Profile: {self.get_job_skills()}"
+        return f"Job Context: {self.get_job_context()}\nSkills Profile: {self.get_job_skills()}\nRole Details: {self.get_job_role_context()}"
     
     def _create_email_inputs(self, email_content, context):
         return {
@@ -692,7 +753,14 @@ Preview: {body_preview}
         result = self.execute_prompty('summerize_action_item.prompty', inputs)
         
         if not result or not result.strip():
-            raise RuntimeError(f"AI prompty execution failed - no response for: {email_content.get('subject', 'Unknown')}")
+            # Return fallback data instead of raising exception
+            return {
+                "action_required": f"Review email: {email_content.get('subject', 'Unknown')[:100]}",
+                "due_date": "No specific deadline",
+                "explanation": "AI processing unavailable - please review manually",
+                "links": [],
+                "relevance": "Manual review needed"
+            }
         
         # Try to parse JSON with fallback
         fallback_data = {
@@ -715,7 +783,15 @@ Preview: {body_preview}
         
         inputs = self._create_email_inputs(email_content, context)
         result = self.execute_prompty('event_relevance_assessment.prompty', inputs)
-        return result.strip() if result else "Professional development opportunity"
+        
+        # Handle fallback responses
+        if result and result.strip():
+            response = result.strip()
+            # If it's a fallback message, return it as-is
+            if any(phrase in response.lower() for phrase in ['content filter', 'unavailable', 'blocked']):
+                return response
+            return response
+        return "Professional development opportunity"
     
     def generate_fyi_summary(self, email_content, context):
         inputs = self._create_email_inputs(email_content, context)
@@ -733,6 +809,133 @@ Preview: {body_preview}
         if result and result.strip():
             return clean_markdown_formatting(result.strip())
         return f"Newsletter from {email_content.get('sender', 'Unknown')}: {email_content.get('subject', 'No summary')}"
+
+    def advanced_deduplicate_action_items(self, action_items):
+        """Use advanced AI to intelligently deduplicate action items by detecting same underlying tasks"""
+        if not action_items or len(action_items) <= 1:
+            return action_items
+        
+        try:
+            # Format action items for AI analysis
+            items_for_analysis = []
+            for i, item in enumerate(action_items):
+                item_summary = {
+                    'id': f"item_{i+1}",
+                    'subject': item.get('subject', 'No subject'),
+                    'sender': item.get('sender', 'Unknown sender'),
+                    'action_required': item.get('action_required', 'No action specified'),
+                    'due_date': item.get('due_date', 'No deadline'),
+                    'explanation': item.get('explanation', 'No details'),
+                    'entry_id': item.get('_entry_id', 'No ID')
+                }
+                items_for_analysis.append(item_summary)
+            
+            # Call AI for intelligent deduplication
+            inputs = {
+                'action_items': json.dumps(items_for_analysis, indent=2)
+            }
+            
+            print(f"🤖 Running advanced AI deduplication on {len(action_items)} action items...")
+            result = self.execute_prompty('action_item_deduplication.prompty', inputs)
+            
+            if result:
+                # Parse AI response
+                dedup_result = parse_json_with_fallback(result.strip())
+                if dedup_result and 'duplicates_found' in dedup_result:
+                    return self._apply_deduplication_results(action_items, dedup_result)
+                else:
+                    print("⚠️  AI deduplication returned invalid format, keeping all items")
+                    
+        except Exception as e:
+            print(f"⚠️  Advanced AI deduplication failed: {e}")
+        
+        return action_items
+    
+    def _apply_deduplication_results(self, original_items, dedup_result):
+        """Apply AI deduplication results to merge related action items"""
+        try:
+            deduplicated_items = []
+            processed_indices = set()
+            duplicates_merged = 0
+            
+            # Process duplicate groups
+            for dup_group in dedup_result.get('duplicates_found', []):
+                primary_id = dup_group.get('primary_item_id', '')
+                duplicate_ids = dup_group.get('duplicate_item_ids', [])
+                merged_action = dup_group.get('merged_action', '')
+                merged_due_date = dup_group.get('merged_due_date', '')
+                reason = dup_group.get('reason', 'Similar underlying task')
+                confidence = dup_group.get('confidence', 0.0)
+                
+                # Extract indices from item IDs
+                try:
+                    primary_idx = int(primary_id.replace('item_', '')) - 1
+                    duplicate_indices = [int(id_.replace('item_', '')) - 1 for id_ in duplicate_ids]
+                except (ValueError, AttributeError):
+                    continue
+                
+                if 0 <= primary_idx < len(original_items) and all(0 <= idx < len(original_items) for idx in duplicate_indices):
+                    # Create merged item based on primary item
+                    primary_item = original_items[primary_idx].copy()
+                    
+                    # Apply AI-suggested merging
+                    if merged_action:
+                        primary_item['action_required'] = merged_action
+                    if merged_due_date and merged_due_date != 'earliest_deadline_from_group':
+                        primary_item['due_date'] = merged_due_date
+                    
+                    # Find the earliest deadline among all items in the group
+                    all_indices = [primary_idx] + duplicate_indices
+                    earliest_date = None
+                    for idx in all_indices:
+                        item_date = original_items[idx].get('due_date', '')
+                        if item_date and item_date != 'No specific deadline':
+                            try:
+                                parsed_date = parse_date_string(item_date)
+                                if parsed_date and (not earliest_date or parsed_date < earliest_date):
+                                    earliest_date = parsed_date
+                                    primary_item['due_date'] = item_date
+                            except:
+                                pass
+                    
+                    # Track merged emails for transparency
+                    if 'contributing_emails' not in primary_item:
+                        primary_item['contributing_emails'] = []
+                    
+                    for dup_idx in duplicate_indices:
+                        dup_item = original_items[dup_idx]
+                        contrib_info = {
+                            'subject': dup_item.get('subject', ''),
+                            'sender': dup_item.get('sender', ''),
+                            'entry_id': dup_item.get('_entry_id', ''),
+                            'merge_reason': reason,
+                            'confidence': confidence
+                        }
+                        primary_item['contributing_emails'].append(contrib_info)
+                    
+                    # Add enhanced explanation
+                    original_explanation = primary_item.get('explanation', '')
+                    primary_item['explanation'] = f"{original_explanation} [AI merged {len(duplicate_indices)} related reminder(s): {reason}]"
+                    
+                    deduplicated_items.append(primary_item)
+                    processed_indices.update([primary_idx] + duplicate_indices)
+                    duplicates_merged += len(duplicate_indices)
+                    
+                    print(f"   🔗 Merged {len(duplicate_indices)} duplicates into '{primary_item.get('subject', 'Unknown')}': {reason}")
+            
+            # Add remaining unique items
+            for i, item in enumerate(original_items):
+                if i not in processed_indices:
+                    deduplicated_items.append(item)
+            
+            if duplicates_merged > 0:
+                print(f"✅ Advanced AI deduplication completed: {duplicates_merged} duplicates merged, {len(deduplicated_items)} unique items remain")
+            
+            return deduplicated_items
+            
+        except Exception as e:
+            print(f"⚠️  Error applying deduplication results: {e}")
+            return original_items
 
     def save_learning_feedback(self, feedback_entries):
         """Save learning feedback to improve AI over time"""

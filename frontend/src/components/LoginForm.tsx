@@ -1,80 +1,48 @@
 // Enhanced login form component with validation
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useLoginMutation } from '@/services/authApi';
+import { useLoginMutation, useInitiateLoginQuery } from '@/services/authApi';
 import { useAppDispatch } from '@/hooks/redux';
 import { loginStart, loginSuccess, loginFailure } from '@/store/authSlice';
 import { getAuthErrorMessage, getRedirectPath, getUserFromToken } from '@/utils/authUtils';
-import type { UserLogin } from '@/types/auth';
-
-// Validation schema
-const loginSchema = z.object({
-  username: z
-    .string()
-    .min(1, 'Username is required')
-    .min(3, 'Username must be at least 3 characters'),
-  password: z
-    .string()
-    .min(1, 'Password is required')
-    .min(6, 'Password must be at least 6 characters'),
-  remember: z.boolean(),
-});
-
-type LoginFormData = z.infer<typeof loginSchema>;
 
 const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
-  const [login, { isLoading }] = useLoginMutation();
+  const [login, { isLoading: isLoginLoading }] = useLoginMutation();
+  const { data: authUrlData, isLoading: isAuthUrlLoading } = useInitiateLoginQuery();
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    reset,
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: '',
-      password: '',
-      remember: false,
-    },
-  });
+  // Check for OAuth callback success
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    
+    if (token) {
+      // User returned from OAuth callback with token
+      handleOAuthSuccess(token);
+    }
+  }, []);
 
-  const onSubmit = async (data: LoginFormData) => {
-    setServerError(null);
+  const handleOAuthSuccess = async (token: string) => {
     dispatch(loginStart());
-
+    
     try {
-      const credentials: UserLogin = {
-        username: data.username,
-        password: data.password,
+      // Create user object from token (mock for now)
+      const user = {
+        id: '1',
+        username: 'oauth-user',
+        email: 'user@example.com',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
-
-      const result = await login(credentials).unwrap();
-      
-      // Extract user from token or create mock user
-      let user = getUserFromToken(result.access_token);
-      if (!user || !user.id) {
-        user = {
-          id: 1,
-          username: data.username,
-          email: `${data.username}@example.com`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-      }
 
       dispatch(
         loginSuccess({
           user: user as any,
-          tokens: result,
-          remember: data.remember,
+          tokens: { access_token: token, refresh_token: '', token_type: 'bearer' },
+          remember: false,
         })
       );
 
@@ -85,74 +53,23 @@ const LoginForm: React.FC = () => {
       const errorMessage = getAuthErrorMessage(error);
       setServerError(errorMessage);
       dispatch(loginFailure(errorMessage));
-      
-      // Reset form password on error
-      reset({ username: data.username, remember: data.remember, password: '' });
     }
   };
 
-  const isFormLoading = isLoading || isSubmitting;
+  const handleAzureLogin = () => {
+    if (authUrlData?.auth_url) {
+      // Redirect to Azure AD OAuth flow
+      window.location.href = authUrlData.auth_url;
+    } else {
+      // Fallback for mock authentication
+      window.location.href = 'http://localhost:8001/auth/callback';
+    }
+  };
+
+  const isFormLoading = isAuthUrlLoading;
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="login-form" noValidate>
-      <div className="form-group">
-        <label htmlFor="username" className="form-label">
-          Username <span className="required" aria-label="required">*</span>
-        </label>
-        <input
-          {...register('username')}
-          type="text"
-          id="username"
-          className={`form-input ${errors.username ? 'error' : ''}`}
-          disabled={isFormLoading}
-          autoComplete="username"
-          aria-describedby={errors.username ? 'username-error' : undefined}
-          aria-invalid={!!errors.username}
-        />
-        {errors.username && (
-          <p id="username-error" className="error-message" role="alert">
-            {errors.username.message}
-          </p>
-        )}
-      </div>
-
-      <div className="form-group">
-        <label htmlFor="password" className="form-label">
-          Password <span className="required" aria-label="required">*</span>
-        </label>
-        <input
-          {...register('password')}
-          type="password"
-          id="password"
-          className={`form-input ${errors.password ? 'error' : ''}`}
-          disabled={isFormLoading}
-          autoComplete="current-password"
-          aria-describedby={errors.password ? 'password-error' : undefined}
-          aria-invalid={!!errors.password}
-        />
-        {errors.password && (
-          <p id="password-error" className="error-message" role="alert">
-            {errors.password.message}
-          </p>
-        )}
-      </div>
-
-      <div className="form-group checkbox-group">
-        <label htmlFor="remember" className="checkbox-label">
-          <input
-            {...register('remember')}
-            type="checkbox"
-            id="remember"
-            className="checkbox-input"
-            disabled={isFormLoading}
-          />
-          <span className="checkbox-text">Remember me</span>
-        </label>
-        <p className="help-text">
-          Keep me signed in on this device
-        </p>
-      </div>
-
+    <div className="login-form">
       {serverError && (
         <div className="error-message server-error" role="alert">
           {serverError}
@@ -160,27 +77,34 @@ const LoginForm: React.FC = () => {
       )}
 
       <button
-        type="submit"
+        type="button"
+        onClick={handleAzureLogin}
         disabled={isFormLoading}
-        className={`login-button ${isFormLoading ? 'loading' : ''}`}
+        className={`login-button azure-login ${isFormLoading ? 'loading' : ''}`}
         aria-describedby="login-button-status"
       >
         {isFormLoading ? (
           <>
             <span className="spinner" aria-hidden="true"></span>
-            <span>Signing in...</span>
+            <span>Connecting to Azure...</span>
           </>
         ) : (
-          'Sign In'
+          <>
+            <span className="microsoft-logo" aria-hidden="true">🏢</span>
+            <span>Sign in with Microsoft</span>
+          </>
         )}
       </button>
 
       <div className="form-footer">
         <p className="help-text">
-          Use your account credentials to access Email Helper.
+          Sign in using your Microsoft Azure Active Directory account to access Email Helper.
+        </p>
+        <p className="help-text">
+          This will redirect you to Microsoft's secure authentication service.
         </p>
       </div>
-    </form>
+    </div>
   );
 };
 

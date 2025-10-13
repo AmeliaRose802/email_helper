@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Azure Configuration Manager - Secure Azure OpenAI authentication
+Azure Configuration Manager - Azure OpenAI + Azure AD OAuth authentication
 Uses DefaultAzureCredential (az login) with fallback to environment variables
+Supports OAuth Single Sign-On with service principal identity
 """
 
 import os

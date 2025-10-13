@@ -14,12 +14,17 @@ export const authApi = apiSlice.injectEndpoints({
       invalidatesTags: ['User'],
     }),
 
-    // User login
-    login: builder.mutation<Token, UserLogin>({
-      query: (credentials) => ({
+    // Initiate OAuth login
+    initiateLogin: builder.query<{ auth_url: string; state: string }, void>({
+      query: () => '/auth/login',
+    }),
+
+    // User login with Azure token
+    login: builder.mutation<Token, { access_token: string }>({
+      query: (tokenData) => ({
         url: '/auth/login',
         method: 'POST',
-        body: credentials,
+        body: tokenData,
       }),
       invalidatesTags: ['User'],
     }),
@@ -51,6 +56,7 @@ export const authApi = apiSlice.injectEndpoints({
 
 export const {
   useRegisterMutation,
+  useInitiateLoginQuery,
   useLoginMutation,
   useRefreshTokenMutation,
   useGetCurrentUserQuery,

@@ -1,0 +1,40 @@
+{
+  "name": "email-helper",
+  "version": "1.0.0",
+  "description": "Intelligent email management system with AI processing",
+  "scripts": {
+    "start": "concurrently \"npm run simple-api\" \"npm run frontend\" --names \"API,WEB\" --prefix-colors \"cyan,green\" --kill-others-on-fail",
+    "start:full": "concurrently \"npm run backend\" \"npm run frontend\" --names \"API,WEB\" --prefix-colors \"blue,green\" --kill-others-on-fail",
+    "backend": "python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000",
+    "frontend": "cd frontend && npm run dev",
+    "simple-api": "python simple_api.py",
+    "gui": "python email_manager_main.py",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\" --names \"API,WEB\" --prefix-colors \"blue,green\" --restart-tries 3",
+    "dev:simple": "concurrently \"npm run simple-api\" \"npm run frontend\" --names \"API,WEB\" --prefix-colors \"cyan,green\" --restart-tries 3",
+    "install-deps": "cd frontend && npm install && echo Frontend dependencies installed!",
+    "setup": "npm install && npm run install-deps && echo All dependencies installed!",
+    "build": "cd frontend && npm run build",
+    "test": "cd frontend && npm test",
+    "lint": "cd frontend && npm run lint",
+    "format": "cd frontend && npm run format",
+    "health": "echo Checking services... && curl -f http://localhost:8000/health && curl -f http://localhost:3000"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "email",
+    "ai",
+    "management",
+    "automation",
+    "outlook",
+    "fastapi",
+    "react"
+  ],
+  "author": "Amelia Payne",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "python": ">=3.8"
+  }
+}
