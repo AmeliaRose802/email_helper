@@ -34,8 +34,18 @@ azure_config.json
 frontend/dist/
 frontend/build/
 
-# Frontend dependencies
+# Frontend dependencies - DO NOT COMMIT
 frontend/node_modules/
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 # Frontend local config
 frontend/.env.local

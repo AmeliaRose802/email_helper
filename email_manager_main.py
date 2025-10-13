@@ -17,9 +17,10 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(script_dir, 'src')
 sys.path.append(src_dir)
 
+import tkinter as tk
 from core.service_factory import ServiceFactory
 from core.config import config
-from unified_gui import UnifiedEmailGUI
+from email_helper_app import EmailHelperApp
 
 
 def setup_logging():
@@ -50,8 +51,8 @@ def validate_configuration():
 
 
 def main():
-    """Main application entry point."""
-    print("🚀 Starting Email Helper...")
+    """Main application entry point - now using clean MVC architecture."""
+    print("🚀 Starting Email Helper (MVC Architecture)...")
     
     # Setup logging
     setup_logging()
@@ -63,12 +64,12 @@ def main():
         sys.exit(1)
     
     try:
-        # Create service factory
-        factory = ServiceFactory()
+        # Create Tkinter root window
+        root = tk.Tk()
         
-        # Create and run the main application
-        app = UnifiedEmailGUI(factory)
-        logger.info("Email Helper started successfully")
+        # Create and run the main application with MVC architecture
+        app = EmailHelperApp(root)
+        logger.info("Email Helper started successfully with MVC architecture")
         app.run()
         
     except KeyboardInterrupt:
