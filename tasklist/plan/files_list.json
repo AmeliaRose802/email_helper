@@ -1,30 +1,5 @@
 [
   {
-    "task_id": "T0.1",
-    "files": [
-      {
-        "pattern": "src/outlook_manager.py",
-        "type": "exact"
-      },
-      {
-        "pattern": "src/ai_processor.py",
-        "type": "exact"
-      },
-      {
-        "pattern": "backend/services/adapters/__init__.py",
-        "type": "exact"
-      },
-      {
-        "pattern": "backend/services/adapters/outlook_adapter.py",
-        "type": "exact"
-      },
-      {
-        "pattern": "backend/services/adapters/ai_adapter.py",
-        "type": "exact"
-      }
-    ]
-  },
-  {
     "task_id": "T1.1",
     "files": [
       {
