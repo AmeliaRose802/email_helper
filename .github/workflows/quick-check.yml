@@ -1,0 +1,50 @@
+name: Quick Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  quick-test:
+    name: Quick Validation
+    runs-on: windows-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install minimal dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-mock pytest-asyncio
+        shell: pwsh
+      
+      - name: Create required directories
+        run: |
+          New-Item -ItemType Directory -Force -Path runtime_data/database
+          New-Item -ItemType Directory -Force -Path user_specific_data
+        shell: pwsh
+      
+      - name: Run syntax check
+        run: |
+          python -m py_compile src/**/*.py backend/**/*.py
+        shell: pwsh
+        continue-on-error: true
+      
+      - name: Quick import test
+        run: |
+          python -c "import sys; sys.path.insert(0, 'src'); from core import config; print('✅ Core imports working')"
+        shell: pwsh
+      
+      - name: Run essential tests only
+        run: |
+          python -m pytest test/essential_tests.py -v --tb=line --maxfail=3 -x
+        shell: pwsh
