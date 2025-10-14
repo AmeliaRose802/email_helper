@@ -1,382 +1,44 @@
 {
   "metadata": {
     "generated_from": "files_list.json",
-    "total_tasks": 21,
+    "total_tasks": 18,
     "description": "Lists file pattern conflicts between tasks"
   },
   "conflicts": [
     {
-      "task_id": "T5.2",
-      "conflicts_with": [
-        {
-          "task_id": "T1.1",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/services/com_email_provider.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/services/email_provider.py"
-            }
-          ]
-        },
-        {
-          "task_id": "T1.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/services/com_ai_service.py"
-            }
-          ]
-        },
-        {
-          "task_id": "T1.3",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/core/config.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/api/emails.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/api/ai.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/api/tasks.py"
-            }
-          ]
-        },
-        {
-          "task_id": "T1.4",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/api/auth.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/core/security.py"
-            }
-          ]
-        },
-        {
-          "task_id": "T1.5",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/tests/test_com_email_provider.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/tests/test_com_ai_service.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/tests/integration/test_com_backend.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/tests/conftest.py"
-            }
-          ]
-        },
-        {
-          "task_id": "T2.1",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/src/services/authApi.ts"
-            },
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/vite.config.ts"
-            }
-          ]
-        },
-        {
-          "task_id": "T2.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/src/services/emailApi.ts"
-            },
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/src/services/aiApi.ts"
-            },
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/src/services/taskApi.ts"
-            }
-          ]
-        },
-        {
-          "task_id": "T3.1",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/tests/e2e/fixtures/test-setup.ts"
-            },
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/tests/e2e/email-processing.spec.ts"
-            },
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/tests/e2e/email-editing.spec.ts"
-            },
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/tests/e2e/summary-generation.spec.ts"
-            },
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/tests/e2e/task-management.spec.ts"
-            },
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/tests/e2e/visual-regression.spec.ts"
-            },
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/playwright.config.ts"
-            }
-          ]
-        },
-        {
-          "task_id": "T3.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/tests/integration/test_com_outlook_integration.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/tests/integration/test_ai_processing_integration.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/tests/integration/test_full_workflow_integration.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/tests/integration/test_api_endpoints_integration.py"
-            }
-          ]
-        },
-        {
-          "task_id": "T3.4",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/tests/performance/test_email_processing_perf.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/tests/performance/test_ai_performance.py"
-            },
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/tests/performance/lighthouse-tests.ts"
-            }
-          ]
-        },
-        {
-          "task_id": "T5.3",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/services/com_email_provider.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/services/com_ai_service.py"
-            },
-            {
-              "my_pattern": "backend/.*\\.py$",
-              "other_pattern": "backend/api/.*\\.py$"
-            },
-            {
-              "my_pattern": "frontend/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/src/.*\\.(ts|tsx)$"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 11,
+      "task_id": "T0.1",
+      "conflicts_with": [],
+      "conflict_count": 0,
       "files": [
         {
-          "pattern": "backend/.*\\.py$",
-          "type": "regex"
-        },
-        {
-          "pattern": "frontend/.*\\.(ts|tsx)$",
-          "type": "regex"
-        },
-        {
-          "pattern": "package.json",
+          "pattern": "src/outlook_manager.py",
           "type": "exact"
         },
         {
-          "pattern": "requirements.txt",
-          "type": "exact"
-        }
-      ]
-    },
-    {
-      "task_id": "T5.3",
-      "conflicts_with": [
-        {
-          "task_id": "T1.1",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/services/com_email_provider.py",
-              "other_pattern": "backend/services/com_email_provider.py"
-            }
-          ]
-        },
-        {
-          "task_id": "T1.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/services/com_ai_service.py",
-              "other_pattern": "backend/services/com_ai_service.py"
-            }
-          ]
-        },
-        {
-          "task_id": "T1.3",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/api/.*\\.py$",
-              "other_pattern": "backend/api/emails.py"
-            },
-            {
-              "my_pattern": "backend/api/.*\\.py$",
-              "other_pattern": "backend/api/ai.py"
-            },
-            {
-              "my_pattern": "backend/api/.*\\.py$",
-              "other_pattern": "backend/api/tasks.py"
-            }
-          ]
-        },
-        {
-          "task_id": "T1.4",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/api/.*\\.py$",
-              "other_pattern": "backend/api/auth.py"
-            }
-          ]
-        },
-        {
-          "task_id": "T2.1",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "frontend/src/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/src/services/authApi.ts"
-            }
-          ]
-        },
-        {
-          "task_id": "T2.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "frontend/src/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/src/services/emailApi.ts"
-            },
-            {
-              "my_pattern": "frontend/src/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/src/services/aiApi.ts"
-            },
-            {
-              "my_pattern": "frontend/src/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/src/services/taskApi.ts"
-            }
-          ]
-        },
-        {
-          "task_id": "T5.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/services/com_email_provider.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/services/com_ai_service.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/api/.*\\.py$",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "frontend/src/.*\\.(ts|tsx)$",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 7,
-      "files": [
-        {
-          "pattern": "backend/services/com_email_provider.py",
+          "pattern": "src/ai_processor.py",
           "type": "exact"
         },
         {
-          "pattern": "backend/services/com_ai_service.py",
+          "pattern": "backend/services/adapters/__init__.py",
           "type": "exact"
         },
         {
-          "pattern": "backend/api/.*\\.py$",
-          "type": "regex"
+          "pattern": "backend/services/adapters/outlook_adapter.py",
+          "type": "exact"
         },
         {
-          "pattern": "frontend/src/.*\\.(ts|tsx)$",
-          "type": "regex"
+          "pattern": "backend/services/adapters/ai_adapter.py",
+          "type": "exact"
         }
       ]
     },
     {
       "task_id": "T1.1",
-      "conflicts_with": [
-        {
-          "task_id": "T5.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/services/com_email_provider.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/services/email_provider.py",
-              "other_pattern": "backend/.*\\.py$"
-            }
-          ]
-        },
-        {
-          "task_id": "T5.3",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/services/com_email_provider.py",
-              "other_pattern": "backend/services/com_email_provider.py"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 2,
+      "conflicts_with": [],
+      "conflict_count": 0,
       "files": [
         {
           "pattern": "backend/services/com_email_provider.py",
-          "type": "exact"
-        },
-        {
-          "pattern": "src/outlook_manager.py",
           "type": "exact"
         },
         {
@@ -387,34 +49,11 @@
     },
     {
       "task_id": "T1.2",
-      "conflicts_with": [
-        {
-          "task_id": "T5.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/services/com_ai_service.py",
-              "other_pattern": "backend/.*\\.py$"
-            }
-          ]
-        },
-        {
-          "task_id": "T5.3",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/services/com_ai_service.py",
-              "other_pattern": "backend/services/com_ai_service.py"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 2,
+      "conflicts_with": [],
+      "conflict_count": 0,
       "files": [
         {
           "pattern": "backend/services/com_ai_service.py",
-          "type": "exact"
-        },
-        {
-          "pattern": "src/ai_processor.py",
           "type": "exact"
         },
         {
@@ -422,54 +61,15 @@
           "type": "exact"
         },
         {
-          "pattern": "prompts/.*\\.prompty$",
+          "pattern": "prompts/.*\\\\.prompty$",
           "type": "regex"
         }
       ]
     },
     {
       "task_id": "T1.3",
-      "conflicts_with": [
-        {
-          "task_id": "T5.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/core/config.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/api/emails.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/api/ai.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/api/tasks.py",
-              "other_pattern": "backend/.*\\.py$"
-            }
-          ]
-        },
-        {
-          "task_id": "T5.3",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/api/emails.py",
-              "other_pattern": "backend/api/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/api/ai.py",
-              "other_pattern": "backend/api/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/api/tasks.py",
-              "other_pattern": "backend/api/.*\\.py$"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 2,
+      "conflicts_with": [],
+      "conflict_count": 0,
       "files": [
         {
           "pattern": "backend/core/config.py",
@@ -482,173 +82,13 @@
         {
           "pattern": "backend/api/ai.py",
           "type": "exact"
-        },
-        {
-          "pattern": "backend/api/tasks.py",
-          "type": "exact"
-        }
-      ]
-    },
-    {
-      "task_id": "T1.4",
-      "conflicts_with": [
-        {
-          "task_id": "T5.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/api/auth.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/core/security.py",
-              "other_pattern": "backend/.*\\.py$"
-            }
-          ]
-        },
-        {
-          "task_id": "T5.3",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/api/auth.py",
-              "other_pattern": "backend/api/.*\\.py$"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 2,
-      "files": [
-        {
-          "pattern": "backend/api/auth.py",
-          "type": "exact"
-        },
-        {
-          "pattern": "backend/core/security.py",
-          "type": "exact"
-        }
-      ]
-    },
-    {
-      "task_id": "T2.1",
-      "conflicts_with": [
-        {
-          "task_id": "T5.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "frontend/src/services/authApi.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            },
-            {
-              "my_pattern": "frontend/vite.config.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            }
-          ]
-        },
-        {
-          "task_id": "T5.3",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "frontend/src/services/authApi.ts",
-              "other_pattern": "frontend/src/.*\\.(ts|tsx)$"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 2,
-      "files": [
-        {
-          "pattern": "frontend/src/services/authApi.ts",
-          "type": "exact"
-        },
-        {
-          "pattern": "frontend/.env.local",
-          "type": "exact"
-        },
-        {
-          "pattern": "frontend/vite.config.ts",
-          "type": "exact"
-        }
-      ]
-    },
-    {
-      "task_id": "T2.2",
-      "conflicts_with": [
-        {
-          "task_id": "T5.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "frontend/src/services/emailApi.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            },
-            {
-              "my_pattern": "frontend/src/services/aiApi.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            },
-            {
-              "my_pattern": "frontend/src/services/taskApi.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            }
-          ]
-        },
-        {
-          "task_id": "T5.3",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "frontend/src/services/emailApi.ts",
-              "other_pattern": "frontend/src/.*\\.(ts|tsx)$"
-            },
-            {
-              "my_pattern": "frontend/src/services/aiApi.ts",
-              "other_pattern": "frontend/src/.*\\.(ts|tsx)$"
-            },
-            {
-              "my_pattern": "frontend/src/services/taskApi.ts",
-              "other_pattern": "frontend/src/.*\\.(ts|tsx)$"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 2,
-      "files": [
-        {
-          "pattern": "frontend/src/services/emailApi.ts",
-          "type": "exact"
-        },
-        {
-          "pattern": "frontend/src/services/aiApi.ts",
-          "type": "exact"
-        },
-        {
-          "pattern": "frontend/src/services/taskApi.ts",
-          "type": "exact"
         }
       ]
     },
     {
       "task_id": "T1.5",
-      "conflicts_with": [
-        {
-          "task_id": "T5.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/tests/test_com_email_provider.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/tests/test_com_ai_service.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/tests/integration/test_com_backend.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/tests/conftest.py",
-              "other_pattern": "backend/.*\\.py$"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 1,
+      "conflicts_with": [],
+      "conflict_count": 0,
       "files": [
         {
           "pattern": "backend/tests/test_com_email_provider.py",
@@ -669,152 +109,39 @@
       ]
     },
     {
-      "task_id": "T3.1",
-      "conflicts_with": [
-        {
-          "task_id": "T5.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "frontend/tests/e2e/fixtures/test-setup.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            },
-            {
-              "my_pattern": "frontend/tests/e2e/email-processing.spec.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            },
-            {
-              "my_pattern": "frontend/tests/e2e/email-editing.spec.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            },
-            {
-              "my_pattern": "frontend/tests/e2e/summary-generation.spec.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            },
-            {
-              "my_pattern": "frontend/tests/e2e/task-management.spec.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            },
-            {
-              "my_pattern": "frontend/tests/e2e/visual-regression.spec.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            },
-            {
-              "my_pattern": "frontend/playwright.config.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 1,
+      "task_id": "T2.1",
+      "conflicts_with": [],
+      "conflict_count": 0,
       "files": [
         {
-          "pattern": "frontend/tests/e2e/fixtures/test-setup.ts",
+          "pattern": "frontend/.env.local",
           "type": "exact"
         },
         {
-          "pattern": "frontend/tests/e2e/email-processing.spec.ts",
+          "pattern": "frontend/vite.config.ts",
           "type": "exact"
         },
         {
-          "pattern": "frontend/tests/e2e/email-editing.spec.ts",
-          "type": "exact"
-        },
-        {
-          "pattern": "frontend/tests/e2e/summary-generation.spec.ts",
-          "type": "exact"
-        },
-        {
-          "pattern": "frontend/tests/e2e/task-management.spec.ts",
-          "type": "exact"
-        },
-        {
-          "pattern": "frontend/tests/e2e/visual-regression.spec.ts",
-          "type": "exact"
-        },
-        {
-          "pattern": "frontend/playwright.config.ts",
+          "pattern": "frontend/src/config/api.ts",
           "type": "exact"
         }
       ]
     },
     {
-      "task_id": "T3.2",
-      "conflicts_with": [
-        {
-          "task_id": "T5.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/tests/integration/test_com_outlook_integration.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/tests/integration/test_ai_processing_integration.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/tests/integration/test_full_workflow_integration.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/tests/integration/test_api_endpoints_integration.py",
-              "other_pattern": "backend/.*\\.py$"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 1,
+      "task_id": "T2.2",
+      "conflicts_with": [],
+      "conflict_count": 0,
       "files": [
         {
-          "pattern": "backend/tests/integration/test_com_outlook_integration.py",
+          "pattern": "frontend/src/services/emailApi.ts",
           "type": "exact"
         },
         {
-          "pattern": "backend/tests/integration/test_ai_processing_integration.py",
+          "pattern": "frontend/src/services/aiApi.ts",
           "type": "exact"
         },
         {
-          "pattern": "backend/tests/integration/test_full_workflow_integration.py",
-          "type": "exact"
-        },
-        {
-          "pattern": "backend/tests/integration/test_api_endpoints_integration.py",
-          "type": "exact"
-        }
-      ]
-    },
-    {
-      "task_id": "T3.4",
-      "conflicts_with": [
-        {
-          "task_id": "T5.2",
-          "conflicting_patterns": [
-            {
-              "my_pattern": "backend/tests/performance/test_email_processing_perf.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "backend/tests/performance/test_ai_performance.py",
-              "other_pattern": "backend/.*\\.py$"
-            },
-            {
-              "my_pattern": "frontend/tests/performance/lighthouse-tests.ts",
-              "other_pattern": "frontend/.*\\.(ts|tsx)$"
-            }
-          ]
-        }
-      ],
-      "conflict_count": 1,
-      "files": [
-        {
-          "pattern": "backend/tests/performance/test_email_processing_perf.py",
-          "type": "exact"
-        },
-        {
-          "pattern": "backend/tests/performance/test_ai_performance.py",
-          "type": "exact"
-        },
-        {
-          "pattern": "frontend/tests/performance/lighthouse-tests.ts",
+          "pattern": "frontend/src/services/taskApi.ts",
           "type": "exact"
         }
       ]
@@ -848,10 +175,6 @@
           "type": "exact"
         },
         {
-          "pattern": ".env.production.example",
-          "type": "exact"
-        },
-        {
           "pattern": "backend/.env.localhost.example",
           "type": "exact"
         },
@@ -862,20 +185,66 @@
       ]
     },
     {
+      "task_id": "T3.1",
+      "conflicts_with": [],
+      "conflict_count": 0,
+      "files": [
+        {
+          "pattern": "frontend/tests/e2e/fixtures/test-setup.ts",
+          "type": "exact"
+        },
+        {
+          "pattern": "frontend/tests/e2e/email-processing.spec.ts",
+          "type": "exact"
+        },
+        {
+          "pattern": "frontend/tests/e2e/email-editing.spec.ts",
+          "type": "exact"
+        },
+        {
+          "pattern": "frontend/tests/e2e/summary-generation.spec.ts",
+          "type": "exact"
+        },
+        {
+          "pattern": "frontend/tests/e2e/task-management.spec.ts",
+          "type": "exact"
+        },
+        {
+          "pattern": "frontend/playwright.config.ts",
+          "type": "exact"
+        }
+      ]
+    },
+    {
+      "task_id": "T3.2",
+      "conflicts_with": [],
+      "conflict_count": 0,
+      "files": [
+        {
+          "pattern": "backend/tests/integration/test_com_outlook_integration.py",
+          "type": "exact"
+        },
+        {
+          "pattern": "backend/tests/integration/test_ai_processing_integration.py",
+          "type": "exact"
+        },
+        {
+          "pattern": "backend/tests/integration/test_full_workflow_integration.py",
+          "type": "exact"
+        }
+      ]
+    },
+    {
       "task_id": "T3.3",
       "conflicts_with": [],
       "conflict_count": 0,
       "files": [
         {
-          "pattern": ".github/workflows/test-com-backend.yml",
+          "pattern": ".github/workflows/merge-validation.yml",
           "type": "exact"
         },
         {
-          "pattern": ".github/workflows/test-frontend.yml",
-          "type": "exact"
-        },
-        {
-          "pattern": ".github/workflows/test-integration.yml",
+          "pattern": ".github/workflows/quick-check.yml",
           "type": "exact"
         }
       ]
@@ -887,14 +256,6 @@
       "files": [
         {
           "pattern": "docs/LOCALHOST_SETUP.md",
-          "type": "exact"
-        },
-        {
-          "pattern": "docs/GRAPH_API_SETUP.md",
-          "type": "exact"
-        },
-        {
-          "pattern": "docs/SWITCHING_PROVIDERS.md",
           "type": "exact"
         },
         {
@@ -939,15 +300,7 @@
           "type": "exact"
         },
         {
-          "pattern": "scripts/start-localhost.sh",
-          "type": "exact"
-        },
-        {
           "pattern": "scripts/stop-all.bat",
-          "type": "exact"
-        },
-        {
-          "pattern": "scripts/stop-all.sh",
           "type": "exact"
         },
         {
@@ -962,7 +315,7 @@
       "conflict_count": 0,
       "files": [
         {
-          "pattern": ".github/issues/.*\\.md$",
+          "pattern": ".github/issues/.*\\\\.md$",
           "type": "regex"
         }
       ]

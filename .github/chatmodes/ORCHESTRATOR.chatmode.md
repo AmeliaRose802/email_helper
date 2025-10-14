@@ -48,8 +48,12 @@ ONLY STOP: After BLOCK 6 complete OR critical error
 - ❌ NEVER wait for user approval after merging
 - ❌ NEVER stop after creating PRs
 - ❌ NEVER exit while script is running
+- ❌ NEVER merge PRs until Watch-Copilot-PRs.ps1 confirms ALL validation passed
+- ❌ NEVER merge PRs with failing CI checks
+- ❌ NEVER merge PRs with pending CI checks
 - ✅ ALWAYS immediately start next block
 - ✅ ALWAYS use blocking Watch-Copilot-PRs.ps1
+- ✅ ALWAYS wait for script to exit code 0 (all validation passed)
 - ✅ ONLY stop after all 6 blocks OR critical error
 
 ---
@@ -68,7 +72,7 @@ ONLY STOP: After BLOCK 6 complete OR critical error
    
    PR 1: Type analysis functions
    - owner: AmeliaRose802
-   - repo: enhanced-ado-mcp
+   - repo: email_helper
    - title: "tech-debt: Type analysis functions with WorkItemAnalysis interfaces"
    - problem_statement: See orchestrator-script.md BLOCK 1 Agent 1
    
@@ -84,25 +88,38 @@ ONLY STOP: After BLOCK 6 complete OR critical error
 
 2. **Block yourself:**
    ```powershell
-   cd c:\Users\ameliapayne\ADO-Work-Item-MSP
+   cd c:\Users\ameliapayne\email_helper\.github\dev\dev_scripts
    .\Watch-Copilot-PRs.ps1 -PRNumbers <actual-PR-numbers-from-step-1>
    ```
    **[YOU ARE NOW BLOCKED FOR 1-2 HOURS]**
    
+   **WHAT HAPPENS DURING BLOCKING:**
+   - Script polls every 30 seconds
+   - Automatically approves workflow runs (enables validation pipelines)
+   - Monitors CI check status
+   - Waits for ALL checks to pass (not just finish)
+   - Only exits when: Copilot done + All CI passed + Mergeable
+   
 3. **Script exits (PRs ready):**
    - You automatically resume
-   - Report: "🎉 BLOCK 1 complete! All 4 PRs ready"
+   - ALL validation has passed - guaranteed
+   - Report: "🎉 BLOCK 1 complete! All 4 PRs ready and validated"
 
-4. **Merge PRs immediately (no asking!):**
+4. **Merge PRs immediately (no asking!) - ONLY IF VALIDATION PASSED:**
    ```
+   VALIDATION REQUIREMENT:
+   - Ensure ALL PRs show "Ready for Merge" status from monitoring script
+   - This means: Copilot finished + CI checks PASSED + Mergeable
+   - NEVER merge if CI checks are still running or failed
+   
    Use GitHub merge tools to merge all 4 PRs
    ```
 
 5. **Run integration tests:**
    ```powershell
-   cd c:\Users\ameliapayne\ADO-Work-Item-MSP\mcp_server
-   npm test
-   npm run build
+   cd c:\Users\ameliapayne\email_helper
+   python -m pytest test/
+   python email_manager_main.py --test
    ```
 
 6. **IMMEDIATELY START BLOCK 2:**
@@ -123,16 +140,18 @@ ONLY STOP: After BLOCK 6 complete OR critical error
    ```powershell
    .\Watch-Copilot-PRs.ps1 -PRNumbers <PR-5,6,7-numbers>
    ```
-   **[BLOCKED FOR 2-3 HOURS]**
+   **[BLOCKED FOR 2-3 HOURS - waiting for full validation]**
 
-3. **Merge in dependency order:**
+3. **Script exits with code 0 (all validation passed)**
+
+4. **Merge in dependency order (ONLY after validation confirmed):**
    - Merge PR 5 first (service)
    - Merge PR 7 second (storage)
    - Merge PR 6 third (schemas)
 
-4. **Run tests**
+5. **Run tests**
 
-5. **IMMEDIATELY START BLOCK 3**
+6. **IMMEDIATELY START BLOCK 3**
 
 ### BLOCK 3: Handler Updates (4 PRs)
 
@@ -199,15 +218,19 @@ When PR shows "Base branch was modified":
 4. NEVER ask user - always fix automatically
 ```
 
-### CI Failures (ALWAYS FIX AUTOMATICALLY)
+### CI Failures (ALWAYS FIX AUTOMATICALLY - NEVER MERGE WITHOUT PASSING)
 ```
 If PR fails CI checks:
 1. Review CI logs
 2. Fix issues in the branch
 3. git push fixes
-4. Wait for CI to pass
-5. Proceed with merge
-6. NEVER ask user unless truly catastrophic (>3 failures)
+4. Wait for CI to pass - BLOCKING REQUIREMENT
+5. ONLY proceed with merge when ALL checks pass
+6. NEVER merge if any check is failing or pending
+7. NEVER ask user unless truly catastrophic (>3 failures)
+
+IMPORTANT: The monitoring script will NOT mark PRs as ready
+until all CI checks have explicitly passed. Trust the script.
 ```
 
 ### Agent Stuck (>3 hours no activity)
@@ -221,7 +244,7 @@ If Copilot agent not progressing:
 
 ### Test Failures After Merge
 ```
-If npm test fails after merging:
+If pytest fails after merging:
 1. Review test output
 2. Create immediate fix PR
 3. Merge fix
@@ -244,6 +267,8 @@ When script exits, you resume and report:
 ```
 🎉 BLOCK X COMPLETE!
 - All Y PRs ready for merge
+- ✅ All validation pipelines PASSED
+- ✅ All CI checks PASSED  
 - Time elapsed: Z hours
 - Merging now...
 - Running tests...
