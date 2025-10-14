@@ -8,7 +8,7 @@ python-dotenv>=1.0.0           # Environment variable management
 
 # Azure OpenAI integration  
 openai>=1.3.0                  # Azure OpenAI client library
-prompty>=1.0.0                 # Microsoft Prompty for AI prompt management
+prompty>=0.1.50                # Microsoft Prompty for AI prompt management (1.0.0 not yet released)
 azure-identity>=1.15.0         # Azure authentication using DefaultAzureCredential
 
 # Optional: Enhanced text processing (can be removed if not used)
