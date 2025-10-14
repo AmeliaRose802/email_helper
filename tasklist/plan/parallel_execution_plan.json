@@ -23,7 +23,17 @@
               }
             ],
             "depends_on": [],
-            "conflicts_with": []
+            "conflicts_with": [],
+            "status": "completed",
+            "completed_at": "2025-10-14T22:31:30.790313+00:00",
+            "pr_number": 74,
+            "pr_url": "https://github.com/AmeliaRose802/email_helper/pull/74",
+            "completion_type": "direct",
+            "files_modified": [
+              "backend/services/com_email_provider.py",
+              "backend/services/email_provider.py",
+              "backend/tests/test_com_email_provider.py"
+            ]
           },
           {
             "task_id": "T1.2",
@@ -48,7 +58,16 @@
               }
             ],
             "depends_on": [],
-            "conflicts_with": []
+            "conflicts_with": [],
+            "status": "completed",
+            "completed_at": "2025-10-14T22:31:36.083292+00:00",
+            "pr_number": 75,
+            "pr_url": "https://github.com/AmeliaRose802/email_helper/pull/75",
+            "completion_type": "direct",
+            "files_modified": [
+              "backend/services/com_ai_service.py",
+              "backend/tests/test_com_ai_service.py"
+            ]
           },
           {
             "task_id": "T2.4",
@@ -73,7 +92,17 @@
               }
             ],
             "depends_on": [],
-            "conflicts_with": []
+            "conflicts_with": [],
+            "status": "completed",
+            "completed_at": "2025-10-14T22:59:02.201162+00:00",
+            "pr_number": 76,
+            "pr_url": "https://github.com/AmeliaRose802/email_helper/pull/76",
+            "completion_type": "direct",
+            "files_modified": [
+              ".env.localhost.example",
+              "backend/.env.localhost.example",
+              "frontend/.env.local.example"
+            ]
           }
         ],
         "parallel_task_count": 3,
