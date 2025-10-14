@@ -32,10 +32,31 @@ AI classification system through comprehensive data collection.
 """
 
 import os
-import pandas as pd
 from datetime import datetime, timedelta
 import json
-import numpy as np
+
+# Optional imports for analytics features
+try:
+    import pandas as pd
+    import numpy as np
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    # Define minimal compatibility for when pandas is not available
+    pd = None
+    np = None
+
+
+def requires_pandas(func):
+    """Decorator to check if pandas is available before executing analytics methods."""
+    def wrapper(*args, **kwargs):
+        if not PANDAS_AVAILABLE:
+            raise ImportError(
+                f"{func.__name__} requires pandas and numpy packages. "
+                "Install them with: pip install pandas numpy"
+            )
+        return func(*args, **kwargs)
+    return wrapper
 
 
 class AccuracyTracker:
@@ -76,6 +97,7 @@ class AccuracyTracker:
         correct_predictions = total_emails_processed - len(user_modifications)
         return round((correct_predictions / total_emails_processed) * 100, 2)
     
+    @requires_pandas
     def record_session_accuracy(self, session_data):
         accuracy_entry = {
             'timestamp': datetime.now().isoformat(),
