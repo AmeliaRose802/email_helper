@@ -7,10 +7,14 @@ Supports OAuth Single Sign-On with service principal identity
 
 import os
 from typing import Optional
-from dotenv import load_dotenv
 
-# Load environment variables from .env file if it exists
-load_dotenv()
+# Optional import for dotenv - only needed for local development
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not available - rely on environment variables only
+    pass
 
 class AzureConfig:
     """Secure Azure OpenAI configuration management"""
