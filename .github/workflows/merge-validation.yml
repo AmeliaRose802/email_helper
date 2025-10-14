@@ -106,14 +106,6 @@ jobs:
           name: coverage-report-${{ matrix.python-version }}
           path: htmlcov/
           retention-days: 30
-      
-      - name: Publish test results
-        if: always()
-        uses: EnricoMi/publish-unit-test-result-action/windows@v2
-        with:
-          files: test-results-*.xml
-          check_name: Test Results (Python ${{ matrix.python-version }})
-          comment_mode: off  # Don't spam PR comments
   
   code-quality:
     name: Code Quality Checks
