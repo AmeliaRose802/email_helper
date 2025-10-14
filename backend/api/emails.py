@@ -4,7 +4,8 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
-from backend.services.email_provider import EmailProvider, get_email_provider
+from backend.services.email_provider import EmailProvider
+from backend.core.dependencies import get_email_provider
 from backend.api.auth import get_current_user
 from backend.models.user import UserInDB
 from backend.models.email import Email, EmailBatch, EmailBatchResult
