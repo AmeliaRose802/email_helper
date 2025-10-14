@@ -202,5 +202,5 @@ jobs:
             Write-Host "::warning::Security scan had issues."
           }
           
-          Write-Host "✅ Merge validation passed!"
+          Write-Host "[PASS] Merge validation passed!"
         shell: pwsh

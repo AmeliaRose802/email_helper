@@ -41,7 +41,7 @@ jobs:
       
       - name: Quick import test
         run: |
-          python -c "import sys; sys.path.insert(0, 'src'); from core import config; print('✅ Core imports working')"
+          python -c "import sys; sys.path.insert(0, 'src'); from core import config; print('Core imports working')"
         shell: pwsh
       
       - name: Run essential tests only
