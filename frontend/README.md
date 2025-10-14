@@ -123,9 +123,25 @@ All backend APIs are implemented and ready:
 
 ### API Configuration
 
-The application automatically proxies API calls:
+The application uses a centralized API configuration system:
+
+**Configuration File**: `src/config/api.ts`
+- Environment-based API URL configuration
+- Centralized endpoint definitions
+- Debug logging utilities
+- Backend health checking
+
+**Proxy Configuration**: The application automatically proxies API calls through Vite's dev server to avoid CORS issues:
 - `/auth/*` → `http://localhost:8000/auth/*`
 - `/api/*` → `http://localhost:8000/api/*`
+- `/health` → `http://localhost:8000/health`
+
+**Direct API Calls**: Services use RTK Query with the base URL set to `/` (proxy handles routing)
+
+The proxy target is configurable via `VITE_API_BASE_URL` in `.env.local`, allowing easy switching between:
+- Local backend: `http://localhost:8000` (default)
+- Docker backend: `http://localhost:8002`
+- Remote backend: `https://api.yourdomain.com`
 
 ### Authentication Flow
 
@@ -199,14 +215,56 @@ npm run test -- --testPathPattern=integration
 
 **Backend Connection Errors**
 ```bash
-# Ensure backend is running
+# 1. Verify backend is running
+curl http://localhost:8000/health
+
+# 2. Check backend logs for errors
 cd ../backend && python main.py
-# Backend should be accessible at http://localhost:8000/health
+
+# 3. Ensure CORS is configured correctly
+# Backend should allow http://localhost:3000
+```
+
+**Port Conflicts**
+```bash
+# If port 3000 is already in use, change it in vite.config.ts
+# or run with a different port:
+npm run dev -- --port 3001
+```
+
+**Environment Variables Not Loading**
+```bash
+# 1. Verify .env.local exists in frontend directory
+ls -la .env.local
+
+# 2. Check variable names start with VITE_
+cat .env.local | grep VITE_
+
+# 3. Restart dev server after changes
+# Press Ctrl+C to stop, then:
+npm run dev
+
+# 4. Verify variables are loaded (in browser console):
+console.log(import.meta.env.VITE_API_BASE_URL)
+```
+
+**Proxy Errors / API 404s**
+```bash
+# Check vite.config.ts proxy configuration
+# Ensure it matches your backend port
+
+# Test direct backend access:
+curl http://localhost:8000/api/emails
+
+# If backend works but proxy doesn't:
+# 1. Restart dev server
+# 2. Clear browser cache (Ctrl+Shift+R)
+# 3. Check browser network tab for actual request URL
 ```
 
 **Build Errors**
 ```bash
-# Clear cache and reinstall
+# Clear cache and reinstall dependencies
 rm -rf node_modules package-lock.json
 npm install
 npm run build
@@ -218,13 +276,135 @@ npm run build
 npx tsc --noEmit
 ```
 
-## 📝 Environment Variables
+### Localhost Development Checklist
 
-Create `.env.local` for local development:
+When starting development, ensure:
+- ✅ Backend is running on http://localhost:8000
+- ✅ `.env.local` exists with correct `VITE_API_BASE_URL`
+- ✅ Frontend dev server started with `npm run dev`
+- ✅ Browser shows frontend at http://localhost:3000
+- ✅ Browser console shows no CORS errors
+- ✅ Network tab shows API calls going to backend
 
+### Debug Mode
+
+Enable debug logging in `.env.local`:
 ```env
-VITE_API_BASE_URL=http://localhost:8000
-VITE_APP_TITLE=Email Helper
+VITE_DEBUG_LOGGING=true
+```
+
+This will log:
+- API configuration on startup
+- Request headers for each API call
+- Backend health check status
+
+Check browser console (F12) for debug output.
+
+## 📝 Environment Variables & Localhost Configuration
+
+### Quick Setup for Localhost Development
+
+1. **Copy the example environment file:**
+   ```bash
+   cp .env.local.example .env.local
+   ```
+
+2. **Configure for your local backend:**
+   ```env
+   # .env.local - Basic configuration for localhost
+   VITE_API_BASE_URL=http://localhost:8000
+   VITE_API_TIMEOUT=30000
+   VITE_APP_TITLE=Email Helper
+   VITE_APP_ENV=development
+   VITE_DEBUG_LOGGING=true
+   VITE_LOCALHOST_MODE=true
+   ```
+
+3. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+   Frontend will be accessible at http://localhost:3000
+
+### Backend Connection
+
+The frontend automatically connects to your local backend server through Vite's proxy configuration:
+
+- **Backend API**: http://localhost:8000
+- **Frontend Dev Server**: http://localhost:3000
+
+The proxy routes the following paths to the backend:
+- `/auth/*` → Authentication endpoints
+- `/api/*` → API endpoints (emails, tasks, AI processing)
+- `/health` → Health check endpoint
+
+### Environment Variable Reference
+
+All frontend environment variables must be prefixed with `VITE_` to be accessible in the browser:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_BASE_URL` | `http://localhost:8000` | Backend API base URL |
+| `VITE_API_TIMEOUT` | `30000` | API request timeout (ms) |
+| `VITE_APP_TITLE` | `Email Helper` | Application title |
+| `VITE_APP_ENV` | `development` | Environment name |
+| `VITE_DEBUG_LOGGING` | `true` | Enable console debug logs |
+| `VITE_LOCALHOST_MODE` | `true` | Enable localhost mode |
+
+**Important:** Changes to `.env.local` require restarting the dev server (`npm run dev`)
+
+### CORS Configuration
+
+CORS is handled by the backend. Ensure your backend configuration includes the frontend URL:
+
+```python
+# backend/core/config.py
+cors_origins = ["http://localhost:3000", "http://localhost:5173"]
+```
+
+The frontend uses two possible ports:
+- Port 3000: Configured in `vite.config.ts`
+- Port 5173: Vite's default port (fallback)
+
+### Verifying Connection
+
+Check that the backend is running and accessible:
+
+```bash
+# Test backend health endpoint
+curl http://localhost:8000/health
+
+# Expected response:
+# {
+#   "status": "healthy",
+#   "service": "email-helper-api",
+#   "version": "1.0.0",
+#   "database": "healthy",
+#   "debug": true
+# }
+```
+
+### Configuration Files
+
+The API configuration is centralized in:
+- `src/config/api.ts` - API configuration and endpoint definitions
+- `vite.config.ts` - Vite dev server and proxy configuration
+- `.env.local` - Environment variables (not tracked in git)
+
+Example usage in components:
+
+```typescript
+import { apiConfig, apiEndpoints, buildApiUrl } from '@/config/api';
+
+// Access configuration
+console.log(apiConfig.baseURL); // http://localhost:8000
+
+// Build API URL
+const healthUrl = buildApiUrl(apiEndpoints.health);
+
+// Check backend availability
+import { checkBackendHealth } from '@/config/api';
+const isOnline = await checkBackendHealth();
 ```
 
 ## 🔗 Related Documentation

@@ -2,16 +2,24 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryApi, FetchArgs } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '@/store/store';
+import { apiConfig, debugLog } from '@/config/api';
 
 // Base query with authentication
 const baseQuery = fetchBaseQuery({
-  baseUrl: '/', // Proxy will handle routing to http://localhost:8000
+  baseUrl: '/', // Proxy will handle routing to backend
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as RootState).auth.token;
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
     headers.set('content-type', 'application/json');
+    
+    // Debug logging
+    debugLog('API Request Headers', {
+      hasToken: !!token,
+      headers: Object.fromEntries(headers.entries()),
+    });
+    
     return headers;
   },
 });
@@ -63,3 +71,9 @@ export const apiSlice = createApi({
 });
 
 export const { useHealthCheckQuery } = apiSlice;
+
+// Log API configuration on initialization
+debugLog('API Slice initialized', {
+  baseUrl: apiConfig.baseURL,
+  localhostMode: apiConfig.localhostMode,
+});
