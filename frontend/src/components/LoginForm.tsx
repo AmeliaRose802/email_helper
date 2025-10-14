@@ -1,4 +1,4 @@
-// Enhanced login form component with validation
+// Enhanced login form component with Azure OAuth validation
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLoginMutation, useInitiateLoginQuery } from '@/services/authApi';
