@@ -30,7 +30,15 @@ This module follows the project's Outlook integration patterns and provides
 comprehensive error handling for robust operation with the Outlook COM interface.
 """
 
-import win32com.client
+# Conditional import for Windows-only dependency
+try:
+    import win32com.client
+    WIN32COM_AVAILABLE = True
+except ImportError:
+    WIN32COM_AVAILABLE = False
+    # Define dummy for type hints when not available
+    win32com = None
+
 import os
 from datetime import datetime, timedelta
 
@@ -67,6 +75,12 @@ CATEGORY_COLORS = {
 
 class OutlookManager:
     def __init__(self):
+        if not WIN32COM_AVAILABLE:
+            raise ImportError(
+                "OutlookManager requires pywin32 package. "
+                "This is only available on Windows. "
+                "Install it with: pip install pywin32"
+            )
         self.outlook = None
         self.namespace = None
         self.inbox = None

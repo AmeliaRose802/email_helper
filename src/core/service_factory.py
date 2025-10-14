@@ -22,9 +22,19 @@ import logging
 from typing import Dict, Any, Optional
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from outlook_manager import OutlookManager
+# Add src directory to path for imports
+src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
+
+# Import modules from src directory
+try:
+    from outlook_manager import OutlookManager
+except ImportError:
+    # Handle import error for non-Windows environments (CI/CD)
+    OutlookManager = None
+    
 from ai_processor import AIProcessor
 from email_analyzer import EmailAnalyzer
 from summary_generator import SummaryGenerator
@@ -52,6 +62,8 @@ class ServiceFactory:
         
     def get_outlook_manager(self) -> EmailProvider:
         """Get OutlookManager instance."""
+        if OutlookManager is None:
+            raise ImportError("OutlookManager requires Windows and pywin32 package")
         return self._get_or_create('outlook_manager', lambda: OutlookManager())
         
     def get_email_analyzer(self) -> 'EmailAnalyzer':
