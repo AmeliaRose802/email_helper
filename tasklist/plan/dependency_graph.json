@@ -3,63 +3,69 @@
     "task_id": "T1.1",
     "depends_on": [],
     "confidence": "high",
-    "reason": "No dependencies - creates base interface",
-    "size": "L",
-    "expected_runtime_min": 45
+    "reason": "Wraps refactored services",
+    "size": "M",
+    "expected_runtime_min": 30
   },
   {
     "task_id": "T1.2",
     "depends_on": [],
     "confidence": "high",
-    "reason": "Parallel with T1.1 - independent AI service wrapper",
+    "reason": "Wraps AI services",
     "size": "M",
     "expected_runtime_min": 24
   },
   {
     "task_id": "T1.3",
-    "depends_on": ["T1.1", "T1.2"],
+    "depends_on": [
+      "T1.1",
+      "T1.2"
+    ],
     "confidence": "high",
-    "reason": "Requires both COM provider and AI service to exist",
+    "reason": "Requires adapters",
     "size": "M",
     "expected_runtime_min": 24
   },
   {
-    "task_id": "T1.4",
-    "depends_on": ["T1.3"],
-    "confidence": "high",
-    "reason": "Updates authentication after API dependencies are configured",
-    "size": "S",
-    "expected_runtime_min": 12
-  },
-  {
     "task_id": "T1.5",
-    "depends_on": ["T1.1", "T1.2"],
+    "depends_on": [
+      "T1.1",
+      "T1.2"
+    ],
     "confidence": "high",
-    "reason": "Tests require COM provider and AI service to be implemented",
+    "reason": "Tests adapters",
     "size": "M",
     "expected_runtime_min": 24
   },
   {
     "task_id": "T2.1",
-    "depends_on": ["T1.1", "T1.2", "T1.3", "T1.4"],
+    "depends_on": [
+      "T1.3"
+    ],
     "confidence": "high",
-    "reason": "Frontend config depends on complete Phase 1 backend",
-    "size": "M",
-    "expected_runtime_min": 18
+    "reason": "Frontend config",
+    "size": "S",
+    "expected_runtime_min": 12
   },
   {
     "task_id": "T2.2",
-    "depends_on": ["T1.1", "T1.2", "T1.3", "T1.4", "T2.1"],
+    "depends_on": [
+      "T1.3",
+      "T2.1"
+    ],
     "confidence": "high",
-    "reason": "Integration testing requires full backend and frontend config",
+    "reason": "Integration test",
     "size": "S",
     "expected_runtime_min": 12
   },
   {
     "task_id": "T2.3",
-    "depends_on": ["T2.1", "T2.2"],
+    "depends_on": [
+      "T2.1",
+      "T2.2"
+    ],
     "confidence": "high",
-    "reason": "Documentation follows successful integration testing",
+    "reason": "Docs after test",
     "size": "S",
     "expected_runtime_min": 12
   },
@@ -67,103 +73,106 @@
     "task_id": "T2.4",
     "depends_on": [],
     "confidence": "high",
-    "reason": "Parallel task - creates templates independent of implementation",
+    "reason": "Parallel templates",
     "size": "S",
     "expected_runtime_min": 6
   },
   {
     "task_id": "T3.1",
-    "depends_on": ["T2.2"],
+    "depends_on": [
+      "T2.2"
+    ],
     "confidence": "high",
-    "reason": "E2E tests require working integration to test against",
+    "reason": "E2E after integration",
     "size": "L",
     "expected_runtime_min": 48
   },
   {
     "task_id": "T3.2",
-    "depends_on": ["T1.5"],
+    "depends_on": [
+      "T1.5"
+    ],
     "confidence": "high",
-    "reason": "Backend integration tests extend unit test infrastructure",
+    "reason": "Extends test infra",
     "size": "M",
     "expected_runtime_min": 24
   },
   {
     "task_id": "T3.3",
-    "depends_on": ["T3.1", "T3.2"],
+    "depends_on": [
+      "T3.1",
+      "T3.2"
+    ],
     "confidence": "high",
-    "reason": "CI/CD setup requires tests to be implemented",
-    "size": "S",
-    "expected_runtime_min": 12
-  },
-  {
-    "task_id": "T3.4",
-    "depends_on": ["T1.1", "T1.2", "T1.3"],
-    "confidence": "medium",
-    "reason": "Performance testing requires core backend but can run parallel with other test work",
+    "reason": "CI/CD after tests",
     "size": "S",
     "expected_runtime_min": 12
   },
   {
     "task_id": "T4.1",
-    "depends_on": ["T3.1", "T3.2"],
+    "depends_on": [
+      "T3.1",
+      "T3.2"
+    ],
     "confidence": "high",
-    "reason": "User docs require stable implementation with passing tests",
+    "reason": "Docs after tests",
     "size": "S",
     "expected_runtime_min": 12
   },
   {
     "task_id": "T4.2",
-    "depends_on": ["T1.1", "T1.2", "T1.3"],
+    "depends_on": [
+      "T1.1",
+      "T1.2",
+      "T1.3"
+    ],
     "confidence": "high",
-    "reason": "Architecture docs require core implementation complete",
+    "reason": "Arch docs",
     "size": "S",
     "expected_runtime_min": 12
   },
   {
     "task_id": "T4.3",
-    "depends_on": ["T2.2", "T4.1"],
+    "depends_on": [
+      "T2.2",
+      "T4.1"
+    ],
     "confidence": "high",
-    "reason": "Migration guide requires integration working and user docs",
+    "reason": "Migration guide",
     "size": "S",
     "expected_runtime_min": 6
   },
   {
     "task_id": "T4.4",
-    "depends_on": ["T2.2"],
+    "depends_on": [
+      "T2.2"
+    ],
     "confidence": "medium",
-    "reason": "Deployment scripts need working integration",
+    "reason": "Deploy scripts",
     "size": "S",
     "expected_runtime_min": 6
   },
   {
     "task_id": "T5.1",
-    "depends_on": ["T4.1", "T4.2", "T4.3"],
+    "depends_on": [
+      "T4.1",
+      "T4.2",
+      "T4.3"
+    ],
     "confidence": "high",
-    "reason": "Technical debt tracking follows all implementation and docs",
+    "reason": "Tech debt tracking",
     "size": "S",
     "expected_runtime_min": 6
   },
   {
-    "task_id": "T5.2",
-    "depends_on": ["T2.2", "T3.3"],
-    "confidence": "high",
-    "reason": "Security audit requires full implementation and CI/CD",
-    "size": "S",
-    "expected_runtime_min": 12
-  },
-  {
-    "task_id": "T5.3",
-    "depends_on": ["T3.4"],
-    "confidence": "high",
-    "reason": "Optimization follows baseline performance testing",
-    "size": "M",
-    "expected_runtime_min": 18
-  },
-  {
     "task_id": "T5.4",
-    "depends_on": ["T4.1", "T4.2", "T4.3", "T5.2"],
+    "depends_on": [
+      "T4.1",
+      "T4.2",
+      "T4.3"
+    ],
     "confidence": "high",
-    "reason": "UAT requires complete, documented, audited system",
+    "reason": "UAT",
     "size": "M",
     "expected_runtime_min": 24
   }

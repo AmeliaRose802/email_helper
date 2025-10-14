@@ -1,215 +1,295 @@
 [
   {
     "task_id": "T1.1",
-    "summary": "Create COM Email Provider Interface",
-    "description": "Implement EmailProvider abstract interface using COM to connect to Outlook. Includes all CRUD operations for emails, folders, and conversation threads with proper error handling and threading safety.",
-    "size": "L",
-    "expected_runtime_min": 45,
+    "summary": "Create COM Email Provider Adapter",
+    "description": "Create FastAPI-compatible EmailProvider adapter that wraps the existing OutlookManager class. Maps COM operations to EmailProvider interface without duplicating existing functionality.",
+    "size": "M",
+    "expected_runtime_min": 30,
     "depends_on": [],
-    "tags": ["backend", "com", "email", "provider", "critical-path"],
+    "tags": [
+      "backend",
+      "com",
+      "email",
+      "provider",
+      "critical-path"
+    ],
     "enabler": false
   },
   {
     "task_id": "T1.2",
-    "summary": "Create COM AI Service Wrapper",
-    "description": "Wrap AIProcessor with COMAIService class providing email classification, action item extraction, summary generation, and duplicate detection with Azure OpenAI integration.",
+    "summary": "Create AI Service Adapter",
+    "description": "Create FastAPI-compatible AI service adapter that wraps existing AIProcessor class. Reuses existing Azure OpenAI integration and prompty files.",
     "size": "M",
     "expected_runtime_min": 24,
     "depends_on": [],
-    "tags": ["backend", "ai", "service", "critical-path"],
+    "tags": [
+      "backend",
+      "ai",
+      "service",
+      "critical-path"
+    ],
     "enabler": false
   },
   {
     "task_id": "T1.3",
-    "summary": "Update API Dependencies for Provider Selection",
-    "description": "Add provider selection configuration, update API endpoints to use dependency injection for email provider, maintain backward compatibility with Graph API.",
+    "summary": "Update API Dependencies",
+    "description": "Wire COM and AI adapters into FastAPI dependency injection system. Update API endpoints to use new adapters.",
     "size": "M",
     "expected_runtime_min": 24,
-    "depends_on": ["T1.1", "T1.2"],
-    "tags": ["backend", "api", "config", "critical-path"],
-    "enabler": false
-  },
-  {
-    "task_id": "T1.4",
-    "summary": "Implement Localhost Authentication Bypass",
-    "description": "Create optional authentication dependency for localhost mode while maintaining full authentication for Graph API mode.",
-    "size": "S",
-    "expected_runtime_min": 12,
-    "depends_on": ["T1.3"],
-    "tags": ["backend", "auth", "security", "critical-path"],
+    "depends_on": [
+      "T1.1",
+      "T1.2"
+    ],
+    "tags": [
+      "backend",
+      "api",
+      "config",
+      "critical-path"
+    ],
     "enabler": false
   },
   {
     "task_id": "T1.5",
-    "summary": "Create Test Infrastructure for COM Backend",
-    "description": "Build comprehensive unit and integration test suite for COM provider and AI service with mocking and fixtures.",
+    "summary": "Create Test Infrastructure",
+    "description": "Build unit and integration test suite for COM and AI service adapters with mocking and fixtures.",
     "size": "M",
     "expected_runtime_min": 24,
-    "depends_on": ["T1.1", "T1.2"],
-    "tags": ["backend", "testing", "infrastructure"],
+    "depends_on": [
+      "T1.1",
+      "T1.2"
+    ],
+    "tags": [
+      "backend",
+      "testing",
+      "infrastructure"
+    ],
     "enabler": true,
-    "acceleration_effect": {"type": "percent", "value": 15},
-    "acceleration_scope": {"tags": ["backend", "testing"]},
+    "acceleration_effect": {
+      "type": "percent",
+      "value": 15
+    },
+    "acceleration_scope": {
+      "tags": [
+        "backend",
+        "testing"
+      ]
+    },
     "half_life_waves": 2
   },
   {
     "task_id": "T2.1",
-    "summary": "Configure Frontend for Localhost Mode",
-    "description": "Add localhost mode configuration to frontend with environment variables, mock authentication, and mode indicator UI.",
-    "size": "M",
-    "expected_runtime_min": 18,
-    "depends_on": ["T1.1", "T1.2", "T1.3", "T1.4"],
-    "tags": ["frontend", "config", "auth", "critical-path"],
+    "summary": "Configure Frontend for Localhost",
+    "description": "Add localhost configuration to frontend with environment variables and API endpoint configuration.",
+    "size": "S",
+    "expected_runtime_min": 12,
+    "depends_on": [
+      "T1.3"
+    ],
+    "tags": [
+      "frontend",
+      "config",
+      "critical-path"
+    ],
     "enabler": false
   },
   {
     "task_id": "T2.2",
-    "summary": "Verify API Integration with COM Backend",
-    "description": "Manual testing and verification of all API endpoints with COM backend, ensuring feature parity and error handling.",
+    "summary": "Verify API Integration",
+    "description": "Manual testing of all API endpoints with COM backend, ensuring feature parity with Tkinter application.",
     "size": "S",
     "expected_runtime_min": 12,
-    "depends_on": ["T1.1", "T1.2", "T1.3", "T1.4", "T2.1"],
-    "tags": ["frontend", "backend", "integration", "testing", "critical-path"],
+    "depends_on": [
+      "T1.3",
+      "T2.1"
+    ],
+    "tags": [
+      "frontend",
+      "backend",
+      "integration",
+      "testing",
+      "critical-path"
+    ],
     "enabler": false
   },
   {
     "task_id": "T2.3",
-    "summary": "Update Documentation for Localhost Setup",
-    "description": "Create comprehensive setup documentation with step-by-step instructions, troubleshooting, and architecture diagrams.",
+    "summary": "Update Setup Documentation",
+    "description": "Create setup documentation with step-by-step instructions and troubleshooting.",
     "size": "S",
     "expected_runtime_min": 12,
-    "depends_on": ["T2.1", "T2.2"],
-    "tags": ["documentation", "setup"],
+    "depends_on": [
+      "T2.1",
+      "T2.2"
+    ],
+    "tags": [
+      "documentation",
+      "setup"
+    ],
     "enabler": false
   },
   {
     "task_id": "T2.4",
     "summary": "Create Configuration Templates",
-    "description": "Generate example environment files for localhost and production with documented variables and security notes.",
+    "description": "Generate example environment files for localhost with documented variables.",
     "size": "S",
     "expected_runtime_min": 6,
     "depends_on": [],
-    "tags": ["config", "documentation", "templates"],
+    "tags": [
+      "config",
+      "documentation",
+      "templates"
+    ],
     "enabler": false
   },
   {
     "task_id": "T3.1",
-    "summary": "Create E2E Test Suite with Playwright",
-    "description": "Implement comprehensive end-to-end tests covering email processing, editing, summarization, task management, and visual regression.",
+    "summary": "Create E2E Test Suite",
+    "description": "Implement end-to-end tests covering email processing, editing, summarization, and task management.",
     "size": "L",
     "expected_runtime_min": 48,
-    "depends_on": ["T2.2"],
-    "tags": ["frontend", "testing", "e2e", "playwright"],
+    "depends_on": [
+      "T2.2"
+    ],
+    "tags": [
+      "frontend",
+      "testing",
+      "e2e",
+      "playwright"
+    ],
     "enabler": false
   },
   {
     "task_id": "T3.2",
     "summary": "Create Backend Integration Tests",
-    "description": "Build integration test suite for COM Outlook operations, AI processing, full workflow, and API endpoints.",
+    "description": "Build integration test suite for COM Outlook operations, AI processing, and full workflow.",
     "size": "M",
     "expected_runtime_min": 24,
-    "depends_on": ["T1.5"],
-    "tags": ["backend", "testing", "integration"],
+    "depends_on": [
+      "T1.5"
+    ],
+    "tags": [
+      "backend",
+      "testing",
+      "integration"
+    ],
     "enabler": false
   },
   {
     "task_id": "T3.3",
-    "summary": "Set Up CI/CD Pipeline",
-    "description": "Configure GitHub Actions workflows for backend unit tests, frontend tests, and integration tests with coverage reporting.",
+    "summary": "Update CI/CD Pipeline",
+    "description": "Update existing GitHub Actions workflows to include COM backend and frontend integration tests.",
     "size": "S",
     "expected_runtime_min": 12,
-    "depends_on": ["T3.1", "T3.2"],
-    "tags": ["ci-cd", "automation", "testing"],
-    "enabler": false
-  },
-  {
-    "task_id": "T3.4",
-    "summary": "Implement Performance Testing",
-    "description": "Create performance benchmarks for email processing, AI classification, and frontend load times with baseline documentation.",
-    "size": "S",
-    "expected_runtime_min": 12,
-    "depends_on": ["T1.1", "T1.2", "T1.3"],
-    "tags": ["performance", "testing", "benchmarking"],
+    "depends_on": [
+      "T3.1",
+      "T3.2"
+    ],
+    "tags": [
+      "ci-cd",
+      "automation",
+      "testing"
+    ],
     "enabler": false
   },
   {
     "task_id": "T4.1",
     "summary": "Create User Documentation",
-    "description": "Write comprehensive user guides for localhost setup, Graph API setup, provider switching, and troubleshooting.",
+    "description": "Write user guides for localhost setup and troubleshooting.",
     "size": "S",
     "expected_runtime_min": 12,
-    "depends_on": ["T3.1", "T3.2"],
-    "tags": ["documentation", "user-guide"],
+    "depends_on": [
+      "T3.1",
+      "T3.2"
+    ],
+    "tags": [
+      "documentation",
+      "user-guide"
+    ],
     "enabler": false
   },
   {
     "task_id": "T4.2",
     "summary": "Update Architecture Documentation",
-    "description": "Document dual-provider architecture, component diagrams, data flows, security model, and performance characteristics.",
+    "description": "Document COM provider architecture, component diagrams, and adapter pattern implementation.",
     "size": "S",
     "expected_runtime_min": 12,
-    "depends_on": ["T1.1", "T1.2", "T1.3"],
-    "tags": ["documentation", "architecture"],
+    "depends_on": [
+      "T1.1",
+      "T1.2",
+      "T1.3"
+    ],
+    "tags": [
+      "documentation",
+      "architecture"
+    ],
     "enabler": false
   },
   {
     "task_id": "T4.3",
     "summary": "Create Migration Guide",
-    "description": "Document migration from Tkinter to Web UI with feature comparison, steps, data migration, and rollback procedures.",
+    "description": "Document migration from Tkinter to Web UI with feature comparison and data migration.",
     "size": "S",
     "expected_runtime_min": 6,
-    "depends_on": ["T2.2", "T4.1"],
-    "tags": ["documentation", "migration"],
+    "depends_on": [
+      "T2.2",
+      "T4.1"
+    ],
+    "tags": [
+      "documentation",
+      "migration"
+    ],
     "enabler": false
   },
   {
     "task_id": "T4.4",
     "summary": "Create Deployment Scripts",
-    "description": "Build one-click startup/shutdown scripts for Windows and Unix with prerequisite checking and validation.",
+    "description": "Build one-click startup/shutdown scripts for Windows with prerequisite checking.",
     "size": "S",
     "expected_runtime_min": 6,
-    "depends_on": ["T2.2"],
-    "tags": ["automation", "deployment", "scripts"],
+    "depends_on": [
+      "T2.2"
+    ],
+    "tags": [
+      "automation",
+      "deployment",
+      "scripts"
+    ],
     "enabler": false
   },
   {
     "task_id": "T5.1",
     "summary": "Create GitHub Issues for Technical Debt",
-    "description": "Document and track technical debt items including cross-platform limitations, optimization opportunities, and future enhancements.",
+    "description": "Document and track technical debt items including Graph API integration and future enhancements.",
     "size": "S",
     "expected_runtime_min": 6,
-    "depends_on": ["T4.1", "T4.2", "T4.3"],
-    "tags": ["technical-debt", "project-management"],
-    "enabler": false
-  },
-  {
-    "task_id": "T5.2",
-    "summary": "Conduct Security Audit",
-    "description": "Perform comprehensive security review of authentication bypass, secrets management, dependency vulnerabilities, and logging practices.",
-    "size": "S",
-    "expected_runtime_min": 12,
-    "depends_on": ["T2.2", "T3.3"],
-    "tags": ["security", "audit", "critical-path"],
-    "enabler": false
-  },
-  {
-    "task_id": "T5.3",
-    "summary": "Performance Baseline and Optimization",
-    "description": "Establish performance baselines, identify bottlenecks, implement optimizations, and document improvements.",
-    "size": "M",
-    "expected_runtime_min": 18,
-    "depends_on": ["T3.4"],
-    "tags": ["performance", "optimization"],
+    "depends_on": [
+      "T4.1",
+      "T4.2",
+      "T4.3"
+    ],
+    "tags": [
+      "technical-debt",
+      "project-management"
+    ],
     "enabler": false
   },
   {
     "task_id": "T5.4",
     "summary": "User Acceptance Testing",
-    "description": "Conduct UAT with test users, collect feedback, document issues, prioritize fixes, and plan future iterations.",
+    "description": "Conduct UAT, collect feedback, document issues, and prioritize fixes.",
     "size": "M",
     "expected_runtime_min": 24,
-    "depends_on": ["T4.1", "T4.2", "T4.3", "T5.2"],
-    "tags": ["testing", "uat", "feedback", "critical-path"],
+    "depends_on": [
+      "T4.1",
+      "T4.2",
+      "T4.3"
+    ],
+    "tags": [
+      "testing",
+      "uat",
+      "feedback",
+      "critical-path"
+    ],
     "enabler": false
   }
 ]

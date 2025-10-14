@@ -40,7 +40,7 @@ param(
     
     [string]$Owner = "AmeliaRose802",
     
-    [string]$Repo = "enhanced-ado-mcp",
+    [string]$Repo = "email_helper",
     
     [int]$PollIntervalSeconds = 30,
     
@@ -490,10 +490,12 @@ for ($i = 1; $i -le $MaxPolls; $i++) {
                 $script:workflowApprovalAttempts[$prNum] = 0
             }
             
-            # Try to approve workflows (max 3 attempts per PR)
-            if ($script:workflowApprovalAttempts[$prNum] -lt 3) {
+            # ALWAYS try to approve workflows on every poll (max 10 attempts)
+            # This ensures validation pipelines run immediately
+            if ($script:workflowApprovalAttempts[$prNum] -lt 10) {
                 if (Approve-WorkflowRuns -PRNumber $prNum) {
                     $script:workflowApprovalAttempts[$prNum]++
+                    Write-Host "     ✅ Workflow approval attempt #$($script:workflowApprovalAttempts[$prNum])" -ForegroundColor Green
                 }
             }
             
@@ -556,11 +558,23 @@ for ($i = 1; $i -le $MaxPolls; $i++) {
             $script:lastStatus[$prNum] = $currentStatus
             
             # Check if this PR is ready for merge
-            # Ready = Copilot finished + (checks passed OR no checks) + mergeable
+            # STRICT REQUIREMENT: Copilot finished + ALL checks PASSED (not pending) + mergeable
+            # NEVER mark as ready if checks are still running or if any failed
             $checksOK = ($checks.Status -eq "Passed") -or ($checks.Status -eq "No checks")
-            if ($copilotFinished -and $checksOK -and $prInfo.mergeable -eq 'MERGEABLE') {
-                Write-Host "     🎉 READY FOR MERGE!" -ForegroundColor Green -BackgroundColor DarkGreen
+            $noFailures = ($checks.Failed -eq 0)
+            $noPending = ($checks.Pending -eq 0)
+            
+            if ($copilotFinished -and $checksOK -and $noFailures -and $noPending -and $prInfo.mergeable -eq 'MERGEABLE') {
+                Write-Host "     🎉 READY FOR MERGE! (All validation passed)" -ForegroundColor Green -BackgroundColor DarkGreen
                 $script:completedPRs += $prNum
+            } elseif ($copilotFinished -and $prInfo.mergeable -eq 'MERGEABLE') {
+                # Copilot finished but checks not ready
+                if ($checks.Pending -gt 0) {
+                    Write-Host "     ⏳ Waiting for CI checks to complete ($($checks.Pending) pending)..." -ForegroundColor Yellow
+                } elseif ($checks.Failed -gt 0) {
+                    Write-Host "     ❌ Cannot merge - CI checks failed (must be fixed first)" -ForegroundColor Red
+                }
+                $allFinished = $false
             }
             
         } else {
@@ -581,8 +595,11 @@ for ($i = 1; $i -le $MaxPolls; $i++) {
         Write-Host "Completed PRs: $($script:completedPRs -join ', ')" -ForegroundColor Green
         Write-Host ""
         Write-Host "✅ All Copilot agents have finished their work" -ForegroundColor Green
-        Write-Host "✅ All CI checks have passed" -ForegroundColor Green
+        Write-Host "✅ All validation pipelines have PASSED" -ForegroundColor Green
+        Write-Host "✅ All CI checks have PASSED (no pending, no failures)" -ForegroundColor Green
         Write-Host "✅ All PRs are mergeable" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "🔒 MERGE SAFETY: All PRs validated and ready" -ForegroundColor Green -BackgroundColor DarkGreen
         Write-Host ""
         Write-Host "🔍 Next Steps:" -ForegroundColor Yellow
         Write-Host "1. Review each PR for quality and correctness" -ForegroundColor White

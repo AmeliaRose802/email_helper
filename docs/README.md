@@ -32,6 +32,7 @@ Technical details and architecture:
 ### 🏗️ Implementation Details
 AI-generated implementation summaries:
 
+- [Adapter Pattern Implementation](implementation/ADAPTER_PATTERN_IMPLEMENTATION.md) - Backend integration adapters (T0.1)
 - [Accuracy Dashboard Implementation](implementation/ACCURACY_DASHBOARD_IMPLEMENTATION_SUMMARY.md)
 - [Aggressive Cleanup Complete](implementation/AGGRESSIVE_CLEANUP_COMPLETE.md)
 - [AI Classification Improvements](implementation/AI_CLASSIFICATION_IMPROVEMENTS.md)
