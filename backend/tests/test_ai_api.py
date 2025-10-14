@@ -7,8 +7,18 @@ from backend.main import app
 from backend.models.ai_models import (
     EmailClassificationRequest, ActionItemRequest, SummaryRequest
 )
+from backend.core.dependencies import reset_dependencies
 
 client = TestClient(app)
+
+
+# Add fixture to reset dependencies between tests
+@pytest.fixture(autouse=True)
+def reset_deps():
+    """Reset dependencies before and after each test."""
+    reset_dependencies()
+    yield
+    reset_dependencies()
 
 
 @pytest.fixture

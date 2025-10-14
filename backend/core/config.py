@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     graph_tenant_id: Optional[str] = None
     graph_redirect_uri: str = "http://localhost:8000/auth/callback"
     
+    # COM Adapter settings (for Windows + Outlook integration)
+    use_com_backend: bool = False  # Enable COM email provider and AI service
+    com_connection_timeout: int = 30  # Seconds to wait for COM connection
+    com_retry_attempts: int = 3  # Number of retry attempts for COM operations
+    
     model_config = {
         "env_file": ".env",
         "case_sensitive": False
