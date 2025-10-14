@@ -124,28 +124,32 @@ class TestDataPersistence:
                 
                 task_persistence = TaskPersistence(temp_dir)
                 
-                # Test data that can be saved/loaded
-                test_tasks = [
-                    {
-                        "subject": "Test Task",
-                        "priority": "high", 
-                        "status": "outstanding",
-                        "due_date": "2025-01-20"
-                    }
-                ]
+                # Test data that can be saved/loaded - must match the expected structure
+                test_tasks = {
+                    "required_actions": [
+                        {
+                            "subject": "Test Task",
+                            "priority": "high", 
+                            "status": "outstanding",
+                            "due_date": "2025-01-20"
+                        }
+                    ]
+                }
                 
-                # Test save operation
-                success = task_persistence.save_outstanding_tasks(test_tasks)
-                assert success
+                # Test save operation (returns None, just verify no exceptions)
+                task_persistence.save_outstanding_tasks(test_tasks)
                 
                 # Test load operation
                 loaded_tasks = task_persistence.load_outstanding_tasks()
-                assert len(loaded_tasks) >= 1
+                assert isinstance(loaded_tasks, dict)
                 
                 # Verify our test task is present
-                test_subjects = {task["subject"] for task in test_tasks}
-                loaded_subjects = {task["subject"] for task in loaded_tasks}
-                assert test_subjects.issubset(loaded_subjects)
+                assert "required_actions" in loaded_tasks
+                assert len(loaded_tasks["required_actions"]) >= 1
+                
+                # Verify the test task subject is in the loaded tasks
+                loaded_subjects = {task.get("subject", "") for task in loaded_tasks["required_actions"]}
+                assert "Test Task" in loaded_subjects
                 
             except ImportError as e:
                 print(f"Skipping task persistence test due to import error: {e}")
