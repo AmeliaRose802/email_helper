@@ -1,40 +1,11 @@
 [
   {
-    "task_id": "T0.1",
-    "summary": "Refactor Existing Services for Backend Integration",
-    "description": "Extract core functionality from OutlookManager and AIProcessor into clean service interfaces. Create adapter layer to wrap existing COM and AI logic without duplication. Establishes foundation for backend API integration.",
-    "size": "M",
-    "expected_runtime_min": 30,
-    "depends_on": [],
-    "tags": [
-      "backend",
-      "refactoring",
-      "enabler",
-      "critical-path"
-    ],
-    "enabler": true,
-    "acceleration_effect": {
-      "type": "percent",
-      "value": 20
-    },
-    "acceleration_scope": {
-      "tags": [
-        "backend",
-        "com",
-        "ai"
-      ]
-    },
-    "half_life_waves": 3
-  },
-  {
     "task_id": "T1.1",
     "summary": "Create COM Email Provider Adapter",
     "description": "Create FastAPI-compatible EmailProvider adapter that wraps the existing OutlookManager class. Maps COM operations to EmailProvider interface without duplicating existing functionality.",
     "size": "M",
     "expected_runtime_min": 30,
-    "depends_on": [
-      "T0.1"
-    ],
+    "depends_on": [],
     "tags": [
       "backend",
       "com",
@@ -50,9 +21,7 @@
     "description": "Create FastAPI-compatible AI service adapter that wraps existing AIProcessor class. Reuses existing Azure OpenAI integration and prompty files.",
     "size": "M",
     "expected_runtime_min": 24,
-    "depends_on": [
-      "T0.1"
-    ],
+    "depends_on": [],
     "tags": [
       "backend",
       "ai",
@@ -86,7 +55,6 @@
     "size": "M",
     "expected_runtime_min": 24,
     "depends_on": [
-      "T0.1",
       "T1.1",
       "T1.2"
     ],

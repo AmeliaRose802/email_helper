@@ -1,17 +1,7 @@
 [
   {
-    "task_id": "T0.1",
-    "depends_on": [],
-    "confidence": "high",
-    "reason": "Foundation refactoring",
-    "size": "M",
-    "expected_runtime_min": 30
-  },
-  {
     "task_id": "T1.1",
-    "depends_on": [
-      "T0.1"
-    ],
+    "depends_on": [],
     "confidence": "high",
     "reason": "Wraps refactored services",
     "size": "M",
@@ -19,9 +9,7 @@
   },
   {
     "task_id": "T1.2",
-    "depends_on": [
-      "T0.1"
-    ],
+    "depends_on": [],
     "confidence": "high",
     "reason": "Wraps AI services",
     "size": "M",
@@ -41,7 +29,6 @@
   {
     "task_id": "T1.5",
     "depends_on": [
-      "T0.1",
       "T1.1",
       "T1.2"
     ],
