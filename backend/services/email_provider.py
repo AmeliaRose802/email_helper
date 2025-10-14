@@ -176,12 +176,28 @@ _email_provider: Optional[EmailProvider] = None
 
 
 def get_email_provider_instance() -> EmailProvider:
-    """Get or create email provider instance."""
+    """Get or create email provider instance.
+    
+    Provider selection priority:
+    1. COM provider if use_com_backend is True (Windows + Outlook)
+    2. Graph API provider if credentials are configured
+    3. Mock provider for development/testing
+    """
     global _email_provider
     
     if _email_provider is None:
+        # Check for COM provider preference (localhost with Outlook)
+        if getattr(settings, 'use_com_backend', False):
+            try:
+                from backend.services.com_email_provider import COMEmailProvider
+                _email_provider = COMEmailProvider()
+            except ImportError as e:
+                # Fall back to other providers if COM not available
+                import logging
+                logging.warning(f"COM provider not available: {e}. Falling back to alternative provider.")
+        
         # Check if Graph API credentials are configured
-        if (settings.graph_client_id and 
+        if _email_provider is None and (settings.graph_client_id and 
             settings.graph_client_secret and 
             settings.graph_tenant_id):
             # Use Graph API provider in production
@@ -192,8 +208,9 @@ def get_email_provider_instance() -> EmailProvider:
                 tenant_id=settings.graph_tenant_id,
                 redirect_uri=settings.graph_redirect_uri
             )
-        else:
-            # Use mock provider for development/testing
+        
+        # Default to mock provider for development/testing
+        if _email_provider is None:
             _email_provider = MockEmailProvider()
     
     return _email_provider
