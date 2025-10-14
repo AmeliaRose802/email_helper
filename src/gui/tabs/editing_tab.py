@@ -97,7 +97,7 @@ class EditingTab:
         self.category_combo = ttk.Combobox(
             details_frame,
             textvariable=self.category_var,
-            values=list(self.category_mapping.keys()),
+            values=self.category_mapping if isinstance(self.category_mapping, list) else list(self.category_mapping.keys()),
             state="readonly"
         )
         self.category_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))

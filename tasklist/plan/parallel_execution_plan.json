@@ -1,0 +1,776 @@
+{
+  "execution_plan": {
+    "waves": [
+      {
+        "wave_number": 1,
+        "tasks": [
+          {
+            "task_id": "T2.4",
+            "summary": "Create Configuration Templates",
+            "description": "Generate example environment files for localhost and production with documented variables and security notes.",
+            "size": "S",
+            "expected_runtime_min": 6,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": ".env.localhost.example",
+                "type": "exact"
+              },
+              {
+                "pattern": ".env.production.example",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/.env.localhost.example",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/.env.local.example",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [],
+            "conflicts_with": []
+          },
+          {
+            "task_id": "T1.1",
+            "summary": "Create COM Email Provider Interface",
+            "description": "Implement EmailProvider abstract interface using COM to connect to Outlook. Includes all CRUD operations for emails, folders, and conversation threads with proper error handling and threading safety.",
+            "size": "L",
+            "expected_runtime_min": 45,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "backend/services/com_email_provider.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "src/outlook_manager.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/services/email_provider.py",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [],
+            "conflicts_with": [
+              "T5.2",
+              "T5.3"
+            ]
+          },
+          {
+            "task_id": "T1.2",
+            "summary": "Create COM AI Service Wrapper",
+            "description": "Wrap AIProcessor with COMAIService class providing email classification, action item extraction, summary generation, and duplicate detection with Azure OpenAI integration.",
+            "size": "M",
+            "expected_runtime_min": 24,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "backend/services/com_ai_service.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "src/ai_processor.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "src/azure_config.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "prompts/.*\\.prompty$",
+                "type": "regex"
+              }
+            ],
+            "depends_on": [],
+            "conflicts_with": [
+              "T5.2",
+              "T5.3"
+            ]
+          }
+        ],
+        "parallel_task_count": 3,
+        "estimated_wave_time_min": 45,
+        "size_distribution": {
+          "S": 1,
+          "L": 1,
+          "M": 1
+        }
+      },
+      {
+        "wave_number": 2,
+        "tasks": [
+          {
+            "task_id": "T1.5",
+            "summary": "Create Test Infrastructure for COM Backend",
+            "description": "Build comprehensive unit and integration test suite for COM provider and AI service with mocking and fixtures.",
+            "size": "M",
+            "expected_runtime_min": 24,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "backend/tests/test_com_email_provider.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/tests/test_com_ai_service.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/tests/integration/test_com_backend.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/tests/conftest.py",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T1.1",
+              "T1.2"
+            ],
+            "conflicts_with": [
+              "T5.2"
+            ]
+          },
+          {
+            "task_id": "T1.3",
+            "summary": "Update API Dependencies for Provider Selection",
+            "description": "Add provider selection configuration, update API endpoints to use dependency injection for email provider, maintain backward compatibility with Graph API.",
+            "size": "M",
+            "expected_runtime_min": 24,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "backend/core/config.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/api/emails.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/api/ai.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/api/tasks.py",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T1.1",
+              "T1.2"
+            ],
+            "conflicts_with": [
+              "T5.2",
+              "T5.3"
+            ]
+          }
+        ],
+        "parallel_task_count": 2,
+        "estimated_wave_time_min": 24,
+        "size_distribution": {
+          "M": 2
+        }
+      },
+      {
+        "wave_number": 3,
+        "tasks": [
+          {
+            "task_id": "T4.2",
+            "summary": "Update Architecture Documentation",
+            "description": "Document dual-provider architecture, component diagrams, data flows, security model, and performance characteristics.",
+            "size": "S",
+            "expected_runtime_min": 12,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "docs/ARCHITECTURE.md",
+                "type": "exact"
+              },
+              {
+                "pattern": "docs/DESIGN_DECISIONS.md",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T1.1",
+              "T1.2",
+              "T1.3"
+            ],
+            "conflicts_with": []
+          },
+          {
+            "task_id": "T3.2",
+            "summary": "Create Backend Integration Tests",
+            "description": "Build integration test suite for COM Outlook operations, AI processing, full workflow, and API endpoints.",
+            "size": "M",
+            "expected_runtime_min": 24,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "backend/tests/integration/test_com_outlook_integration.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/tests/integration/test_ai_processing_integration.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/tests/integration/test_full_workflow_integration.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/tests/integration/test_api_endpoints_integration.py",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T1.5"
+            ],
+            "conflicts_with": [
+              "T5.2"
+            ]
+          },
+          {
+            "task_id": "T3.4",
+            "summary": "Implement Performance Testing",
+            "description": "Create performance benchmarks for email processing, AI classification, and frontend load times with baseline documentation.",
+            "size": "S",
+            "expected_runtime_min": 12,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "backend/tests/performance/test_email_processing_perf.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/tests/performance/test_ai_performance.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/tests/performance/lighthouse-tests.ts",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T1.1",
+              "T1.2",
+              "T1.3"
+            ],
+            "conflicts_with": [
+              "T5.2"
+            ]
+          },
+          {
+            "task_id": "T1.4",
+            "summary": "Implement Localhost Authentication Bypass",
+            "description": "Create optional authentication dependency for localhost mode while maintaining full authentication for Graph API mode.",
+            "size": "S",
+            "expected_runtime_min": 12,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "backend/api/auth.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/core/security.py",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T1.3"
+            ],
+            "conflicts_with": [
+              "T5.2",
+              "T5.3"
+            ]
+          }
+        ],
+        "parallel_task_count": 4,
+        "estimated_wave_time_min": 24,
+        "size_distribution": {
+          "S": 3,
+          "M": 1
+        }
+      },
+      {
+        "wave_number": 4,
+        "tasks": [
+          {
+            "task_id": "T2.1",
+            "summary": "Configure Frontend for Localhost Mode",
+            "description": "Add localhost mode configuration to frontend with environment variables, mock authentication, and mode indicator UI.",
+            "size": "M",
+            "expected_runtime_min": 18,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "frontend/src/services/authApi.ts",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/.env.local",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/vite.config.ts",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T1.1",
+              "T1.2",
+              "T1.3",
+              "T1.4"
+            ],
+            "conflicts_with": [
+              "T5.2",
+              "T5.3"
+            ]
+          }
+        ],
+        "parallel_task_count": 1,
+        "estimated_wave_time_min": 18,
+        "size_distribution": {
+          "M": 1
+        }
+      },
+      {
+        "wave_number": 5,
+        "tasks": [
+          {
+            "task_id": "T2.2",
+            "summary": "Verify API Integration with COM Backend",
+            "description": "Manual testing and verification of all API endpoints with COM backend, ensuring feature parity and error handling.",
+            "size": "S",
+            "expected_runtime_min": 12,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "frontend/src/services/emailApi.ts",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/src/services/aiApi.ts",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/src/services/taskApi.ts",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T1.1",
+              "T1.2",
+              "T1.3",
+              "T1.4",
+              "T2.1"
+            ],
+            "conflicts_with": [
+              "T5.2",
+              "T5.3"
+            ]
+          }
+        ],
+        "parallel_task_count": 1,
+        "estimated_wave_time_min": 12,
+        "size_distribution": {
+          "S": 1
+        }
+      },
+      {
+        "wave_number": 6,
+        "tasks": [
+          {
+            "task_id": "T2.3",
+            "summary": "Update Documentation for Localhost Setup",
+            "description": "Create comprehensive setup documentation with step-by-step instructions, troubleshooting, and architecture diagrams.",
+            "size": "S",
+            "expected_runtime_min": 12,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "frontend/README.md",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/README.md",
+                "type": "exact"
+              },
+              {
+                "pattern": "README.md",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T2.1",
+              "T2.2"
+            ],
+            "conflicts_with": []
+          },
+          {
+            "task_id": "T4.4",
+            "summary": "Create Deployment Scripts",
+            "description": "Build one-click startup/shutdown scripts for Windows and Unix with prerequisite checking and validation.",
+            "size": "S",
+            "expected_runtime_min": 6,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "scripts/start-localhost.bat",
+                "type": "exact"
+              },
+              {
+                "pattern": "scripts/start-localhost.sh",
+                "type": "exact"
+              },
+              {
+                "pattern": "scripts/stop-all.bat",
+                "type": "exact"
+              },
+              {
+                "pattern": "scripts/stop-all.sh",
+                "type": "exact"
+              },
+              {
+                "pattern": "scripts/check-prerequisites.ps1",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T2.2"
+            ],
+            "conflicts_with": []
+          },
+          {
+            "task_id": "T3.1",
+            "summary": "Create E2E Test Suite with Playwright",
+            "description": "Implement comprehensive end-to-end tests covering email processing, editing, summarization, task management, and visual regression.",
+            "size": "L",
+            "expected_runtime_min": 48,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "frontend/tests/e2e/fixtures/test-setup.ts",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/tests/e2e/email-processing.spec.ts",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/tests/e2e/email-editing.spec.ts",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/tests/e2e/summary-generation.spec.ts",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/tests/e2e/task-management.spec.ts",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/tests/e2e/visual-regression.spec.ts",
+                "type": "exact"
+              },
+              {
+                "pattern": "frontend/playwright.config.ts",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T2.2"
+            ],
+            "conflicts_with": [
+              "T5.2"
+            ]
+          },
+          {
+            "task_id": "T5.3",
+            "summary": "Performance Baseline and Optimization",
+            "description": "Establish performance baselines, identify bottlenecks, implement optimizations, and document improvements.",
+            "size": "M",
+            "expected_runtime_min": 18,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "backend/services/com_email_provider.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/services/com_ai_service.py",
+                "type": "exact"
+              },
+              {
+                "pattern": "backend/api/.*\\.py$",
+                "type": "regex"
+              },
+              {
+                "pattern": "frontend/src/.*\\.(ts|tsx)$",
+                "type": "regex"
+              }
+            ],
+            "depends_on": [
+              "T3.4"
+            ],
+            "conflicts_with": [
+              "T1.1",
+              "T1.2",
+              "T1.3",
+              "T1.4",
+              "T2.1",
+              "T2.2",
+              "T5.2"
+            ]
+          }
+        ],
+        "parallel_task_count": 4,
+        "estimated_wave_time_min": 48,
+        "size_distribution": {
+          "S": 2,
+          "L": 1,
+          "M": 1
+        }
+      },
+      {
+        "wave_number": 7,
+        "tasks": [
+          {
+            "task_id": "T3.3",
+            "summary": "Set Up CI/CD Pipeline",
+            "description": "Configure GitHub Actions workflows for backend unit tests, frontend tests, and integration tests with coverage reporting.",
+            "size": "S",
+            "expected_runtime_min": 12,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": ".github/workflows/test-com-backend.yml",
+                "type": "exact"
+              },
+              {
+                "pattern": ".github/workflows/test-frontend.yml",
+                "type": "exact"
+              },
+              {
+                "pattern": ".github/workflows/test-integration.yml",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T3.1",
+              "T3.2"
+            ],
+            "conflicts_with": []
+          },
+          {
+            "task_id": "T4.1",
+            "summary": "Create User Documentation",
+            "description": "Write comprehensive user guides for localhost setup, Graph API setup, provider switching, and troubleshooting.",
+            "size": "S",
+            "expected_runtime_min": 12,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "docs/LOCALHOST_SETUP.md",
+                "type": "exact"
+              },
+              {
+                "pattern": "docs/GRAPH_API_SETUP.md",
+                "type": "exact"
+              },
+              {
+                "pattern": "docs/SWITCHING_PROVIDERS.md",
+                "type": "exact"
+              },
+              {
+                "pattern": "docs/TROUBLESHOOTING.md",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T3.1",
+              "T3.2"
+            ],
+            "conflicts_with": []
+          }
+        ],
+        "parallel_task_count": 2,
+        "estimated_wave_time_min": 12,
+        "size_distribution": {
+          "S": 2
+        }
+      },
+      {
+        "wave_number": 8,
+        "tasks": [
+          {
+            "task_id": "T4.3",
+            "summary": "Create Migration Guide",
+            "description": "Document migration from Tkinter to Web UI with feature comparison, steps, data migration, and rollback procedures.",
+            "size": "S",
+            "expected_runtime_min": 6,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "docs/TKINTER_TO_WEB_MIGRATION.md",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T2.2",
+              "T4.1"
+            ],
+            "conflicts_with": []
+          },
+          {
+            "task_id": "T5.2",
+            "summary": "Conduct Security Audit",
+            "description": "Perform comprehensive security review of authentication bypass, secrets management, dependency vulnerabilities, and logging practices.",
+            "size": "S",
+            "expected_runtime_min": 12,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "backend/.*\\.py$",
+                "type": "regex"
+              },
+              {
+                "pattern": "frontend/.*\\.(ts|tsx)$",
+                "type": "regex"
+              },
+              {
+                "pattern": "package.json",
+                "type": "exact"
+              },
+              {
+                "pattern": "requirements.txt",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T2.2",
+              "T3.3"
+            ],
+            "conflicts_with": [
+              "T1.1",
+              "T1.2",
+              "T1.3",
+              "T1.4",
+              "T1.5",
+              "T2.1",
+              "T2.2",
+              "T3.1",
+              "T3.2",
+              "T3.4",
+              "T5.3"
+            ]
+          }
+        ],
+        "parallel_task_count": 2,
+        "estimated_wave_time_min": 12,
+        "size_distribution": {
+          "S": 2
+        }
+      },
+      {
+        "wave_number": 9,
+        "tasks": [
+          {
+            "task_id": "T5.1",
+            "summary": "Create GitHub Issues for Technical Debt",
+            "description": "Document and track technical debt items including cross-platform limitations, optimization opportunities, and future enhancements.",
+            "size": "S",
+            "expected_runtime_min": 6,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": ".github/issues/.*\\.md$",
+                "type": "regex"
+              }
+            ],
+            "depends_on": [
+              "T4.1",
+              "T4.2",
+              "T4.3"
+            ],
+            "conflicts_with": []
+          },
+          {
+            "task_id": "T5.4",
+            "summary": "User Acceptance Testing",
+            "description": "Conduct UAT with test users, collect feedback, document issues, prioritize fixes, and plan future iterations.",
+            "size": "M",
+            "expected_runtime_min": 24,
+            "tags": [],
+            "enabler": false,
+            "files": [
+              {
+                "pattern": "docs/UAT_PLAN.md",
+                "type": "exact"
+              },
+              {
+                "pattern": "docs/UAT_RESULTS.md",
+                "type": "exact"
+              },
+              {
+                "pattern": "docs/UAT_FEEDBACK.md",
+                "type": "exact"
+              }
+            ],
+            "depends_on": [
+              "T4.1",
+              "T4.2",
+              "T4.3",
+              "T5.2"
+            ],
+            "conflicts_with": []
+          }
+        ],
+        "parallel_task_count": 2,
+        "estimated_wave_time_min": 24,
+        "size_distribution": {
+          "S": 1,
+          "M": 1
+        }
+      }
+    ],
+    "summary": {
+      "total_waves": 9,
+      "total_tasks": 21,
+      "estimated_total_time_min": 219,
+      "average_parallelism": 2.33,
+      "max_parallelism": 4,
+      "efficiency_metrics": {
+        "sequential_time_min": 369,
+        "parallel_time_min": 219,
+        "time_savings_percent": 40.7
+      }
+    }
+  }
+}

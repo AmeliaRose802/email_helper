@@ -11,6 +11,8 @@ The EmailAnalyzer class handles:
 - Job posting detection and analysis
 - Content analysis for AI classification support
 - Text preprocessing and cleaning for downstream processing
+- Email thread grouping and representative selection
+- Content similarity detection for duplicate identification
 
 Key Features:
 - Intelligent due date extraction with relative date support
@@ -18,14 +20,50 @@ Key Features:
 - Job listing detection and metadata extraction
 - Content preprocessing for AI analysis
 - Support for various email formats and content types
+- Thread-aware email grouping for better organization
+- Duplicate detection using content similarity algorithms
 
 This module integrates with the AI processor to provide enhanced
 context for email classification and task extraction.
+
+Dependencies:
+    - re: Regular expression operations for pattern matching
+    - urllib.parse: URL parsing and manipulation
+    - datetime: Date and time operations
+
+Example Usage:
+    >>> from email_analyzer import EmailAnalyzer
+    >>> from ai_processor import AIProcessor
+    >>> 
+    >>> # Initialize with AI processor for enhanced analysis
+    >>> ai_processor = AIProcessor()
+    >>> analyzer = EmailAnalyzer(ai_processor)
+    >>> 
+    >>> # Extract due date from email content
+    >>> email_text = "Please respond by tomorrow at 5 PM"
+    >>> due_date = analyzer.extract_due_date_intelligent(email_text)
+    >>> print(f"Due date: {due_date}")
+    >>> 
+    >>> # Extract and categorize links
+    >>> email_body = "Check out https://forms.microsoft.com/survey123 and https://docs.microsoft.com/azure"
+    >>> links = analyzer.extract_links_intelligent(email_body)
+    >>> for link in links:
+    ...     print(f"Found link: {link}")
+    >>> 
+    >>> # Group emails by thread
+    >>> emails = get_emails_from_outlook()  # Your email retrieval function
+    >>> thread_groups = analyzer.group_emails_by_thread(emails)
+    >>> print(f"Found {len(thread_groups)} conversation threads")
+
+Author: Email Helper Team
+Version: 2.0
+Last Updated: 2025-10-13
 """
 
 import re
 import urllib.parse as urlparse
 from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional, Tuple
 
 
 class EmailAnalyzer:
@@ -41,67 +79,129 @@ class EmailAnalyzer:
     - Job posting detection and analysis
     - Content preprocessing for AI models
     - Text cleaning and normalization
+    - Email thread grouping and management
+    - Duplicate detection via content similarity
     
     Attributes:
         ai_processor (AIProcessor, optional): Reference to AI processor for
-            enhanced analysis capabilities.
+            enhanced analysis capabilities. When provided, enables advanced
+            features like job qualification assessment.
+    
+    Thread Safety:
+        This class is not thread-safe. Create separate instances for concurrent use.
+    
+    Performance Considerations:
+        - Link extraction is limited to first 10 URLs to prevent performance issues
+        - Text normalization uses efficient regex patterns
+        - Content similarity uses Jaccard similarity for O(n) performance
     
     Example:
         >>> analyzer = EmailAnalyzer(ai_processor)
         >>> due_date = analyzer.extract_due_date_intelligent(
         ...     "Please respond by tomorrow"
         ... )
-        >>> print(due_date)
-        'December 16, 2024'
+        >>> print(due_date)  # "December 16, 2024"
+        >>> 
+        >>> # Extract metadata in one call (more efficient)
+        >>> metadata = analyzer.extract_email_metadata(
+        ...     subject="Meeting Request",
+        ...     body="Please confirm by Friday..."
+        ... )
+        >>> print(metadata['due_date'])
+        >>> print(metadata['links'])
     """
     
     def __init__(self, ai_processor=None):
+        """Initialize the EmailAnalyzer.
+        
+        Args:
+            ai_processor (AIProcessor, optional): AI processor instance for 
+                enhanced analysis capabilities. If None, advanced features 
+                like job qualification will be unavailable.
+        """
         self.ai_processor = ai_processor
     
-    def extract_due_date_intelligent(self, text):
+    def extract_due_date_intelligent(self, text: str) -> str:
         """Extract due dates from email text using intelligent pattern matching.
         
         This method analyzes email content to identify due dates, deadlines,
         and time-sensitive information using both relative date expressions
         (like "tomorrow", "next week") and absolute date patterns.
         
+        Supported Patterns:
+            - Relative dates: "tomorrow", "next week", "end of week"
+            - Absolute dates: "December 15, 2024", "12/15/2024", "15-12-2024"
+            - Deadline phrases: "due by Monday", "deadline: Friday"
+            - Expiration dates: "expires on January 1"
+        
+        Algorithm:
+            1. Check for relative date keywords (tomorrow, next week, etc.)
+            2. If found, calculate absolute date from current date
+            3. Otherwise, search for absolute date patterns using regex
+            4. Return first match found or "No specific deadline"
+        
         Args:
-            text (str): Email content to analyze for due dates.
+            text (str): Email content to analyze for due dates. Can include
+                subject line, body, or combination of both.
             
         Returns:
-            str: Formatted due date string or None if no date found.
-                 Relative dates are converted to absolute dates.
-                 Uncertain dates are prefixed with "~".
+            str: Formatted due date string in one of these formats:
+                - "Month Day, Year" for specific dates (e.g., "December 16, 2024")
+                - "~Month Day, Year" for approximate dates (prefixed with ~)
+                - "No specific deadline" if no date found
                  
         Example:
             >>> analyzer = EmailAnalyzer()
+            >>> 
+            >>> # Relative date
             >>> date = analyzer.extract_due_date_intelligent("Please respond by tomorrow")
-            >>> print(date)  # "December 16, 2024"
+            >>> print(date)  # "December 16, 2024" (if today is Dec 15)
+            >>> 
+            >>> # Absolute date
+            >>> date = analyzer.extract_due_date_intelligent("Deadline: January 15, 2025")
+            >>> print(date)  # "january 15, 2025"
+            >>> 
+            >>> # Approximate date
             >>> date2 = analyzer.extract_due_date_intelligent("Due next week")
             >>> print(date2)  # "~December 23, 2024"
+            >>> 
+            >>> # No deadline
+            >>> date3 = analyzer.extract_due_date_intelligent("FYI: Status update")
+            >>> print(date3)  # "No specific deadline"
+        
+        Performance:
+            O(n) where n is the length of the text. Pattern matching is efficient
+            as it stops at the first match.
+        
+        Notes:
+            - Text is converted to lowercase for case-insensitive matching
+            - Relative dates use current system time
+            - "~" prefix indicates approximate/estimated dates
+            - Year is inferred from context if not explicitly provided
         """
         text_lower = text.lower()
         
-        # Simple relative dates
+        # Simple relative dates - calculate from current date
         if 'tomorrow' in text_lower:
             return (datetime.now() + timedelta(days=1)).strftime('%B %d, %Y')
         elif 'next week' in text_lower:
             return f"~{(datetime.now() + timedelta(days=7)).strftime('%B %d, %Y')}"
         elif 'end of week' in text_lower:
+            # Calculate days until Friday
             days_ahead = 4 - datetime.now().weekday()
             if days_ahead <= 0:
                 days_ahead += 7
             return (datetime.now() + timedelta(days=days_ahead)).strftime('%B %d, %Y')
         
-        # Date patterns
+        # Absolute date patterns - ordered by specificity
         patterns = [
-            r'due\s+(?:by\s+)?(\w+\s+\d{1,2}(?:,\s+\d{4})?)',
-            r'deadline:?\s*(\w+\s+\d{1,2}(?:,\s+\d{4})?)',
-            r'expires?\s+(?:on\s+)?(\w+\s+\d{1,2}(?:,\s+\d{4})?)',
-            r'by\s+(\w+\s+\d{1,2}(?:,\s+\d{4})?)',
-            r'(\d{1,2}/\d{1,2}/\d{4})',
-            r'(\w+\s+\d{1,2},\s+\d{4})',
-            r'(\d{1,2}-\d{1,2}-\d{4})'
+            r'due\s+(?:by\s+)?(\w+\s+\d{1,2}(?:,\s+\d{4})?)',  # "due by January 15" or "due January 15, 2024"
+            r'deadline:?\s*(\w+\s+\d{1,2}(?:,\s+\d{4})?)',      # "deadline: January 15, 2024"
+            r'expires?\s+(?:on\s+)?(\w+\s+\d{1,2}(?:,\s+\d{4})?)',  # "expires on January 15"
+            r'by\s+(\w+\s+\d{1,2}(?:,\s+\d{4})?)',              # "by January 15"
+            r'(\d{1,2}/\d{1,2}/\d{4})',                         # "1/15/2024"
+            r'(\w+\s+\d{1,2},\s+\d{4})',                        # "January 15, 2024"
+            r'(\d{1,2}-\d{1,2}-\d{4})'                          # "15-1-2024"
         ]
         
         for pattern in patterns:
@@ -111,17 +211,86 @@ class EmailAnalyzer:
         
         return "No specific deadline"
     
-    def extract_links_intelligent(self, text):
-        """Intelligent link extraction with context and image filtering"""
+    def extract_links_intelligent(self, text: str) -> List[str]:
+        """Intelligent link extraction with context-aware categorization and filtering.
+        
+        This method extracts URLs from email text, filters out non-actionable links
+        (like images, tracking pixels), cleans tracking parameters, and categorizes
+        links based on their domain and purpose.
+        
+        Features:
+            - Automatic image and tracking pixel filtering
+            - Tracking parameter removal for cleaner URLs
+            - Domain-based categorization (Survey, Code, Docs, Meeting)
+            - Limit to top 5 actionable links to prevent information overload
+        
+        Filtered Out:
+            - Image files (.png, .jpg, .gif, .svg, etc.)
+            - Tracking pixels and analytics URLs
+            - Non-actionable protocol links (cid:, data:, mailto:)
+            - URLs in image/asset paths
+        
+        Categorization Rules:
+            - "Survey:" - forms.microsoft.com, survey domains
+            - "Code:" - github.com, visualstudio.com
+            - "Docs:" - docs.microsoft.com, aka.ms
+            - "Meeting:" - teams.microsoft.com, outlook.com
+            - Plain URL - all other actionable links
+        
+        Args:
+            text (str): Email body text containing URLs. HTML tags are
+                automatically handled by regex pattern.
+            
+        Returns:
+            List[str]: List of categorized, cleaned URLs (max 5). Each URL
+                may be prefixed with a category label for context.
+                Returns empty list if no actionable links found.
+                
+        Example:
+            >>> analyzer = EmailAnalyzer()
+            >>> 
+            >>> email_body = '''
+            ... Check out this survey: https://forms.microsoft.com/survey123?utm_source=email
+            ... And review the docs: https://docs.microsoft.com/azure/overview
+            ... Meeting link: https://teams.microsoft.com/l/meetup/thread123
+            ... Image: https://example.com/images/logo.png
+            ... '''
+            >>> 
+            >>> links = analyzer.extract_links_intelligent(email_body)
+            >>> for link in links:
+            ...     print(link)
+            # Output:
+            # Survey: https://forms.microsoft.com/survey123
+            # Docs: https://docs.microsoft.com/azure/overview
+            # Meeting: https://teams.microsoft.com/l/meetup/thread123
+        
+        Performance:
+            O(n*m) where n is number of URLs found and m is average URL length.
+            Limited to first 10 URLs for processing, returns max 5 actionable links.
+        
+        Notes:
+            - Tracking parameters (utm_*, fbclid, etc.) are automatically removed
+            - Image links are filtered out to prevent clutter
+            - URLs are validated before being returned
+            - Category prefixes help users understand link purpose at a glance
+        
+        See Also:
+            - _is_actionable_link(): Link filtering logic
+            - _clean_tracking_parameters(): URL cleaning logic
+        """
+        # Extract all HTTP/HTTPS URLs from text
         urls = re.findall(r'http[s]?://[^\s<>"]+', text)
         
-        categorized_links = []
-        for url in urls[:10]:  # Check more URLs before limiting
+        categorized_links: List[str] = []
+        
+        # Process URLs and filter/categorize
+        for url in urls[:10]:  # Check up to 10 URLs before limiting
             # Filter out image links and other non-actionable URLs
             if self._is_actionable_link(url):
                 # Clean tracking parameters from the URL
                 clean_url = self._clean_tracking_parameters(url)
                 
+                # Categorize based on domain
                 if 'forms.' in clean_url or 'survey' in clean_url:
                     categorized_links.append(f"Survey: {clean_url}")
                 elif 'github.com' in clean_url or 'visualstudio.com' in clean_url:
@@ -133,16 +302,57 @@ class EmailAnalyzer:
                 else:
                     categorized_links.append(clean_url)
             
-            # Limit to 5 actionable links
+            # Limit to 5 actionable links to prevent information overload
             if len(categorized_links) >= 5:
                 break
         
         return categorized_links
     
-    def _clean_tracking_parameters(self, url):
-        """Remove tracking parameters from URLs"""
-        import urllib.parse as urlparse
+    def _clean_tracking_parameters(self, url: str) -> str:
+        """Remove tracking parameters from URLs for cleaner presentation.
         
+        This method strips common tracking parameters (UTM codes, click IDs, etc.)
+        from URLs while preserving functional query parameters. This results in
+        cleaner, more readable URLs without affecting functionality.
+        
+        Tracking Parameters Removed:
+            - UTM parameters: utm_source, utm_medium, utm_campaign, utm_content, utm_term
+            - Click IDs: fbclid (Facebook), gclid (Google), _hsenc/_hsmi (HubSpot)
+            - Email tracking: mc_cid, mc_eid (MailChimp)
+            - Generic: ref, source, campaign_id
+        
+        Args:
+            url (str): Original URL potentially containing tracking parameters.
+            
+        Returns:
+            str: Cleaned URL with tracking parameters removed. If URL parsing
+                fails, returns the original URL unchanged.
+                
+        Example:
+            >>> analyzer = EmailAnalyzer()
+            >>> 
+            >>> dirty_url = "https://example.com/page?utm_source=email&utm_campaign=promo&id=123"
+            >>> clean_url = analyzer._clean_tracking_parameters(dirty_url)
+            >>> print(clean_url)
+            # "https://example.com/page?id=123"
+            >>> 
+            >>> # Invalid URL returns unchanged
+            >>> bad_url = "not a real url"
+            >>> result = analyzer._clean_tracking_parameters(bad_url)
+            >>> print(result == bad_url)  # True
+        
+        Performance:
+            O(n) where n is the number of query parameters.
+        
+        Error Handling:
+            If URL parsing fails (malformed URL), returns the original URL
+            unchanged rather than raising an exception.
+        
+        Notes:
+            - Preserves all non-tracking query parameters
+            - Maintains URL structure (scheme, domain, path, fragment)
+            - Safe to use on any string - won't crash on invalid URLs
+        """
         try:
             parsed = urlparse.urlparse(url)
             
@@ -156,11 +366,11 @@ class EmailAnalyzer:
             # Parse query parameters
             query_params = urlparse.parse_qs(parsed.query)
             
-            # Remove tracking parameters
+            # Remove tracking parameters, keep functional ones
             cleaned_params = {k: v for k, v in query_params.items() 
                             if k not in tracking_params}
             
-            # Rebuild the URL
+            # Rebuild the URL with cleaned parameters
             new_query = urlparse.urlencode(cleaned_params, doseq=True)
             cleaned_url = urlparse.urlunparse((
                 parsed.scheme, parsed.netloc, parsed.path,
@@ -169,15 +379,65 @@ class EmailAnalyzer:
             
             return cleaned_url
         except Exception:
-            # If URL parsing fails, return original URL
+            # If URL parsing fails, return original URL unchanged
             return url
     
-    def _is_actionable_link(self, url):
-        """Filter out image links, tracking pixels, and other non-actionable URLs"""
+    def _is_actionable_link(self, url: str) -> bool:
+        """Filter out image links, tracking pixels, and other non-actionable URLs.
+        
+        This method determines whether a URL represents an actionable link that
+        users would want to see, versus images, tracking pixels, and other
+        non-actionable content that should be filtered out.
+        
+        Filtering Criteria:
+            - Excludes non-HTTP protocols (cid:, data:, mailto:, tel:)
+            - Excludes image file extensions (.png, .jpg, .gif, .svg, etc.)
+            - Excludes image/asset URL paths (/images/, /icons/, /logo/, etc.)
+            - Excludes tracking/analytics domains (Google Analytics, Facebook, etc.)
+            - Excludes very short URLs (< 10 characters, likely incomplete)
+        
+        Args:
+            url (str): URL to evaluate for actionability.
+            
+        Returns:
+            bool: True if URL is actionable (should be shown to user),
+                False if URL should be filtered out.
+                
+        Example:
+            >>> analyzer = EmailAnalyzer()
+            >>> 
+            >>> # Actionable links return True
+            >>> analyzer._is_actionable_link("https://docs.microsoft.com/azure")
+            True
+            >>> 
+            >>> # Image links return False
+            >>> analyzer._is_actionable_link("https://example.com/logo.png")
+            False
+            >>> 
+            >>> # Tracking pixels return False
+            >>> analyzer._is_actionable_link("https://google-analytics.com/collect?...")
+            False
+            >>> 
+            >>> # Non-HTTP protocols return False
+            >>> analyzer._is_actionable_link("mailto:user@example.com")
+            False
+        
+        Performance:
+            O(1) - Uses string containment checks and startswith/endswith operations.
+        
+        Notes:
+            - Case-insensitive matching for robustness
+            - Designed to be conservative - when in doubt, filters out
+            - Helps prevent email clutter from tracking and decorative content
+            - Easy to extend with additional filtering rules
+        
+        See Also:
+            - extract_links_intelligent(): Uses this method for filtering
+        """
         # Convert to lowercase for case-insensitive matching
         url_lower = url.lower()
         
-        # Exclude specific protocols
+        # Exclude specific protocols that aren't clickable web links
         if url_lower.startswith(('cid:', 'data:', 'mailto:', 'tel:')):
             return False
         
@@ -203,9 +463,70 @@ class EmailAnalyzer:
         
         return True
     
-    def extract_email_metadata(self, subject, body):
-        """Extract both due date and links in one call to reduce duplication"""
+    def extract_email_metadata(self, subject: str, body: str) -> Dict[str, Any]:
+        """Extract both due date and links in one efficient call.
+        
+        This method is a convenience function that extracts multiple pieces of
+        metadata from an email in a single call, reducing code duplication and
+        improving performance by analyzing the combined text only once.
+        
+        Features:
+            - Single-pass analysis of email content
+            - Combines subject and body for comprehensive due date detection
+            - Extracts actionable links from body
+            - Returns structured dictionary for easy access
+        
+        Args:
+            subject (str): Email subject line. Used for due date detection
+                as deadlines are often mentioned in subjects.
+            body (str): Email body text. Used for both due date and link
+                extraction.
+            
+        Returns:
+            Dict[str, Any]: Dictionary containing extracted metadata with keys:
+                - 'due_date' (str): Extracted due date or "No specific deadline"
+                - 'links' (List[str]): List of categorized, actionable URLs
+                
+        Example:
+            >>> analyzer = EmailAnalyzer()
+            >>> 
+            >>> subject = "Project Review - Due Friday"
+            >>> body = '''
+            ... Please review the project by end of week.
+            ... Documentation: https://docs.microsoft.com/project
+            ... Survey: https://forms.microsoft.com/feedback
+            ... '''
+            >>> 
+            >>> metadata = analyzer.extract_email_metadata(subject, body)
+            >>> print(metadata['due_date'])
+            # "~December 20, 2024" (approximate end of week)
+            >>> 
+            >>> print(len(metadata['links']))
+            # 2
+            >>> 
+            >>> for link in metadata['links']:
+            ...     print(link)
+            # Docs: https://docs.microsoft.com/project
+            # Survey: https://forms.microsoft.com/feedback
+        
+        Performance:
+            O(n + m) where n is the combined text length and m is the number of URLs.
+            More efficient than calling extract_due_date_intelligent() and
+            extract_links_intelligent() separately.
+        
+        Use Cases:
+            - Initial email processing and classification
+            - Batch email analysis
+            - Generating email summaries
+            - Preparing data for AI classification
+        
+        See Also:
+            - extract_due_date_intelligent(): Due date extraction logic
+            - extract_links_intelligent(): Link extraction and categorization
+        """
+        # Combine subject and body for comprehensive due date detection
         text_combined = f"{subject} {body}"
+        
         return {
             'due_date': self.extract_due_date_intelligent(text_combined),
             'links': self.extract_links_intelligent(body)

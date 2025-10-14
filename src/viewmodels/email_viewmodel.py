@@ -122,6 +122,72 @@ class EmailDetailViewModel:
             suggestion_data: Raw suggestion data from controller
         """
         self.suggestion_data = suggestion_data
+        self._index = None
+    
+    def set_index(self, index: int):
+        """Set the index for this email.
+        
+        Args:
+            index: Index of the email in the list
+        """
+        self._index = index
+    
+    @property
+    def index(self) -> Optional[int]:
+        """Get email index."""
+        return self._index
+    
+    @property
+    def subject(self) -> str:
+        """Get email subject."""
+        email_data = self.suggestion_data.get('email_data', {})
+        return email_data.get('subject', 'Unknown Subject')
+    
+    @property
+    def sender(self) -> str:
+        """Get email sender."""
+        email_data = self.suggestion_data.get('email_data', {})
+        return email_data.get('sender_name', email_data.get('sender', 'Unknown Sender'))
+    
+    @property
+    def date(self) -> str:
+        """Get formatted date."""
+        email_data = self.suggestion_data.get('email_data', {})
+        received_time = email_data.get('received_time', 'Unknown Date')
+        
+        if hasattr(received_time, 'strftime'):
+            return received_time.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            return str(received_time)
+    
+    @property
+    def recipients(self) -> str:
+        """Get email recipients."""
+        email_data = self.suggestion_data.get('email_data', {})
+        # Try to get recipients from email object if available
+        email_obj = email_data.get('email_object')
+        if email_obj and hasattr(email_obj, 'To'):
+            return email_obj.To
+        return ""
+    
+    @property
+    def category(self) -> str:
+        """Get formatted category."""
+        suggestion = self.suggestion_data.get('ai_suggestion', 'Unknown')
+        return suggestion.replace('_', ' ').title()
+    
+    @property
+    def original_category(self) -> str:
+        """Get original category."""
+        initial = self.suggestion_data.get('initial_classification',
+                                          self.suggestion_data.get('ai_suggestion', 'Unknown'))
+        return initial.replace('_', ' ').title()
+    
+    @property
+    def body(self) -> str:
+        """Get email body."""
+        email_data = self.suggestion_data.get('email_data', {})
+        return email_data.get('body', 'No content available')
     
     @property
     def ai_summary(self) -> str:
@@ -156,9 +222,8 @@ class EmailDetailViewModel:
     
     @property
     def email_body(self) -> str:
-        """Get email body."""
-        email_data = self.suggestion_data.get('email_data', {})
-        return email_data.get('body', 'No content available')
+        """Get email body (alias for body)."""
+        return self.body
     
     @property
     def was_reclassified(self) -> bool:

@@ -51,7 +51,18 @@ class EmailProcessingController:
         
         log_callback("🚀 Starting Email Helper Processing...")
         log_callback(f"📊 Processing up to {max_emails} emails")
-        log_callback("🔍 Connecting to Outlook and retrieving conversations...")
+        log_callback("🔍 Connecting to Outlook...")
+        progress_callback(2, "Connecting to Outlook...")
+        
+        # Connect to Outlook first
+        try:
+            self.outlook_manager.connect_to_outlook()
+            log_callback("✅ Connected to Outlook successfully")
+        except Exception as e:
+            log_callback(f"❌ Failed to connect to Outlook: {e}")
+            raise
+        
+        log_callback("📧 Retrieving conversations...")
         progress_callback(5, "Retrieving conversations...")
         
         # Get conversations

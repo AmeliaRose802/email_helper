@@ -30,6 +30,9 @@ from viewmodels import EmailSuggestionViewModel, EmailDetailViewModel
 # Views
 from gui.tabs import ProcessingTab, EditingTab, SummaryTab, AccuracyTab
 
+# Service Factory
+from core.service_factory import ServiceFactory
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,14 +43,30 @@ class EmailHelperApp:
     All business logic is delegated to controller classes.
     """
     
-    # Category mapping for display
+    # Category mapping for display (actual category IDs)
     CATEGORY_MAPPING = {
-        'Action': 'Action',
-        'FYI': 'FYI',
-        'Newsletter': 'Newsletter',
-        'Optional': 'Optional',
-        'Job': 'Job',
-        'Trash': 'Trash'
+        'required_personal_action': 'Required Personal Action',
+        'team_action': 'Team Action',
+        'optional_action': 'Optional Action',
+        'job_listing': 'Job Listing',
+        'optional_event': 'Optional Event',
+        'work_relevant': 'Work Relevant',
+        'fyi': 'FYI',
+        'newsletter': 'Newsletter',
+        'spam_to_delete': 'Spam To Delete'
+    }
+    
+    # Category priority for sorting
+    CATEGORY_PRIORITY = {
+        'required_personal_action': 1,
+        'team_action': 2,
+        'optional_action': 3,
+        'job_listing': 4,
+        'optional_event': 5,
+        'work_relevant': 6,
+        'fyi': 7,
+        'newsletter': 8,
+        'spam_to_delete': 9
     }
     
     def __init__(self, root):
@@ -64,6 +83,9 @@ class EmailHelperApp:
         self.email_suggestions: List[Dict[str, Any]] = []
         self.processing_cancelled = False
         
+        # Initialize service factory
+        self.service_factory = ServiceFactory()
+        
         # Initialize controllers
         self._init_controllers()
         
@@ -74,10 +96,42 @@ class EmailHelperApp:
     
     def _init_controllers(self):
         """Initialize all controllers."""
-        self.processing_controller = EmailProcessingController()
-        self.editing_controller = EmailEditingController()
-        self.summary_controller = SummaryController()
-        self.accuracy_controller = AccuracyController()
+        # Get services from factory
+        outlook_manager = self.service_factory.get_outlook_manager()
+        ai_processor = self.service_factory.get_ai_processor()
+        email_analyzer = self.service_factory.get_email_analyzer()
+        email_processor = self.service_factory.get_email_processor()
+        task_persistence = self.service_factory.get_task_persistence()
+        summary_generator = self.service_factory.get_summary_generator()
+        accuracy_tracker = self.service_factory.get_accuracy_tracker()
+        db_migrations = self.service_factory.get_database_migrations()
+        
+        # Apply database migrations
+        db_migrations.apply_migrations()
+        
+        # Create controllers with dependencies
+        self.processing_controller = EmailProcessingController(
+            outlook_manager,
+            ai_processor,
+            email_analyzer,
+            email_processor,
+            task_persistence
+        )
+        self.editing_controller = EmailEditingController(
+            ai_processor,
+            email_processor,
+            task_persistence
+        )
+        self.summary_controller = SummaryController(
+            summary_generator,
+            task_persistence,
+            email_processor
+        )
+        self.accuracy_controller = AccuracyController(
+            accuracy_tracker,
+            task_persistence,
+            db_migrations
+        )
     
     def _create_ui(self):
         """Create the main UI structure."""
@@ -107,7 +161,7 @@ class EmailHelperApp:
         
         self.editing_tab = EditingTab(
             self.editing_frame,
-            category_mapping=self.CATEGORY_MAPPING,
+            category_mapping=list(self.CATEGORY_MAPPING.keys()),
             on_email_select_callback=self.on_email_select,
             on_category_change_callback=self.on_category_change,
             on_apply_category_callback=self.on_apply_category,
@@ -188,17 +242,30 @@ class EmailHelperApp:
             # Progress callback
             def on_progress(percent: float, message: str):
                 self.root.after(0, self.processing_tab.update_progress, percent, message)
-                self.root.after(0, self.processing_tab.add_log_message, message)
                 return not self.processing_cancelled
             
-            # Delegate to controller
-            results = self.processing_controller.start_email_processing(
+            # Log callback
+            def on_log(message: str):
+                self.root.after(0, self.processing_tab.add_log_message, message)
+            
+            # Delegate to controller - this starts a background thread and returns it
+            processing_thread = self.processing_controller.start_email_processing(
                 max_emails=max_emails,
-                progress_callback=on_progress
+                progress_callback=on_progress,
+                log_callback=on_log
             )
             
-            # Update results
-            self.email_suggestions = results.get('suggestions', [])
+            # Wait for the thread to complete
+            processing_thread.join()
+            
+            # Get the results from the controller
+            self.email_suggestions = self.processing_controller.get_email_suggestions()
+            
+            # Create results dict for UI update
+            results = {
+                'suggestions': self.email_suggestions,
+                'action_items': self.processing_controller.get_action_items_data()
+            }
             
             # Update UI on main thread
             self.root.after(0, self._on_processing_complete, results)
@@ -253,7 +320,7 @@ class EmailHelperApp:
         """Load processed emails into editing tab."""
         # Transform to view models
         viewmodels = [
-            EmailSuggestionViewModel(suggestion)
+            EmailSuggestionViewModel(suggestion, self.CATEGORY_PRIORITY)
             for suggestion in self.email_suggestions
         ]
         
@@ -271,7 +338,7 @@ class EmailHelperApp:
         suggestion = self.email_suggestions[index]
         
         # Transform to detail view model
-        detail_vm = EmailDetailViewModel(suggestion, index)
+        detail_vm = EmailDetailViewModel(suggestion)
         
         # Check if modified
         is_modified = suggestion.get('user_modified', False)
@@ -304,23 +371,31 @@ class EmailHelperApp:
         
         # Get current suggestion
         suggestion = self.email_suggestions[index]
-        old_category = suggestion.get('suggested_category', '')
+        old_category = suggestion.get('ai_suggestion', '')
         
         if new_category == old_category:
             return
         
         # Delegate to controller
-        updated_suggestion = self.editing_controller.edit_suggestion(
-            suggestion=suggestion,
+        success = self.editing_controller.edit_suggestion(
+            email_suggestions=self.email_suggestions,
+            email_index=index,
             new_category=new_category,
-            explanation=explanation
+            user_explanation=explanation
         )
+        
+        if not success:
+            logger.error(f"Failed to edit suggestion at index {index}")
+            return
+        
+        # Get the updated suggestion
+        updated_suggestion = self.email_suggestions[index]
         
         # Update in list
         self.email_suggestions[index] = updated_suggestion
         
         # Update view
-        vm = EmailSuggestionViewModel(updated_suggestion)
+        vm = EmailSuggestionViewModel(updated_suggestion, self.CATEGORY_PRIORITY)
         self.editing_tab.update_email_in_tree(index, vm)
         
         # Refresh details
@@ -338,7 +413,8 @@ class EmailHelperApp:
         self.email_suggestions = self.editing_controller.sort_suggestions(
             self.email_suggestions,
             column,
-            self.editing_tab.sort_reverse
+            self.editing_tab.sort_reverse,
+            self.CATEGORY_PRIORITY
         )
         
         # Toggle sort direction
@@ -353,20 +429,35 @@ class EmailHelperApp:
             messagebox.showwarning("No Emails", "No emails to apply to Outlook.")
             return
         
-        # Delegate to controller
+        # Apply categorizations using the email processor
         try:
-            result = self.editing_controller.apply_to_outlook(self.email_suggestions)
+            # Get the email processor from service factory
+            email_processor = self.service_factory.get_email_processor()
+            outlook_manager = self.service_factory.get_outlook_manager()
             
-            if result.get('success'):
-                messagebox.showinfo(
-                    "Success",
-                    f"Successfully applied {result.get('count', 0)} categorizations to Outlook!"
-                )
-            else:
-                messagebox.showerror(
-                    "Error",
-                    f"Failed to apply categorizations: {result.get('error', 'Unknown error')}"
-                )
+            # Ensure Outlook is connected
+            if not hasattr(outlook_manager, 'outlook') or outlook_manager.outlook is None:
+                outlook_manager.connect_to_outlook()
+            
+            # Apply categorizations
+            count = 0
+            for suggestion in self.email_suggestions:
+                try:
+                    email_obj = suggestion.get('email_object')
+                    category = suggestion.get('ai_suggestion', '')
+                    
+                    if email_obj and category:
+                        outlook_manager.categorize_email(email_obj, category)
+                        count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to categorize email: {e}")
+                    continue
+            
+            messagebox.showinfo(
+                "Success",
+                f"Successfully applied {count} categorizations to Outlook!"
+            )
+            
         except Exception as e:
             logger.error(f"Error applying to Outlook: {e}", exc_info=True)
             messagebox.showerror("Error", f"Error applying to Outlook:\n\n{str(e)}")
@@ -382,11 +473,17 @@ class EmailHelperApp:
         logger.info("Generating email summary")
         
         try:
+            # Get action items data from email processor
+            action_items_data = self.processing_controller.get_action_items_data()
+            
             # Delegate to controller
-            summary_data = self.summary_controller.generate_summary(self.email_suggestions)
+            summary_sections, saved_path = self.summary_controller.generate_summary(
+                action_items_data,
+                self.email_suggestions
+            )
             
             # Display in view
-            self.summary_tab.display_summary(summary_data)
+            self.summary_tab.display_summary(summary_sections)
             
             # Switch to summary tab
             self.notebook.select(self.summary_frame)

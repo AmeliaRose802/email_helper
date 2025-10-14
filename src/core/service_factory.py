@@ -31,6 +31,7 @@ from summary_generator import SummaryGenerator
 from email_processor import EmailProcessor
 from task_persistence import TaskPersistence
 from accuracy_tracker import AccuracyTracker
+from database.migrations import DatabaseMigrations
 from .interfaces import EmailProvider, AIProvider, StorageProvider
 
 
@@ -93,6 +94,12 @@ class ServiceFactory:
         from .config import config
         runtime_data_dir = config.get('storage.base_dir')
         return self._get_or_create('accuracy_tracker', lambda: AccuracyTracker(runtime_data_dir))
+    
+    def get_database_migrations(self) -> 'DatabaseMigrations':
+        """Get DatabaseMigrations instance."""
+        from .config import config
+        db_path = config.get_storage_path('database/email_helper.db')
+        return self._get_or_create('database_migrations', lambda: DatabaseMigrations(db_path))
         
     def reset(self):
         """Reset all instances (useful for testing)."""

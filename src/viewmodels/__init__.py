@@ -6,3 +6,10 @@ __all__ = [
     'EmailSuggestionViewModel',
     'EmailDetailViewModel',
 ]
+
+from viewmodels.email_viewmodel import EmailSuggestionViewModel, EmailDetailViewModel
+
+__all__ = [
+    'EmailSuggestionViewModel',
+    'EmailDetailViewModel',
+]
