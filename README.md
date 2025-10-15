@@ -12,14 +12,53 @@ npm start
 ```
 This will start both the React frontend and API backend automatically!
 
-### Option 2: Manual Setup
+### Option 2: Localhost Development Setup
+
+For developers working on the web application (React frontend + FastAPI backend):
+
+#### Prerequisites
+- **Windows 10/11** with Microsoft Outlook installed and configured
+- **Python 3.12+** and pip ([download](https://www.python.org/downloads/))
+- **Node.js 18+** and npm ([download](https://nodejs.org/))
+
+#### Quick Start
+```bash
+# 1. Clone and navigate to the repository
+git clone https://github.com/AmeliaRose802/email_helper.git
+cd email_helper
+
+# 2. Set up backend
+pip install -r requirements.txt
+cp .env.localhost.example .env
+
+# 3. Set up frontend
+cd frontend
+npm install
+cp .env.local.example .env.local
+cd ..
+
+# 4. Start backend (in one terminal)
+python run_backend.py
+
+# 5. Start frontend (in another terminal)
+cd frontend
+npm run dev
+```
+
+Then open your browser to **http://localhost:3000** or **http://localhost:5173**
+
+> **📖 Detailed Instructions:** See [Localhost Setup Guide](docs/LOCALHOST_SETUP.md) for comprehensive setup instructions, configuration options, and troubleshooting.
+
+### Option 3: Desktop GUI Application
+
+For the original desktop application with Tkinter GUI:
 
 #### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure Azure Authentication
+#### 2. Configure Azure Authentication
 Choose your preferred authentication method:
 
 **Option A: Azure CLI (Recommended - Most Secure)**
@@ -34,7 +73,7 @@ cp .env.template .env
 # Edit .env with your Azure OpenAI details
 ```
 
-### 3. Set Up Personal Configuration
+#### 3. Set Up Personal Configuration
 ```bash
 # Create user-specific data directory (if not exists)
 mkdir user_specific_data
@@ -46,7 +85,7 @@ cp job_skill_summery.md.template user_specific_data/job_skill_summery.md
 # Edit the files with your job context and skills
 ```
 
-### 4. Run the Application
+#### 4. Run the Application
 ```bash
 python email_manager_main.py
 ```
@@ -126,30 +165,55 @@ your_username
 
 ## 📖 Documentation
 
+### Setup & Configuration
+- **[Localhost Setup Guide](docs/LOCALHOST_SETUP.md)** - Complete localhost development setup
+- **[Backend README](backend/README.md)** - Backend API documentation and setup
+- **[Frontend README](frontend/README.md)** - React frontend documentation and setup
 - [`SECURITY_SETUP.md`](SECURITY_SETUP.md) - Detailed security configuration guide
 - [`scripts/README.md`](scripts/README.md) - Technical implementation details
-- [`docs/`](docs/) - Additional documentation and guides
 
-## 🛠️ Development
-
-### Adding New Categories
-
-1. Update prompts in `prompts/email_classifier_system.prompty`
-2. Update documentation
-
-### Customizing Prompts
-All AI prompts are in the `prompts/` directory using Microsoft Prompty format. Edit these files to customize the AI behavior for your specific needs.
-
-## 📚 Documentation
-
-Comprehensive documentation is available in the `docs/` directory:
-
+### Additional Documentation
 - **[Complete Documentation Index](docs/README.md)** - Start here for all documentation
 - **[Quick Start Guide](QUICK_START.md)** - Get up and running quickly
 - **[User Setup](docs/setup/USER_SETUP.md)** - Detailed setup instructions
 - **[Feature Guides](docs/features/)** - Learn about specific features
 - **[Technical Documentation](docs/technical/)** - Architecture and design details
 - **[Test Documentation](test/TEST_ORGANIZATION.md)** - Testing guide and organization
+- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+
+## 🐛 Troubleshooting
+
+### Localhost Development Issues
+
+**Backend won't start:**
+```bash
+# Check if port 8000 is already in use
+netstat -ano | findstr :8000
+
+# Verify Python dependencies are installed
+pip install -r requirements.txt
+
+# Check Outlook is installed and configured
+```
+
+**Frontend can't connect to backend:**
+```bash
+# Verify backend is running
+curl http://localhost:8000/health
+
+# Check .env.local has correct API URL
+cat frontend/.env.local | grep VITE_API_BASE_URL
+
+# Ensure CORS is configured in backend .env
+```
+
+**Outlook COM errors:**
+- Ensure Microsoft Outlook is installed (2016 or later)
+- Open Outlook manually to verify it works
+- Run the application with administrator privileges
+- Check Windows COM settings
+
+> **📖 More Help:** See the [Troubleshooting Guide](docs/TROUBLESHOOTING.md) for comprehensive troubleshooting steps.
 
 ## 🤝 Contributing
 
