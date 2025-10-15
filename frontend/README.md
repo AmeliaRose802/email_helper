@@ -2,6 +2,36 @@
 
 React web application frontend for the Email Helper system with complete backend API integration.
 
+## 🚀 Quick Start - Localhost Development
+
+Get the frontend running locally in 3 steps:
+
+### Prerequisites
+- **Node.js 18+** and npm ([download](https://nodejs.org/))
+- **Backend server** running on http://localhost:8000 (see [Backend README](../backend/README.md))
+
+### Setup
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Configure environment
+cp .env.local.example .env.local
+
+# 3. Start development server
+npm run dev
+```
+
+The frontend will be accessible at **http://localhost:3000** or **http://localhost:5173**
+
+> **📖 Detailed Setup:** See [Frontend Localhost Setup](./LOCALHOST_SETUP.md) for comprehensive instructions and troubleshooting.
+
+### Verify Setup
+- ✅ Backend running at http://localhost:8000 ([verify health](http://localhost:8000/health))
+- ✅ `.env.local` file exists with `VITE_API_BASE_URL=http://localhost:8000`
+- ✅ Browser console shows no CORS errors
+- ✅ Network tab shows API calls succeeding
+
 ## 🚀 Features
 
 - **Modern React Stack**: React 19 with TypeScript, Vite, and ES modules
@@ -211,6 +241,37 @@ npm run test -- --testPathPattern=integration
 
 ## 🐛 Troubleshooting
 
+### Quick Fixes
+
+**Backend Connection Errors**
+```bash
+# Verify backend is running
+curl http://localhost:8000/health
+
+# Check backend logs for errors
+cd ../backend && python main.py
+
+# Ensure CORS is configured correctly in backend .env
+# Backend should include: CORS_ORIGINS=["http://localhost:3000", "http://localhost:5173"]
+```
+
+**Port Conflicts**
+```bash
+# Change port in vite.config.ts or run with different port
+npm run dev -- --port 3001
+```
+
+**Environment Variables Not Loading**
+```bash
+# Verify .env.local exists in frontend directory
+ls -la .env.local
+
+# Check variable names start with VITE_
+cat .env.local | grep VITE_
+
+# Restart dev server after changes (Ctrl+C, then npm run dev)
+```
+
 ### Common Issues
 
 **Backend Connection Errors**
@@ -275,6 +336,8 @@ npm run build
 # Run type checking
 npx tsc --noEmit
 ```
+
+> **📖 More Help:** See the [Frontend Localhost Setup](./LOCALHOST_SETUP.md) and [Troubleshooting Guide](../docs/TROUBLESHOOTING.md) for detailed solutions.
 
 ### Localhost Development Checklist
 
