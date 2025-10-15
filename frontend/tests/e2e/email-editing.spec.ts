@@ -7,6 +7,7 @@
  * - Updating email categories
  * - Bulk email operations
  */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { test, expect } from './fixtures/test-setup';
 
 test.describe('Email Editing Workflow', () => {
@@ -280,7 +281,7 @@ test.describe('Email Editing Workflow', () => {
 
   test('should handle edit conflicts gracefully', async ({ page }) => {
     // Mock conflict error
-    await page.route('**/api/emails/*/**, async (route) => {
+    await page.route('**/api/emails/*/**', async (route) => {
       if (route.request().method() === 'PATCH') {
         await route.fulfill({
           status: 409,

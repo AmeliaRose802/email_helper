@@ -1,4 +1,7 @@
-import { test as base, expect, Page, BrowserContext } from '@playwright/test';
+/* eslint-disable react-hooks/rules-of-hooks */
+/* eslint-disable no-empty-pattern */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { test as base, expect, Page } from '@playwright/test';
 
 /**
  * Mock email data for testing
@@ -432,35 +435,35 @@ export const test = base.extend<TestFixtures>({
     await use(authPage);
   },
   
-  mockEmails: async ({}, use) => {
+  mockEmails: async ({ }, use) => {
     await use(generateMockEmails(15));
   },
   
-  mockTasks: async ({}, use) => {
+  mockTasks: async ({ }, use) => {
     await use(generateMockTasks(8));
   },
   
-  mockEmailAPI: async ({}, use) => {
+  mockEmailAPI: async ({ }, use) => {
     await use(mockEmailAPI);
   },
   
-  mockTaskAPI: async ({}, use) => {
+  mockTaskAPI: async ({ }, use) => {
     await use(mockTaskAPI);
   },
   
-  mockAIAPI: async ({}, use) => {
+  mockAIAPI: async ({ }, use) => {
     await use(mockAIAPI);
   },
   
-  navigateToEmails: async ({}, use) => {
+  navigateToEmails: async ({ }, use) => {
     await use(navigateToEmails);
   },
   
-  navigateToTasks: async ({}, use) => {
+  navigateToTasks: async ({ }, use) => {
     await use(navigateToTasks);
   },
   
-  navigateToProcessing: async ({}, use) => {
+  navigateToProcessing: async ({ }, use) => {
     await use(navigateToProcessing);
   },
 });

@@ -7,6 +7,7 @@
  * - Batch email summaries
  * - Different email types and categories
  */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { test, expect } from './fixtures/test-setup';
 
 test.describe('Summary Generation', () => {

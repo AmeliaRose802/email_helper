@@ -7,6 +7,7 @@
  * - Batch processing operations
  * - Error handling for processing failures
  */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { test, expect } from './fixtures/test-setup';
 
 test.describe('Email Processing Workflow', () => {
