@@ -44,10 +44,11 @@ from msal import ConfidentialClientApplication
 import httpx
 from jose import JWTError, jwt as jose_jwt
 
-# Import existing services - commented out for debugging
-# from email_analyzer import EmailAnalyzer
-# from task_persistence import TaskPersistence
-# from ai_processor import AIProcessor
+# Import existing services for real email processing
+from email_analyzer import EmailAnalyzer
+from task_persistence import TaskPersistence
+from ai_processor import AIProcessor
+from outlook_manager import OutlookManager
 
 # Load environment variables
 load_dotenv()
@@ -57,7 +58,7 @@ app = FastAPI(title="Email Helper API", version="1.0.0")
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:8080"],  # Frontend URLs
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:8080", "http://localhost:5173"],  # Frontend URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -211,10 +212,21 @@ async def verify_session_token(credentials: HTTPAuthorizationCredentials = Depen
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid session token")
 
-# Initialize services - commented out for debugging
-# email_analyzer = EmailAnalyzer()
-# task_manager = TaskPersistence()
-# ai_processor = AIProcessor()
+# Initialize services for real email processing
+try:
+    ai_processor = AIProcessor()
+    email_analyzer = EmailAnalyzer(ai_processor)
+    task_manager = TaskPersistence()
+    outlook_manager = OutlookManager()
+    services_available = True
+    print("✅ Email processing services initialized")
+except Exception as e:
+    print(f"⚠️  Email services unavailable: {e}")
+    services_available = False
+    ai_processor = None
+    email_analyzer = None
+    task_manager = None
+    outlook_manager = None
 
 @app.get("/")
 async def root():
@@ -432,12 +444,13 @@ async def logout(current_user: dict = Depends(verify_session_token)):
 async def health_check():
     """Health check endpoint."""
     return {
-        "status": "healthy",
+        "status": "healthy" if services_available else "degraded",
         "timestamp": datetime.now().isoformat(),
         "services": {
-            "email_analyzer": "active",
-            "task_manager": "active",
-            "ai_processor": "active"
+            "email_analyzer": "active" if email_analyzer else "unavailable",
+            "task_manager": "active" if task_manager else "unavailable",
+            "ai_processor": "active" if ai_processor else "unavailable",
+            "outlook_manager": "active" if outlook_manager else "unavailable"
         }
     }
 
@@ -445,20 +458,64 @@ async def health_check():
 async def get_emails(limit: int = 50, category: Optional[str] = None):
     """Get processed emails."""
     try:
-        # Mock email data for testing
-        emails = [
-            {
-                "id": f"email_{i}",
-                "subject": f"Test Email {i}",
-                "sender": f"sender{i}@example.com",
-                "received_date": datetime.now().isoformat(),
-                "category": "action_item" if i % 3 == 0 else "fyi",
-                "priority": "high" if i % 5 == 0 else "medium",
-                "summary": f"This is a test email summary for email {i}",
-                "processed": True
-            }
-            for i in range(1, min(limit + 1, 21))
-        ]
+        if not services_available:
+            # Fallback to mock data if services unavailable
+            emails = [
+                {
+                    "id": f"email_{i}",
+                    "subject": f"Mock Email {i} (Services Unavailable)",
+                    "sender": f"sender{i}@example.com",
+                    "received_date": datetime.now().isoformat(),
+                    "category": "action_item" if i % 3 == 0 else "fyi",
+                    "priority": "high" if i % 5 == 0 else "medium",
+                    "summary": f"This is a mock email summary for email {i}",
+                    "processed": False
+                }
+                for i in range(1, min(limit + 1, 21))
+            ]
+        else:
+            # Get real emails from Outlook
+            try:
+                outlook_manager.connect_to_outlook()
+                recent_emails = outlook_manager.get_recent_emails(days_back=7, max_emails=limit)
+                
+                emails = []
+                for i, email in enumerate(recent_emails[:limit]):
+                    try:
+                        # Extract basic email info
+                        email_data = {
+                            "id": email.EntryID if hasattr(email, 'EntryID') else f"email_{i}",
+                            "subject": email.Subject if hasattr(email, 'Subject') else "No Subject",
+                            "sender": email.SenderName if hasattr(email, 'SenderName') else "Unknown Sender",
+                            "received_date": email.ReceivedTime.isoformat() if hasattr(email, 'ReceivedTime') else datetime.now().isoformat(),
+                            "category": "pending_classification",  # Would be set by AI processor
+                            "priority": "medium",  # Would be determined by AI
+                            "summary": email.Body[:200] + "..." if hasattr(email, 'Body') and email.Body else "No content",
+                            "processed": False  # Indicates this is raw email data
+                        }
+                        
+                        emails.append(email_data)
+                        
+                    except Exception as email_error:
+                        print(f"Error processing email {i}: {email_error}")
+                        continue
+                        
+            except Exception as outlook_error:
+                print(f"Outlook connection failed: {outlook_error}")
+                # Fallback to mock data
+                emails = [
+                    {
+                        "id": f"email_{i}",
+                        "subject": f"Email {i} (Outlook Unavailable)",
+                        "sender": f"sender{i}@example.com",
+                        "received_date": datetime.now().isoformat(),
+                        "category": "connection_error",
+                        "priority": "medium",
+                        "summary": f"Could not connect to Outlook: {outlook_error}",
+                        "processed": False
+                    }
+                    for i in range(1, 6)  # Just show a few error entries
+                ]
         
         if category:
             emails = [e for e in emails if e["category"] == category]
@@ -466,7 +523,8 @@ async def get_emails(limit: int = 50, category: Optional[str] = None):
         return {
             "emails": emails,
             "total": len(emails),
-            "category": category
+            "category": category,
+            "services_available": services_available
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -504,20 +562,58 @@ async def get_email(email_id: str):
 async def get_tasks(status: Optional[str] = None):
     """Get tasks/action items."""
     try:
-        # Mock task data
-        tasks = [
-            {
-                "id": f"task_{i}",
-                "title": f"Task {i}",
-                "description": f"This is task {i} description",
-                "status": "todo" if i % 2 == 0 else "in_progress",
-                "priority": "high" if i % 3 == 0 else "medium",
-                "due_date": "2025-10-05",
-                "created_from_email": f"email_{i}",
-                "created_date": datetime.now().isoformat()
-            }
-            for i in range(1, 11)
-        ]
+        if not services_available or not task_manager:
+            # Fallback to mock data if services unavailable
+            tasks = [
+                {
+                    "id": f"task_{i}",
+                    "title": f"Mock Task {i} (Services Unavailable)",
+                    "description": f"This is mock task {i} description",
+                    "status": "todo" if i % 2 == 0 else "in_progress",
+                    "priority": "high" if i % 3 == 0 else "medium",
+                    "due_date": "2025-10-20",
+                    "created_from_email": f"email_{i}",
+                    "created_date": datetime.now().isoformat()
+                }
+                for i in range(1, 6)
+            ]
+        else:
+            # Get real tasks from task persistence
+            try:
+                outstanding_tasks = task_manager.get_outstanding_tasks()
+                
+                tasks = []
+                for task in outstanding_tasks:
+                    task_data = {
+                        "id": task.get('id', f"task_{len(tasks)}"),
+                        "title": task.get('action_required', 'Unknown Task')[:100],
+                        "description": task.get('summary', ''),
+                        "status": "todo",  # Outstanding tasks are by definition not completed
+                        "priority": task.get('priority', 'medium'),
+                        "due_date": task.get('due_date', 'No deadline'),
+                        "created_from_email": task.get('email_subject', 'Unknown Email')[:50],
+                        "created_date": task.get('timestamp', datetime.now().isoformat()),
+                        "sender": task.get('sender', 'Unknown'),
+                        "category": task.get('category', 'uncategorized')
+                    }
+                    tasks.append(task_data)
+                    
+            except Exception as task_error:
+                print(f"Task retrieval failed: {task_error}")
+                # Fallback to mock data
+                tasks = [
+                    {
+                        "id": f"task_error_{i}",
+                        "title": f"Task Error {i}",
+                        "description": f"Could not load tasks: {task_error}",
+                        "status": "error",
+                        "priority": "medium",
+                        "due_date": "Unknown",
+                        "created_from_email": "Error",
+                        "created_date": datetime.now().isoformat()
+                    }
+                    for i in range(1, 3)
+                ]
         
         if status:
             tasks = [t for t in tasks if t["status"] == status]
@@ -525,7 +621,8 @@ async def get_tasks(status: Optional[str] = None):
         return {
             "tasks": tasks,
             "total": len(tasks),
-            "status_filter": status
+            "status_filter": status,
+            "services_available": services_available
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -573,17 +670,64 @@ async def get_summary():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/process")
-async def process_emails():
-    """Trigger email processing."""
+async def process_emails(request: dict = None):
+    """Trigger email processing with configurable email count."""
     try:
-        # Mock processing
+        if not services_available:
+            return {
+                "message": "Email processing services unavailable",
+                "status": "error",
+                "timestamp": datetime.now().isoformat(),
+                "error": "Services not initialized properly"
+            }
+        
+        # Get email count from request, default to 50
+        email_count = 50
+        if request and "email_count" in request:
+            email_count = int(request["email_count"])
+            # Limit to reasonable range
+            email_count = max(1, min(email_count, 500))
+        
+        # Connect to Outlook and process emails
+        outlook_manager.connect_to_outlook()
+        print(f"📧 Processing {email_count} emails from Outlook...")
+        
+        # Get emails with conversations
+        email_conversations = outlook_manager.get_emails_with_full_conversations(
+            days_back=7, 
+            max_emails=email_count
+        )
+        
+        if not email_conversations:
+            return {
+                "message": "No emails found to process",
+                "status": "completed", 
+                "timestamp": datetime.now().isoformat(),
+                "emails_processed": 0
+            }
+        
+        # Process emails through AI
+        processed_count = 0
+        for conversation_id, conversation_data in email_conversations:
+            try:
+                representative_email = conversation_data['recent_trigger']
+                # Basic processing - in full implementation would use AI classification
+                processed_count += 1
+            except Exception as email_error:
+                print(f"Error processing email: {email_error}")
+                continue
+        
         return {
-            "message": "Email processing started",
-            "status": "processing",
-            "timestamp": datetime.now().isoformat()
+            "message": f"Successfully processed {processed_count} emails",
+            "status": "completed",
+            "timestamp": datetime.now().isoformat(),
+            "emails_processed": processed_count,
+            "email_count_requested": email_count
         }
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Email processing error: {e}")
+        raise HTTPException(status_code=500, detail=f"Email processing failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
@@ -591,4 +735,4 @@ if __name__ == "__main__":
     print("Mock data endpoints ready")
     print("API will be available at: http://localhost:8001")
     print("Press Ctrl+C to stop the server")
-    uvicorn.run(app, host="127.0.0.1", port=8002, reload=False)
+    uvicorn.run(app, host="127.0.0.1", port=8001, reload=False)

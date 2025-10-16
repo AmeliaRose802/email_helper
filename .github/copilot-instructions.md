@@ -211,4 +211,69 @@ def call_ai_service(prompt, data):
 - Verify AI service responses and error handling
 - Use the test framework for isolated component testing
 
+## PowerShell and Process Management
+
+### CRITICAL: Never Use taskkill in PowerShell Scripts
+
+**ALWAYS use PowerShell's native `Stop-Process` cmdlet instead of `taskkill`**
+
+❌ **WRONG - Will prompt for confirmation and block:**
+```powershell
+taskkill /IM electron.exe /F
+taskkill /IM python.exe /F
+```
+
+✅ **CORRECT - No prompts, never blocks:**
+```powershell
+Get-Process -Name electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process -Name python -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+```
+
+### Why This Matters
+
+- `taskkill` is a Windows command-line tool that may prompt for confirmation when multiple processes match
+- Even with `/F` flag, `taskkill` can block waiting for user input with "Terminate batch job (Y/N)?"
+- `Stop-Process -Force` is PowerShell-native and **NEVER prompts for confirmation**
+- `-ErrorAction SilentlyContinue` prevents errors when no matching processes exist
+
+### Proper Process Cleanup Pattern
+
+```powershell
+# Kill processes without prompts
+Get-Process -Name electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process -Name python -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+# Free specific ports if needed
+$port8000 = Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
+if ($port8000) {
+    $port8000 | Select-Object -ExpandProperty OwningProcess | ForEach-Object {
+        Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# Wait for cleanup
+Start-Sleep -Seconds 2
+```
+
+### Electron App Startup
+
+Use the provided `electron/start-app.ps1` script for clean app startup:
+```powershell
+cd c:\Users\ameliapayne\email_helper\electron
+& ".\start-app.ps1"
+```
+
+This script handles:
+- Killing existing Electron and Python processes (without prompts!)
+- Freeing port 8000
+- Starting the app cleanly
+
+### Terminal Command Best Practices
+
+When running terminal commands:
+1. **Always use `Stop-Process`** instead of `taskkill` in PowerShell
+2. Include `-ErrorAction SilentlyContinue` to handle cases where processes don't exist
+3. Use `Start-Sleep` after killing processes to ensure cleanup completes
+4. Check for port conflicts with `Get-NetTCPConnection` before starting servers
+
 Remember: This project handles sensitive user data (emails). Always prioritize security, privacy, and reliability in your implementations.

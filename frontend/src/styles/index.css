@@ -1,6 +1,45 @@
 /* Main stylesheet for Email Helper web app */
 
 /* ===========================================
+   Electron-specific Base Styles
+   =========================================== */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+/* Prevent text selection issues */
+* {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+button, a, input[type="button"], input[type="submit"] {
+  cursor: pointer !important;
+  -webkit-user-select: none;
+  user-select: none;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 10;
+}
+
+button:disabled, a:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ===========================================
    Modern Design System & CSS Variables
    =========================================== */
 :root {
@@ -552,21 +591,35 @@ html {
   font-weight: 600;
 }
 
-.quick-actions button {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
-  color: white;
-  border: none;
-  padding: var(--space-md) var(--space-xl);
+.quick-actions button,
+.action-button {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover)) !important;
+  color: white !important;
+  border: none !important;
+  padding: var(--space-md) var(--space-xl) !important;
   margin-right: var(--space-md);
   margin-bottom: var(--space-md);
   border-radius: var(--radius-md);
-  cursor: pointer;
+  cursor: pointer !important;
   font-weight: 600;
   font-size: var(--font-size-base);
   transition: all var(--transition-base);
   box-shadow: var(--shadow-sm);
-  position: relative;
+  position: relative !important;
   overflow: hidden;
+  user-select: none;
+  min-height: 44px !important;
+  min-width: 200px !important;
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+  -webkit-app-region: no-drag !important;
+  /* Electron-specific fixes */
+  -webkit-user-select: none !important;
+  -webkit-pointer-events: auto !important;
+  touch-action: manipulation !important;
+  /* Force clickability */
+  display: inline-block !important;
+  outline: none !important;
 }
 
 .quick-actions button::before {

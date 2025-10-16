@@ -6,7 +6,7 @@ import { apiConfig, debugLog } from '@/config/api';
 
 // Base query with authentication
 const baseQuery = fetchBaseQuery({
-  baseUrl: '/', // Proxy will handle routing to backend
+  baseUrl: apiConfig.baseURL, // Use configured backend URL
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as RootState).auth.token;
     if (token) {

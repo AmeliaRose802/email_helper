@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 
@@ -14,7 +14,7 @@ from backend.database.connection import get_database
 from backend.models.user import User, UserCreate, UserLogin, Token, TokenData, UserInDB
 
 router = APIRouter()
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)  # Don't auto-error if token missing
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -108,10 +108,29 @@ def authenticate_user(db: sqlite3.Connection, username: str, password: str) -> O
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: sqlite3.Connection = Depends(get_database)
 ) -> UserInDB:
     """Get current authenticated user."""
+    # If authentication is disabled, return a dummy localhost user
+    if not settings.require_authentication:
+        return UserInDB(
+            id=1,
+            username="localhost_user",
+            email="localhost@example.com",
+            hashed_password="",
+            is_active=True,
+            created_at=datetime.now().isoformat()
+        )
+    
+    # If no credentials provided, raise error
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

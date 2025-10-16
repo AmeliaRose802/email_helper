@@ -17,7 +17,11 @@
     "test": "cd frontend && npm test",
     "lint": "cd frontend && npm run lint",
     "format": "cd frontend && npm run format",
-    "health": "echo Checking services... && curl -f http://localhost:8000/health && curl -f http://localhost:3000"
+    "health": "echo Checking services... && curl -f http://localhost:8000/health && curl -f http://localhost:3000",
+    "electron:install": "cd electron && npm install",
+    "electron:dev": "cd frontend && npm run build && cd ../electron && npm run dev",
+    "electron:build": "cd frontend && npm run build && cd ../electron && npm run build",
+    "electron": "npm run electron:dev"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -11,15 +11,26 @@ if __name__ == "__main__":
     from backend.main import app, settings
     import uvicorn
     
-    print(f"🌟 Starting {settings.app_name} v{settings.app_version}")
-    print(f"🔧 Debug mode: {settings.debug}")
-    print(f"🌐 Server: {settings.host}:{settings.port}")
-    print(f"📋 API docs: http://{settings.host}:{settings.port}/docs")
+    print(f"Starting {settings.app_name} v{settings.app_version}")
+    print(f"Debug mode: {settings.debug}")
+    print(f"Server: {settings.host}:{settings.port}")
+    print(f"API docs: http://{settings.host}:{settings.port}/docs")
     
-    uvicorn.run(
-        app,
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug,
-        log_level="info"
-    )
+    if settings.debug:
+        # Use module string for reload
+        uvicorn.run(
+            "backend.main:app",
+            host=settings.host,
+            port=settings.port,
+            reload=True,
+            log_level="info"
+        )
+    else:
+        # Use app object for production
+        uvicorn.run(
+            app,
+            host=settings.host,
+            port=settings.port,
+            reload=False,
+            log_level="info"
+        )

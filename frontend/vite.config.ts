@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    base: './', // Use relative paths for Electron
     resolve: {
       alias: {
         '@': resolve(__dirname, './src'),

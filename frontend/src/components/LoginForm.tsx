@@ -1,16 +1,17 @@
 // Enhanced login form component with Azure OAuth validation
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useLoginMutation, useInitiateLoginQuery } from '@/services/authApi';
+import { useInitiateLoginQuery } from '@/services/authApi';
 import { useAppDispatch } from '@/hooks/redux';
 import { loginStart, loginSuccess, loginFailure } from '@/store/authSlice';
-import { getAuthErrorMessage, getRedirectPath, getUserFromToken } from '@/utils/authUtils';
+import { getAuthErrorMessage, getRedirectPath } from '@/utils/authUtils';
 
 const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
-  const [login, { isLoading: isLoginLoading }] = useLoginMutation();
+  // Login mutation not used in localhost mode
+  // const [login, { isLoading: isLoginLoading }] = useLoginMutation();
   const { data: authUrlData, isLoading: isAuthUrlLoading } = useInitiateLoginQuery();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -41,7 +42,7 @@ const LoginForm: React.FC = () => {
       dispatch(
         loginSuccess({
           user: user as any,
-          tokens: { access_token: token, refresh_token: '', token_type: 'bearer' },
+          tokens: { access_token: token, refresh_token: '', token_type: 'bearer', expires_in: 3600 },
           remember: false,
         })
       );

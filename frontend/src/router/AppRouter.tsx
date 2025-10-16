@@ -1,6 +1,6 @@
 // React Router configuration
 import React from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createHashRouter, RouterProvider } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import Dashboard from '@/pages/Dashboard';
@@ -10,7 +10,7 @@ import TaskList from '@/pages/TaskList';
 import Login from '@/pages/Login';
 import Settings from '@/pages/Settings';
 
-const router = createBrowserRouter([
+const router = createHashRouter([
   {
     path: '/login',
     element: <Login />,

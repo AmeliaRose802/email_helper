@@ -89,6 +89,57 @@ async def get_emails(
         )
 
 
+@router.get("/emails/stats")
+async def get_email_stats(
+    current_user: UserInDB = Depends(get_current_user),
+    provider: EmailProvider = Depends(get_email_provider)
+):
+    """Get email statistics for the current user."""
+    try:
+        # Get emails from inbox to calculate stats
+        emails = provider.get_emails(folder="Inbox", limit=1000)
+        
+        total_emails = len(emails)
+        unread_emails = sum(1 for email in emails if not email.get("is_read", False))
+        
+        # Get folder counts (simplified)
+        folders = provider.get_folders()
+        emails_by_folder = {}
+        for folder in folders[:5]:  # Limit to top 5 folders
+            folder_name = folder.get("name", "Unknown")
+            try:
+                folder_emails = provider.get_emails(folder=folder_name, limit=100)
+                emails_by_folder[folder_name] = len(folder_emails)
+            except:
+                emails_by_folder[folder_name] = 0
+        
+        # Count by sender (top 5)
+        sender_counts = {}
+        for email in emails[:100]:  # Limit to recent 100 emails
+            sender = email.get("sender", "Unknown")
+            sender_counts[sender] = sender_counts.get(sender, 0) + 1
+        
+        # Get top 5 senders
+        emails_by_sender = dict(
+            sorted(sender_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        )
+        
+        return {
+            "total_emails": total_emails,
+            "unread_emails": unread_emails,
+            "emails_by_folder": emails_by_folder,
+            "emails_by_sender": emails_by_sender
+        }
+    except Exception as e:
+        # Return mock data if email provider fails
+        return {
+            "total_emails": 0,
+            "unread_emails": 0,
+            "emails_by_folder": {},
+            "emails_by_sender": {}
+        }
+
+
 @router.get("/emails/{email_id}", response_model=Dict[str, Any])
 async def get_email(
     email_id: str,

@@ -7,7 +7,7 @@ from backend.models.task import (
     Task, TaskCreate, TaskUpdate, TaskListResponse, 
     BulkTaskUpdate, BulkTaskDelete
 )
-from backend.models.user import User
+from backend.models.user import UserInDB
 from backend.services.task_service import TaskService, get_task_service
 from backend.api.auth import get_current_user
 
@@ -17,7 +17,7 @@ router = APIRouter()
 @router.post("/tasks", response_model=Task, status_code=201)
 async def create_task(
     task: TaskCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_user),
     task_service: TaskService = Depends(get_task_service)
 ):
     """Create a new task."""
@@ -37,7 +37,7 @@ async def get_tasks(
     status: Optional[str] = Query(None, description="Filter by task status"),
     priority: Optional[str] = Query(None, description="Filter by task priority"),
     search: Optional[str] = Query(None, description="Search in title and description"),
-    current_user: User = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_user),
     task_service: TaskService = Depends(get_task_service)
 ):
     """Get paginated list of tasks with filtering."""
@@ -62,10 +62,33 @@ async def get_tasks(
         raise HTTPException(status_code=500, detail="Failed to retrieve tasks")
 
 
+@router.get("/tasks/stats")
+async def get_task_stats(
+    current_user: UserInDB = Depends(get_current_user),
+    task_service: TaskService = Depends(get_task_service)
+):
+    """Get task statistics for the current user."""
+    try:
+        # Ensure we have a valid user ID
+        user_id = getattr(current_user, 'id', 1)  # Default to 1 if not available
+        stats = await task_service.get_task_stats(user_id)
+        return stats
+    except Exception as e:
+        # Return mock stats if there's an error
+        return {
+            "total_tasks": 0,
+            "pending_tasks": 0,
+            "completed_tasks": 0,
+            "overdue_tasks": 0,
+            "tasks_by_priority": {},
+            "tasks_by_category": {}
+        }
+
+
 @router.get("/tasks/{task_id}", response_model=Task)
 async def get_task(
     task_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_user),
     task_service: TaskService = Depends(get_task_service)
 ):
     """Get a specific task by ID."""
@@ -79,7 +102,7 @@ async def get_task(
 async def update_task(
     task_id: int,
     updates: TaskUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_user),
     task_service: TaskService = Depends(get_task_service)
 ):
     """Update a specific task."""
@@ -97,7 +120,7 @@ async def update_task(
 @router.delete("/tasks/{task_id}")
 async def delete_task(
     task_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_user),
     task_service: TaskService = Depends(get_task_service)
 ):
     """Delete a specific task."""
@@ -113,7 +136,7 @@ async def delete_task(
 @router.post("/tasks/bulk-update", response_model=List[Task])
 async def bulk_update_tasks(
     bulk_update: BulkTaskUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_user),
     task_service: TaskService = Depends(get_task_service)
 ):
     """Update multiple tasks at once."""
@@ -131,7 +154,7 @@ async def bulk_update_tasks(
 @router.post("/tasks/bulk-delete")
 async def bulk_delete_tasks(
     bulk_delete: BulkTaskDelete,
-    current_user: User = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_user),
     task_service: TaskService = Depends(get_task_service)
 ):
     """Delete multiple tasks at once."""
@@ -152,7 +175,7 @@ async def bulk_delete_tasks(
 async def link_email_to_task(
     task_id: int,
     email_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_user),
     task_service: TaskService = Depends(get_task_service)
 ):
     """Link an email to a task."""

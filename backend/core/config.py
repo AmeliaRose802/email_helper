@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     use_com_backend: bool = False  # Enable COM email provider and AI service
     com_connection_timeout: int = 30  # Seconds to wait for COM connection
     com_retry_attempts: int = 3  # Number of retry attempts for COM operations
+    email_provider: Optional[str] = None  # Email provider: 'com' or 'graph'
+    
+    # Localhost development settings
+    require_authentication: bool = True  # Set to False for localhost development without auth
     
     model_config = {
         "env_file": ".env",

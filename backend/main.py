@@ -24,22 +24,22 @@ from backend.api import auth
 async def lifespan(app: FastAPI):
     """Application lifespan management."""
     # Startup
-    print("🚀 Starting Email Helper API...")
-    print(f"📊 Database path: {db_manager.db_path}")
+    print("Starting Email Helper API...")
+    print(f"Database path: {db_manager.db_path}")
     
     # Ensure database is ready
     try:
         with db_manager.get_connection() as conn:
             cursor = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
             table_count = cursor.fetchone()[0]
-            print(f"📋 Database initialized with {table_count} tables")
+            print(f"Database initialized with {table_count} tables")
     except Exception as e:
-        print(f"⚠️ Database initialization warning: {e}")
+        print(f"Database initialization warning: {e}")
     
     yield
     
     # Shutdown
-    print("🛑 Shutting down Email Helper API...")
+    print("Shutting down Email Helper API...")
 
 
 # Create FastAPI app

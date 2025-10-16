@@ -1,5 +1,6 @@
 // Dashboard page component with modern animations and loading states
 import React, { useState, useEffect } from 'react';
+// import { useNavigate } from 'react-router-dom'; // Temporarily disabled for button testing
 import { useGetEmailStatsQuery } from '@/services/emailApi';
 import { useGetTaskStatsQuery } from '@/services/taskApi';
 
@@ -98,8 +99,63 @@ const StatCard: React.FC<{
  * Provides quick action buttons for common operations
  */
 const Dashboard: React.FC = () => {
+  // const navigate = useNavigate(); // Temporarily disabled for button testing
   const { data: emailStats, isLoading: emailStatsLoading, error: emailError } = useGetEmailStatsQuery();
   const { data: taskStats, isLoading: taskStatsLoading, error: taskError } = useGetTaskStatsQuery();
+
+  const handleProcessEmails = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    console.log('🎯 Process emails button clicked!');
+    console.trace('Click event trace');
+    
+    // Visual feedback
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.style.background = 'lime';
+      setTimeout(() => {
+        (event.currentTarget as HTMLElement).style.background = '';
+      }, 2000);
+    }
+    
+    alert('✅ SUCCESS! Process emails button is working! This will fetch new emails from Outlook.');
+    // TODO: Implement email processing
+  };
+
+  const handleViewTasks = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    console.log('🎯 View tasks button clicked!');
+    console.trace('Click event trace');
+    
+    // Visual feedback
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.style.background = 'lime';
+      setTimeout(() => {
+        (event.currentTarget as HTMLElement).style.background = '';
+      }, 2000);
+    }
+    
+    alert('✅ SUCCESS! View tasks button is working! Navigation will be implemented.');
+    // navigate('/tasks');
+  };
+
+  const handleGenerateSummary = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    console.log('🎯 Generate summary button clicked!');
+    console.trace('Click event trace');
+    
+    // Visual feedback
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.style.background = 'lime';
+      setTimeout(() => {
+        (event.currentTarget as HTMLElement).style.background = '';
+      }, 2000);
+    }
+    
+    alert('✅ SUCCESS! Generate summary button is working! This will create a summary of your emails.');
+    // TODO: Implement summary generation
+  };
 
   return (
     <div className="dashboard">
@@ -146,13 +202,31 @@ const Dashboard: React.FC = () => {
 
       <div className="quick-actions">
         <h3>⚡ Quick Actions</h3>
-        <button onClick={() => console.log('Process emails')}>
+        <button 
+          type="button"
+          className="action-button"
+          onClick={handleProcessEmails}
+          style={{ pointerEvents: 'auto', zIndex: 100, WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          data-testid="process-emails-button"
+        >
           📥 Process New Emails
         </button>
-        <button onClick={() => console.log('View tasks')}>
+        <button 
+          type="button"
+          className="action-button"
+          onClick={handleViewTasks}
+          style={{ pointerEvents: 'auto', zIndex: 100, WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          data-testid="view-tasks-button"
+        >
           📋 View Pending Tasks
         </button>
-        <button onClick={() => console.log('Generate summary')}>
+        <button 
+          type="button"
+          className="action-button"
+          onClick={handleGenerateSummary}
+          style={{ pointerEvents: 'auto', zIndex: 100, WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          data-testid="generate-summary-button"
+        >
           📝 Generate Summary
         </button>
       </div>

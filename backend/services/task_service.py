@@ -297,6 +297,84 @@ class TaskService:
         updates = TaskUpdate(email_id=email_id)
         return await self.update_task(task_id, updates, user_id)
     
+    async def get_task_stats(self, user_id: int) -> Dict[str, Any]:
+        """Get task statistics for a user."""
+        loop = asyncio.get_event_loop()
+        
+        def _get_stats_sync():
+            with db_manager.get_connection() as conn:
+                # Total tasks
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM tasks WHERE user_id = ?",
+                    (user_id,)
+                )
+                total_tasks = cursor.fetchone()[0]
+                
+                # Pending tasks (not completed)
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM tasks WHERE user_id = ? AND status != 'done'",
+                    (user_id,)
+                )
+                pending_tasks = cursor.fetchone()[0]
+                
+                # Completed tasks
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM tasks WHERE user_id = ? AND status = 'done'",
+                    (user_id,)
+                )
+                completed_tasks = cursor.fetchone()[0]
+                
+                # Overdue tasks
+                cursor = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM tasks 
+                    WHERE user_id = ? 
+                    AND status != 'done' 
+                    AND due_date IS NOT NULL 
+                    AND due_date < datetime('now')
+                    """,
+                    (user_id,)
+                )
+                overdue_tasks = cursor.fetchone()[0]
+                
+                # Tasks by priority
+                cursor = conn.execute(
+                    """
+                    SELECT priority, COUNT(*) 
+                    FROM tasks 
+                    WHERE user_id = ? 
+                    GROUP BY priority
+                    """,
+                    (user_id,)
+                )
+                tasks_by_priority = {row[0]: row[1] for row in cursor.fetchall()}
+                
+                # Tasks by category (if category column exists)
+                try:
+                    cursor = conn.execute(
+                        """
+                        SELECT status, COUNT(*) 
+                        FROM tasks 
+                        WHERE user_id = ? 
+                        GROUP BY status
+                        """,
+                        (user_id,)
+                    )
+                    tasks_by_category = {row[0]: row[1] for row in cursor.fetchall()}
+                except sqlite3.OperationalError:
+                    tasks_by_category = {}
+                
+                return {
+                    "total_tasks": total_tasks,
+                    "pending_tasks": pending_tasks,
+                    "completed_tasks": completed_tasks,
+                    "overdue_tasks": overdue_tasks,
+                    "tasks_by_priority": tasks_by_priority,
+                    "tasks_by_category": tasks_by_category
+                }
+        
+        return await loop.run_in_executor(None, _get_stats_sync)
+    
     def _row_to_task(self, row) -> Task:
         """Convert database row to Task model."""
         return Task(

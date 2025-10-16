@@ -1,6 +1,6 @@
 // Authentication API service for T1 backend integration
 import { apiSlice } from './api';
-import type { User, UserCreate, UserLogin, Token } from '@/types/auth';
+import type { User, UserCreate, Token } from '@/types/auth';
 
 export const authApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({

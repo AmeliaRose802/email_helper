@@ -8,7 +8,8 @@ import EmailList from '@/pages/EmailList';
 import { apiSlice } from '@/services/api';
 import authSlice from '@/store/authSlice';
 
-// Mock data
+// Mock data - commented out as not currently used
+/*
 const mockEmails = [
   {
     id: '1',
@@ -35,14 +36,7 @@ const mockEmails = [
     categories: ['fyi'],
   },
 ];
-
-const mockEmailListResponse = {
-  emails: mockEmails,
-  total_count: 2,
-  page: 1,
-  per_page: 20,
-  has_more: false,
-};
+*/
 
 // Create test store
 const createTestStore = () => {
@@ -187,8 +181,8 @@ describe('EmailList Component', () => {
     // Initially shows loading, then should show empty state if no data
     await waitFor(() => {
       // Since we don't have mock data setup, it should show empty state
-      const emptyMessage = screen.queryByText(/No emails found/);
-      // This might not be visible immediately due to loading state
+      // Check that page loads without errors
+      expect(screen.getByText(/Email List/i)).toBeInTheDocument();
     }, { timeout: 1000 });
   });
 });
