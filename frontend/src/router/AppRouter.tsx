@@ -1,7 +1,6 @@
 // React Router configuration - Simple routes without auth for localhost
 import React from 'react';
 import { createHashRouter, RouterProvider } from 'react-router-dom';
-import Dashboard from '@/pages/Dashboard';
 import EmailList from '@/pages/EmailList';
 import EmailDetail from '@/pages/EmailDetail';
 import TaskList from '@/pages/TaskList';
@@ -49,10 +48,6 @@ const router = createHashRouter(
       path: '/',
       element: <SimpleNav><EmailList /></SimpleNav>,
       errorElement: <SimpleNav><div className="error-container"><h2>Page Error</h2><p>Something went wrong. <a href="#/">Go to Inbox</a></p></div></SimpleNav>,
-    },
-    {
-      path: '/dashboard',
-      element: <SimpleNav><Dashboard /></SimpleNav>,
     },
     {
       path: '/emails',

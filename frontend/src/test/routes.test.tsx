@@ -6,7 +6,6 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import { apiSlice } from '../services/api';
 import authReducer from '../store/authSlice';
-import Dashboard from '../pages/Dashboard';
 import EmailList from '../pages/EmailList';
 import TaskList from '../pages/TaskList';
 import Login from '../pages/Login';
@@ -45,11 +44,6 @@ beforeEach(() => {
 });
 
 describe('Route Components', () => {
-  it('renders Dashboard component', () => {
-    renderWithProviders(<Dashboard />);
-    expect(screen.getByText('Email Helper Dashboard')).toBeInTheDocument();
-  });
-
   it('renders EmailList component with loading state', () => {
     renderWithProviders(<EmailList />);
     // Should show loading initially due to API call
