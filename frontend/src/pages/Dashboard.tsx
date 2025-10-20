@@ -204,46 +204,6 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ===== ORIGINAL STATS GRID WITH API - STILL COMMENTED OUT ===== */}
-      {/* <div className="stats-grid">
-        <StatCard
-          title="Email Statistics"
-          icon="📧"
-          isLoading={emailStatsLoading}
-          stats={
-            emailStats
-              ? [
-                  { label: 'Total Emails', value: emailStats.total_emails || 0 },
-                  { label: 'Unread Emails', value: emailStats.unread_emails || 0 },
-                ]
-              : []
-          }
-        />
-
-        <StatCard
-          title="Task Statistics"
-          icon="✅"
-          isLoading={taskStatsLoading}
-          stats={
-            taskStats
-              ? [
-                  { label: 'Total Tasks', value: taskStats.total_tasks || 0 },
-                  { label: 'Pending', value: taskStats.pending_tasks || 0 },
-                  { label: 'Completed', value: taskStats.completed_tasks || 0 },
-                  { label: 'Overdue', value: taskStats.overdue_tasks || 0 },
-                ]
-              : []
-          }
-        />
-      </div> */}
-
-      {/* ===== COMMENTED OUT: Error handling ===== */}
-      {/* {(emailError || taskError) && (
-        <div className="error-message" style={{ marginTop: '1rem' }}>
-          ⚠️ Failed to load some statistics. Please try refreshing the page.
-        </div>
-      )} */}
-
       <div className="quick-actions">
         <h3>⚡ Quick Actions</h3>
         <button 

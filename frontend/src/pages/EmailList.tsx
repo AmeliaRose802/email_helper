@@ -434,62 +434,16 @@ const EmailList: React.FC = () => {
     });
   }, [currentPageEmails, sortBy, sortOrder]);
 
-  // Main container style
-  const containerStyle = {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    height: '100%',
-    backgroundColor: '#f8f9fa',
-  };
-
-  const headerStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '24px',
-    backgroundColor: '#fff',
-    borderBottom: '1px solid #e0e0e0',
-    gap: '16px',
-    flexWrap: 'wrap' as const,
-  };
-
-  const listContainerStyle = {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    border: '1px solid #e0e0e0',
-    minHeight: '400px',
-  };
-
-  const sortControlsStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '16px',
-    borderBottom: '1px solid #e0e0e0',
-    backgroundColor: '#f8f9fa',
-  };
-
-  const sortButtonStyle = (active: boolean) => ({
-    padding: '6px 12px',
-    border: '1px solid #e0e0e0',
-    borderRadius: '4px',
-    backgroundColor: active ? '#007acc' : '#fff',
-    color: active ? '#fff' : '#333',
-    cursor: 'pointer',
-    fontSize: '12px',
-    fontWeight: '500',
-    transition: 'all 0.2s ease',
-  });
+  // All styles moved to unified.css
 
   // Loading state
   if (currentLoading) {
     return (
-      <div style={containerStyle}>
-        <div style={{...headerStyle, justifyContent: 'center'}}>
-          <div style={{ textAlign: 'center', padding: '40px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📧</div>
-            <h2 style={{ marginBottom: '24px', color: '#495057' }}>Loading Emails</h2>
+      <div className="email-list-container">
+        <div className="email-list-header email-list-header--centered">
+          <div className="email-list-loading-overlay">
+            <div className="email-list-loading-overlay__icon">📧</div>
+            <h2 className="email-list-loading-overlay__title">Loading Emails</h2>
             <ProgressBar
               current={0}
               total={100}
@@ -497,7 +451,7 @@ const EmailList: React.FC = () => {
               showPercentage={false}
               color="#4a90e2"
             />
-            <p style={{ marginTop: '16px', color: '#6c757d', fontSize: '14px' }}>
+            <p className="email-list-loading-overlay__message">
               This may take a moment...
             </p>
           </div>
@@ -515,40 +469,21 @@ const EmailList: React.FC = () => {
                          'Unknown error';
     
     return (
-      <div style={containerStyle}>
-        <div style={{...headerStyle, justifyContent: 'center'}}>
-          <div style={{ textAlign: 'center', color: '#dc3545', padding: '40px' }}>
-            <div style={{ fontSize: '24px', marginBottom: '16px' }}>⚠️</div>
-            <h2 style={{ marginBottom: '16px' }}>Error Loading Emails</h2>
-            <div style={{ 
-              backgroundColor: '#f8d7da', 
-              border: '1px solid #f5c6cb', 
-              borderRadius: '4px',
-              padding: '16px',
-              marginBottom: '16px',
-              maxWidth: '600px',
-              margin: '0 auto 16px',
-              textAlign: 'left'
-            }}>
+      <div className="email-list-container">
+        <div className="email-list-header email-list-header--centered">
+          <div className="email-list-error-overlay">
+            <div className="email-list-error-overlay__icon">⚠️</div>
+            <h2 className="email-list-error-overlay__title">Error Loading Emails</h2>
+            <div className="email-list-error-overlay__details">
               <strong>Error Details:</strong><br/>
               {errorMessage}
             </div>
-            <p style={{ marginBottom: '16px', color: '#6c757d' }}>
+            <p className="email-list-error-overlay__help">
               Make sure the backend server is running on http://localhost:8000
             </p>
             <button 
               onClick={refetch}
-              style={{
-                marginTop: '8px',
-                padding: '12px 24px',
-                backgroundColor: '#007acc',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: '500'
-              }}
+              className="email-list-error-overlay__retry-btn"
             >
               🔄 Retry
             </button>
@@ -641,7 +576,7 @@ const EmailList: React.FC = () => {
               : 'Apply classifications to Outlook AND extract tasks - all in one click!'
           }
         >
-          <span style={{ fontSize: '22px' }}>✅</span>
+          <span className="email-list-checkmark">✅</span>
           {isApplyingToOutlook || isExtractingTasks ? 'Processing...' : 'Approve All (Apply + Extract Tasks)'}
         </button>
       </div>
@@ -692,29 +627,29 @@ const EmailList: React.FC = () => {
         )}
 
         {/* Email List and Detail - Split View */}
-        <div style={{ display: 'flex', gap: '16px', height: 'calc(100vh - 300px)' }}>
+        <div className="email-list-split-view">
           {/* Email List - Left Side */}
-          <div style={{ ...listContainerStyle, flex: selectedEmailId ? '0 0 40%' : '1', minWidth: '400px' }}>
+          <div className={`email-list-panel ${selectedEmailId ? 'email-list-panel--split' : ''}`}>
             {/* Sort Controls */}
-            <div style={sortControlsStyle}>
-              <span style={{ fontSize: '14px', fontWeight: '500', color: '#6c757d' }}>
+            <div className="email-list-sort-controls">
+              <span className="email-list-sort-label">
                 Sort by:
               </span>
               <button
                 onClick={() => handleSortChange('date')}
-                style={sortButtonStyle(sortBy === 'date')}
+                className={`email-list-sort-btn ${sortBy === 'date' ? 'email-list-sort-btn--active' : ''}`}
               >
                 Date {sortBy === 'date' && (sortOrder === 'desc' ? '↓' : '↑')}
               </button>
               <button
                 onClick={() => handleSortChange('sender')}
-                style={sortButtonStyle(sortBy === 'sender')}
+                className={`email-list-sort-btn ${sortBy === 'sender' ? 'email-list-sort-btn--active' : ''}`}
               >
                 Sender {sortBy === 'sender' && (sortOrder === 'desc' ? '↓' : '↑')}
               </button>
               <button
                 onClick={() => handleSortChange('subject')}
-                style={sortButtonStyle(sortBy === 'subject')}
+                className={`email-list-sort-btn ${sortBy === 'subject' ? 'email-list-sort-btn--active' : ''}`}
               >
                 Subject {sortBy === 'subject' && (sortOrder === 'desc' ? '↓' : '↑')}
               </button>
@@ -723,11 +658,7 @@ const EmailList: React.FC = () => {
               {sortedEmails.length > 0 && (
                 <button
                   onClick={handleSelectAll}
-                  style={{
-                    ...sortButtonStyle(false),
-                    marginLeft: 'auto',
-                    backgroundColor: '#f8f9fa',
-                  }}
+                  className="email-list-sort-btn email-list-sort-btn--select-all"
                 >
                   {sortedEmails.every(email => selectedEmails.includes(email.id)) ? 'Deselect All' : 'Select All'}
                 </button>
@@ -736,20 +667,12 @@ const EmailList: React.FC = () => {
 
             {/* Email Items */}
             {sortedEmails.length === 0 ? (
-              <div style={{ 
-                padding: '48px 24px',
-                textAlign: 'center',
-                color: '#6c757d'
-              }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
-                <div>No emails found</div>
+              <div className="email-list-empty-state">
+                <div className="email-list-empty-state__icon">📭</div>
+                <div className="email-list-empty-state__title">No emails found</div>
               </div>
             ) : (
-              <div style={{ 
-                height: 'calc(100% - 60px)', 
-                overflowY: 'auto',
-                padding: '8px'
-              }}>
+              <div className="email-list-items-container">
                 {sortedEmails.map((email) => (
                   <EmailItem
                     key={email.id}
@@ -765,13 +688,7 @@ const EmailList: React.FC = () => {
 
           {/* Email Detail - Right Side */}
           {selectedEmailId && (
-            <div style={{ 
-              flex: '1',
-              border: '1px solid #e0e0e0',
-              borderRadius: '8px',
-              backgroundColor: '#fff',
-              overflow: 'hidden'
-            }}>
+            <div className="email-list-panel">
               <EmailDetailView
                 emailId={selectedEmailId}
                 onClose={() => setSelectedEmailId(null)}
@@ -782,16 +699,7 @@ const EmailList: React.FC = () => {
 
           {/* Placeholder when no email selected */}
           {!selectedEmailId && (
-            <div style={{
-              flex: '1',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#6c757d',
-              fontSize: '18px',
-              border: '2px dashed #e0e0e0',
-              borderRadius: '8px',
-            }}>
+            <div className="email-list-placeholder">
               ← Select an email to view details
             </div>
           )}

@@ -1587,6 +1587,10 @@ button:disabled, a:disabled {
   backdrop-filter: blur(10px);
 }
 
+.email-list-header--centered {
+  justify-content: center;
+}
+
 .email-list-title {
   margin: 0;
   font-size: var(--font-size-3xl);
@@ -3766,4 +3770,203 @@ button:disabled, a:disabled {
 
 .email-detail-error__message {
   margin-bottom: 24px;
+}
+
+/* ========================================
+   EMAIL LIST PAGE STYLES
+   ======================================== */
+
+/* Main container - already exists as .email-list-container */
+
+/* Loading/Error overlays */
+.email-list-loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+
+.email-list-loading-overlay__icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.email-list-loading-overlay__title {
+  margin-bottom: 24px;
+  color: #495057;
+}
+
+.email-list-loading-overlay__message {
+  margin-top: 16px;
+  color: #6c757d;
+  font-size: 14px;
+}
+
+.email-list-error-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+  color: #dc3545;
+}
+
+.email-list-error-overlay__icon {
+  font-size: 24px;
+  margin-bottom: 16px;
+}
+
+.email-list-error-overlay__title {
+  margin-bottom: 16px;
+}
+
+.email-list-error-overlay__details {
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  padding: 16px;
+  margin-bottom: 16px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+
+.email-list-error-overlay__help {
+  margin-bottom: 16px;
+  color: #6c757d;
+}
+
+.email-list-error-overlay__retry-btn {
+  margin-top: 8px;
+  padding: 12px 24px;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* Split view container */
+.email-list-split-view {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 300px);
+}
+
+.email-list-panel {
+  flex: 1;
+  background-color: #fff;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  min-height: 400px;
+}
+
+.email-list-panel--split {
+  flex: 0 0 40%;
+  min-width: 400px;
+}
+
+/* Sort controls */
+.email-list-sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f8f9fa;
+}
+
+.email-list-sort-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6c757d;
+}
+
+.email-list-sort-btn {
+  padding: 6px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #333;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.email-list-sort-btn--active {
+  background-color: #007acc;
+  color: #fff;
+}
+
+.email-list-sort-btn--select-all {
+  margin-left: auto;
+  background-color: #f8f9fa;
+}
+
+/* Empty state */
+.email-list-empty-state {
+  padding: 48px 24px;
+  text-align: center;
+  color: #6c757d;
+}
+
+.email-list-empty-state__icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.email-list-empty-state__title {
+  font-size: 18px;
+}
+
+.email-list-empty-state__message {
+  font-size: 18px;
+  color: #6c757d;
+}
+
+/* Email list items container (scrollable) */
+.email-list-items-container {
+  height: calc(100% - 60px);
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Email list placeholder (when no email selected) */
+.email-list-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #e0e0e0;
+  border-radius: 8px;
+  color: #6c757d;
+  font-size: 18px;
+}
+
+/* Email list split view container */
+.email-list-split-view {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 300px);
+}
+
+.email-list-empty-state__title {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.email-list-empty-state__message {
+  font-size: 14px;
+}
+
+/* Checkmark icon */
+.email-list-checkmark {
+  font-size: 22px;
 }
