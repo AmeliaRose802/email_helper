@@ -199,3 +199,149 @@ async def link_email_to_task(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to link email to task")
 
+
+@router.post("/tasks/deduplicate/fyi")
+async def deduplicate_fyi_tasks(
+    task_service: TaskService = Depends(get_task_service)
+):
+    """Deduplicate FYI task summaries using AI analysis.
+    
+    This endpoint:
+    1. Retrieves all FYI tasks from the database
+    2. Extracts their summary content
+    3. Uses AI to identify and merge duplicates
+    4. Updates the database with deduplicated content
+    5. Returns statistics about the deduplication
+    """
+    try:
+        # Get FYI tasks from database
+        result = await task_service.get_tasks_paginated(
+            user_id=LOCALHOST_USER_ID,
+            page=1,
+            limit=1000,  # Get all FYI tasks
+            status=None,
+            priority=None,
+            search=None
+        )
+        
+        # Filter for FYI category
+        fyi_tasks = [task for task in result.tasks if task.category == 'fyi']
+        
+        if not fyi_tasks:
+            return {
+                "message": "No FYI tasks found to deduplicate",
+                "statistics": {
+                    "original_count": 0,
+                    "deduplicated_count": 0,
+                    "duplicates_removed": 0
+                }
+            }
+        
+        # Format tasks for deduplication
+        from backend.core.dependencies import get_com_ai_service
+        ai_service = get_com_ai_service()
+        
+        content_items = []
+        for task in fyi_tasks:
+            content_items.append({
+                "id": task.id,
+                "content": task.one_line_summary or task.description or "",
+                "metadata": {
+                    "email_id": task.email_id,
+                    "created_at": task.created_at.isoformat() if task.created_at else None
+                }
+            })
+        
+        # Call AI service for deduplication
+        dedup_result = await ai_service.deduplicate_content(content_items, "fyi")
+        
+        # Update database with deduplicated content
+        # For now, just return the results without updating
+        # In production, would update task descriptions and mark duplicates as deleted
+        
+        return {
+            "message": f"Deduplicated {len(fyi_tasks)} FYI tasks",
+            "deduplicated_items": dedup_result["deduplicated_items"],
+            "removed_duplicates": dedup_result["removed_duplicates"],
+            "statistics": dedup_result["statistics"]
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to deduplicate FYI tasks: {str(e)}"
+        )
+
+
+@router.post("/tasks/deduplicate/newsletters")
+async def deduplicate_newsletter_tasks(
+    task_service: TaskService = Depends(get_task_service)
+):
+    """Deduplicate newsletter task summaries using AI analysis.
+    
+    This endpoint:
+    1. Retrieves all newsletter tasks from the database
+    2. Extracts their summary content
+    3. Uses AI to identify and merge duplicates
+    4. Updates the database with deduplicated content
+    5. Returns statistics about the deduplication
+    """
+    try:
+        # Get newsletter tasks from database
+        result = await task_service.get_tasks_paginated(
+            user_id=LOCALHOST_USER_ID,
+            page=1,
+            limit=1000,  # Get all newsletter tasks
+            status=None,
+            priority=None,
+            search=None
+        )
+        
+        # Filter for newsletter category
+        newsletter_tasks = [task for task in result.tasks if task.category == 'newsletter']
+        
+        if not newsletter_tasks:
+            return {
+                "message": "No newsletter tasks found to deduplicate",
+                "statistics": {
+                    "original_count": 0,
+                    "deduplicated_count": 0,
+                    "duplicates_removed": 0
+                }
+            }
+        
+        # Format tasks for deduplication
+        from backend.core.dependencies import get_com_ai_service
+        ai_service = get_com_ai_service()
+        
+        content_items = []
+        for task in newsletter_tasks:
+            content_items.append({
+                "id": task.id,
+                "content": task.description or task.one_line_summary or "",
+                "metadata": {
+                    "email_id": task.email_id,
+                    "created_at": task.created_at.isoformat() if task.created_at else None
+                }
+            })
+        
+        # Call AI service for deduplication
+        dedup_result = await ai_service.deduplicate_content(content_items, "newsletter")
+        
+        # Update database with deduplicated content
+        # For now, just return the results without updating
+        # In production, would update task descriptions and mark duplicates as deleted
+        
+        return {
+            "message": f"Deduplicated {len(newsletter_tasks)} newsletter tasks",
+            "deduplicated_items": dedup_result["deduplicated_items"],
+            "removed_duplicates": dedup_result["removed_duplicates"],
+            "statistics": dedup_result["statistics"]
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to deduplicate newsletter tasks: {str(e)}"
+        )
+

@@ -623,6 +623,150 @@ class COMAIService:
             print(f"Error in duplicate detection: {e}")
             return []
     
+    async def deduplicate_content(
+        self, 
+        content_items: List[Dict[str, Any]],
+        content_type: str = "fyi"
+    ) -> Dict[str, Any]:
+        """Deduplicate similar content items using AI analysis.
+        
+        This method uses the content_deduplication prompty template to identify
+        and merge duplicate or highly similar content items (FYI summaries,
+        newsletter summaries, etc.).
+        
+        Args:
+            content_items: List of content dictionaries with 'id', 'content', and optional 'metadata'
+            content_type: Type of content being deduplicated ('fyi', 'newsletter', etc.)
+            
+        Returns:
+            Dictionary with deduplication results:
+            - deduplicated_items: List of unique items with merged metadata
+            - removed_duplicates: List of items that were merged/removed
+            - statistics: Counts and metrics about the deduplication
+        
+        Example:
+            >>> items = [
+            >>>     {"id": 1, "content": "Project X deadline moved to Friday"},
+            >>>     {"id": 2, "content": "Project X has a new deadline on Friday"}
+            >>> ]
+            >>> result = await service.deduplicate_content(items, "fyi")
+            >>> print(len(result['deduplicated_items']))  # 1 item after merge
+        """
+        self._ensure_initialized()
+        
+        try:
+            # Run in thread pool to avoid blocking event loop
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(
+                None, 
+                self._deduplicate_content_sync, 
+                content_items,
+                content_type
+            )
+            
+        except Exception as e:
+            print(f"Error in content deduplication: {e}")
+            # Return original items unchanged on error
+            return {
+                "deduplicated_items": content_items,
+                "removed_duplicates": [],
+                "statistics": {
+                    "original_count": len(content_items),
+                    "deduplicated_count": len(content_items),
+                    "duplicates_removed": 0,
+                    "merge_operations": 0,
+                    "error": str(e)
+                }
+            }
+    
+    def _deduplicate_content_sync(
+        self, 
+        content_items: List[Dict[str, Any]],
+        content_type: str
+    ) -> Dict[str, Any]:
+        """Synchronous helper for content deduplication (runs in thread pool)."""
+        try:
+            # Format content items for the prompt
+            formatted_items = []
+            for idx, item in enumerate(content_items):
+                formatted_items.append({
+                    "id": item.get("id", idx),
+                    "content": item.get("content", ""),
+                    "metadata": item.get("metadata", {})
+                })
+            
+            # Prepare inputs for the prompty
+            inputs = {
+                "content_items": json.dumps(formatted_items, indent=2),
+                "content_type": content_type,
+                "threshold": "high"  # Use high similarity threshold by default
+            }
+            
+            # Execute the content_deduplication prompty
+            result = self.ai_processor.execute_prompty(
+                "content_deduplication.prompty",
+                inputs=inputs
+            )
+            
+            # Parse result
+            if isinstance(result, str):
+                try:
+                    result = json.loads(result)
+                except json.JSONDecodeError:
+                    # Return original items if parse fails
+                    return {
+                        "deduplicated_items": content_items,
+                        "removed_duplicates": [],
+                        "statistics": {
+                            "original_count": len(content_items),
+                            "deduplicated_count": len(content_items),
+                            "duplicates_removed": 0,
+                            "merge_operations": 0,
+                            "error": "Failed to parse AI response"
+                        }
+                    }
+            
+            # Validate and return result
+            if isinstance(result, dict):
+                return {
+                    "deduplicated_items": result.get("deduplicated_items", content_items),
+                    "removed_duplicates": result.get("removed_duplicates", []),
+                    "statistics": result.get("statistics", {
+                        "original_count": len(content_items),
+                        "deduplicated_count": len(result.get("deduplicated_items", content_items)),
+                        "duplicates_removed": len(result.get("removed_duplicates", [])),
+                        "merge_operations": len(result.get("removed_duplicates", []))
+                    })
+                }
+            else:
+                # Unexpected result format
+                return {
+                    "deduplicated_items": content_items,
+                    "removed_duplicates": [],
+                    "statistics": {
+                        "original_count": len(content_items),
+                        "deduplicated_count": len(content_items),
+                        "duplicates_removed": 0,
+                        "merge_operations": 0,
+                        "error": "Unexpected AI response format"
+                    }
+                }
+            
+        except Exception as e:
+            print(f"Error in _deduplicate_content_sync: {e}")
+            # Return original items unchanged on error
+            return {
+                "deduplicated_items": content_items,
+                "removed_duplicates": [],
+                "statistics": {
+                    "original_count": len(content_items),
+                    "deduplicated_count": len(content_items),
+                    "duplicates_removed": 0,
+                    "merge_operations": 0,
+                    "error": str(e)
+                }
+            }
+    
     async def get_available_templates(self) -> Dict[str, Any]:
         """Get list of available prompty templates.
         
