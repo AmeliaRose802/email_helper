@@ -9,7 +9,7 @@ import {
   useUpdateEmailClassificationMutation
 } from '@/services/emailApi';
 import { CategoryBadge } from '@/components/Email/CategoryBadge';
-import { formatEmailDate, getPriorityIcon } from '@/utils/emailUtils';
+import { getPriorityIcon } from '@/utils/emailUtils';
 
 // Helper function to convert URLs in text to clickable links
 const linkifyText = (text: string): string => {
@@ -444,15 +444,32 @@ const EmailDetail: React.FC = () => {
         )}
         
         <div style={metaRowStyle}>
-          <div style={senderStyle}>From: {email.sender || 'Unknown'}</div>
-          <div style={recipientStyle}>To: {email.recipient || 'Unknown'}</div>
-          <div>{email.date ? formatEmailDate(email.date) : email.received_time ? formatEmailDate(email.received_time) : 'No date'}</div>
+          <div style={senderStyle}>
+            <strong>From:</strong> {email.sender || 'Unknown Sender'}
+          </div>
         </div>
         
         <div style={metaRowStyle}>
-          <div>Date: {email.date ? new Date(email.date).toLocaleString() : email.received_time ? new Date(email.received_time).toLocaleString() : 'Invalid Date'}</div>
+          <div style={recipientStyle}>
+            <strong>To:</strong> {email.recipient || 'Unknown Recipient'}
+          </div>
+        </div>
+        
+        <div style={metaRowStyle}>
+          <div>
+            <strong>Date:</strong> {email.date 
+              ? new Date(email.date).toLocaleString('en-US', { 
+                  weekday: 'short', 
+                  year: 'numeric', 
+                  month: 'short', 
+                  day: 'numeric', 
+                  hour: 'numeric', 
+                  minute: '2-digit' 
+                })
+                : 'Date unavailable'}
+          </div>
           {email.folder_name && (
-            <div>Folder: {email.folder_name}</div>
+            <div><strong>Folder:</strong> {email.folder_name}</div>
           )}
         </div>
         

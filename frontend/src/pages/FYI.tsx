@@ -166,23 +166,40 @@ const FYI: React.FC = () => {
                     }}
                   />
                   <div style={{ flex: 1 }}>
+                    {/* Show only summary text without extra email metadata */}
                     <div style={{
                       fontSize: '15px',
-                      color: isDone ? '#6c757d' : '#333',
+                      color: isDone ? '#6c757d' : '#00E6FF',
                       textDecoration: isDone ? 'line-through' : 'none',
-                      lineHeight: '1.5',
+                      lineHeight: '1.6',
                     }}>
-                      {task.description}
+                      {/* Extract bullet points if present, otherwise show full description */}
+                      {task.description.split('\n').map((line, idx) => {
+                        const trimmedLine = line.trim();
+                        if (!trimmedLine) return null;
+                        
+                        // Check if line starts with bullet point or dash
+                        const isBullet = trimmedLine.match(/^[•\-\*]\s/);
+                        const cleanedLine = isBullet 
+                          ? trimmedLine.replace(/^[•\-\*]\s/, '') 
+                          : trimmedLine;
+                        
+                        // Skip common email header patterns
+                        if (cleanedLine.match(/^(From:|To:|Subject:|Date:|Sent:)/i)) {
+                          return null;
+                        }
+                        
+                        return (
+                          <div key={idx} style={{ 
+                            marginBottom: '4px',
+                            paddingLeft: isBullet ? '0' : '0'
+                          }}>
+                            {isBullet && <span style={{ marginRight: '8px' }}>•</span>}
+                            {cleanedLine}
+                          </div>
+                        );
+                      }).filter(Boolean)}
                     </div>
-                    {task.created_at && (
-                      <div style={{
-                        marginTop: '8px',
-                        fontSize: '12px',
-                        color: '#6c757d',
-                      }}>
-                        {new Date(task.created_at).toLocaleDateString()}
-                      </div>
-                    )}
                   </div>
                   <button
                     onClick={() => handleDelete(task.id)}

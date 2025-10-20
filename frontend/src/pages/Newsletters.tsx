@@ -164,42 +164,68 @@ const Newsletters: React.FC = () => {
                       }}
                     />
                     <div style={{ flex: 1 }}>
-                      <h3 style={{
-                        margin: '0 0 12px 0',
-                        fontSize: '18px',
-                        fontWeight: '600',
-                        color: isDone ? '#6c757d' : '#333',
-                        textDecoration: isDone ? 'line-through' : 'none',
-                      }}>
-                        {task.title.replace('📰 ', '')}
-                      </h3>
+                      {/* Show only summary without extra noise - clean newsletter format */}
                       <div style={{
-                        fontSize: '14px',
-                        color: '#495057',
-                        lineHeight: '1.6',
+                        fontSize: '15px',
+                        color: isDone ? '#6c757d' : '#00E6FF',
+                        lineHeight: '1.7',
                         whiteSpace: 'pre-wrap',
                       }}>
-                        {task.description}
+                        {/* Clean up description - remove email headers and format paragraphs */}
+                        {task.description.split('\n\n').map((paragraph, idx) => {
+                          const trimmedPara = paragraph.trim();
+                          
+                          // Skip email headers and metadata
+                          if (trimmedPara.match(/^(From:|To:|Subject:|Date:|Sent:|Email from)/i)) {
+                            return null;
+                          }
+                          
+                          // Skip empty paragraphs
+                          if (!trimmedPara) return null;
+                          
+                          return (
+                            <p key={idx} style={{ 
+                              margin: idx === 0 ? '0 0 12px 0' : '12px 0',
+                              color: isDone ? '#6c757d' : '#D8D8E8',
+                              textDecoration: isDone ? 'line-through' : 'none',
+                            }}>
+                              {trimmedPara}
+                            </p>
+                          );
+                        }).filter(Boolean)}
                       </div>
-                      {task.metadata?.key_points && Array.isArray(task.metadata.key_points) ? (
-                        <div style={{ marginTop: '12px' }}>
-                          <strong style={{ fontSize: '13px', color: '#007acc' }}>Key Points:</strong>
-                          <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+                      
+                      {/* Show key points if available */}
+                      {task.metadata?.key_points && Array.isArray(task.metadata.key_points) && (task.metadata.key_points as unknown as string[]).length > 0 ? (
+                        <div style={{ 
+                          marginTop: '16px',
+                          padding: '12px',
+                          background: 'rgba(0, 230, 255, 0.05)',
+                          borderLeft: '3px solid var(--synthwave-cyan)',
+                          borderRadius: '4px'
+                        }}>
+                          <strong style={{ 
+                            fontSize: '13px', 
+                            color: 'var(--synthwave-cyan)',
+                            display: 'block',
+                            marginBottom: '8px'
+                          }}>
+                            Key Takeaways:
+                          </strong>
+                          <ul style={{ margin: '0', paddingLeft: '20px' }}>
                             {(task.metadata.key_points as unknown as string[]).map((point: string, idx: number) => (
-                              <li key={idx} style={{ fontSize: '13px', marginBottom: '4px' }}>{String(point)}</li>
+                              <li key={idx} style={{ 
+                                fontSize: '14px', 
+                                marginBottom: '6px',
+                                color: '#A1A1B5',
+                                lineHeight: '1.5'
+                              }}>
+                                {String(point)}
+                              </li>
                             ))}
                           </ul>
                         </div>
                       ) : null}
-                      {task.created_at && (
-                        <div style={{
-                          marginTop: '12px',
-                          fontSize: '12px',
-                          color: '#6c757d',
-                        }}>
-                          {new Date(task.created_at).toLocaleDateString()}
-                        </div>
-                      )}
                     </div>
                     <button
                       onClick={() => handleDelete(task.id)}

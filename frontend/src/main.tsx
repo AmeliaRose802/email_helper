@@ -1,6 +1,7 @@
 // Main entry point for Email Helper React app
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import './styles/unified.css';
 
 // CRITICAL: Catch all errors to prevent JavaScript from breaking
 window.addEventListener('error', (event) => {
