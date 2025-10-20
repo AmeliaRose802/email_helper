@@ -88,7 +88,8 @@ class EmailProcessor:
         
         # Get conversations with full thread context using Outlook APIs
         print("🔗 Retrieving conversations using Outlook conversation APIs...")
-        conversation_data = self.outlook_manager.get_emails_with_full_conversations(days_back=7, max_emails=max_emails)
+        # Use None for days_back to retrieve all unread emails regardless of date
+        conversation_data = self.outlook_manager.get_emails_with_full_conversations(days_back=None, max_emails=max_emails)
         
         print(f"📊 Analyzing {len(conversation_data)} unique conversations...")
         

@@ -1,0 +1,61 @@
+---
+name: Content Deduplication
+description: Deduplicate similar content items (FYI summaries, newsletters, etc.)
+authors:
+  - Email Helper Team
+model:
+  api: chat
+  configuration:
+    type: azure_openai
+    azure_deployment: gpt-4
+  parameters:
+    temperature: 0.1
+    max_tokens: 2000
+---
+
+system:
+You are an expert at identifying duplicate and similar content. You help deduplicate lists of summaries, articles, and information items to remove redundancy while preserving unique information.
+
+user:
+I have a list of content items (summaries, articles, newsletters, etc.) that may contain duplicates or very similar information. Please help me deduplicate this list.
+
+**Instructions:**
+1. Identify items that are duplicates or near-duplicates (same core information, just worded differently)
+2. For duplicate groups, keep the most informative version
+3. Merge items if they complement each other with additional unique details
+4. Preserve all unique information - don't discard anything valuable
+5. Return a deduplicated list with clear, concise items
+
+**Content Items to Deduplicate:**
+{{content_items}}
+
+**Output Format:**
+Return a JSON object with:
+{
+  "deduplicated_items": [
+    {
+      "content": "The deduplicated content",
+      "sources": ["original_item_1", "original_item_2"],  // IDs of source items that were merged
+      "confidence": 0.95  // Confidence that this is correctly deduplicated
+    }
+  ],
+  "removed_duplicates": [
+    {
+      "removed_content": "Duplicate item that was removed",
+      "merged_into": "ID of the item it was merged into",
+      "reason": "Why it was considered a duplicate"
+    }
+  ],
+  "statistics": {
+    "original_count": 10,
+    "deduplicated_count": 7,
+    "duplicates_removed": 3,
+    "merge_operations": 2
+  }
+}
+
+**Important:**
+- Be conservative - when in doubt, keep items separate
+- Preserve all unique factual information
+- Maintain the original tone and style when possible
+- If items are related but distinct, keep them separate
