@@ -6,7 +6,7 @@ export interface Task {
   description?: string;
   status: 'todo' | 'in-progress' | 'review' | 'done';
   priority: 'high' | 'medium' | 'low';
-  category?: 'required_action' | 'team_action' | 'optional_action' | 'job_listing' | 'optional_event' | 'fyi' | 'newsletter' | string;
+  category?: 'required_personal_action' | 'team_action' | 'optional_action' | 'job_listing' | 'optional_event' | 'fyi' | 'newsletter' | string;
   due_date?: string;
   created_at: string;
   updated_at: string;
@@ -20,7 +20,7 @@ export interface TaskCreate {
   title: string;
   description?: string;
   priority: 'high' | 'medium' | 'low';
-  category?: 'required_action' | 'team_action' | 'optional_action' | 'job_listing' | 'optional_event' | 'fyi' | 'newsletter' | string;
+  category?: 'required_personal_action' | 'team_action' | 'optional_action' | 'job_listing' | 'optional_event' | 'fyi' | 'newsletter' | string;
   due_date?: string;
   email_id?: string;
   metadata?: Record<string, unknown>;
@@ -41,7 +41,7 @@ export interface TaskUpdate {
 export interface TaskFilter {
   status?: 'todo' | 'in-progress' | 'review' | 'done';
   priority?: 'high' | 'medium' | 'low';
-  category?: 'required_action' | 'team_action' | 'optional_action' | 'job_listing' | 'optional_event' | 'fyi' | 'newsletter' | string;
+  category?: 'required_personal_action' | 'team_action' | 'optional_action' | 'job_listing' | 'optional_event' | 'fyi' | 'newsletter' | string;
   due_date_from?: string;
   due_date_to?: string;
   email_id?: string;

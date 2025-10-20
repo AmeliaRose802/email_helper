@@ -78,7 +78,7 @@ class ConversationResponse(BaseModel):
 @router.get("/emails", response_model=EmailListResponse)
 async def get_emails(
     folder: str = Query("Inbox", description="Email folder name"),
-    limit: int = Query(10000, ge=1, le=10000, description="Number of emails to retrieve"),
+    limit: int = Query(50000, ge=1, le=50000, description="Number of emails to retrieve"),
     offset: int = Query(0, ge=0, description="Number of emails to skip"),
     category: Optional[str] = Query(None, description="Filter by AI category"),
     source: str = Query("outlook", description="Data source: 'outlook' or 'database'"),
@@ -709,7 +709,7 @@ async def update_email_classification(
         Operation result with success status and message
     """
     try:
-        # Import categories from com_email_provider to ensure consistency
+        from backend.database.connection import db_manager
         from backend.services.com_email_provider import INBOX_CATEGORIES, NON_INBOX_CATEGORIES
         
         category = request.category.lower()
@@ -721,6 +721,17 @@ async def update_email_classification(
             folder_name = all_categories[category]
         else:
             folder_name = 'Work Relevant'  # Default fallback
+        
+        # CRITICAL: Store user correction in database for accuracy tracking
+        # This allows us to compare ai_category (original AI) vs category (user-corrected)
+        with db_manager.get_connection() as conn:
+            # Update the user-corrected category in the database
+            conn.execute("""
+                UPDATE emails 
+                SET category = ? 
+                WHERE id = ?
+            """, (category, email_id))
+            conn.commit()
         
         if request.apply_to_outlook and folder_name:
             # Move email to the category folder
@@ -742,7 +753,7 @@ async def update_email_classification(
             # Just update classification without moving
             return EmailOperationResponse(
                 success=True,
-                message=f"Email classified as '{request.category}' (not applied to Outlook)",
+                message=f"Email classified as '{request.category}' (stored in database)",
                 email_id=email_id
             )
     
@@ -973,7 +984,7 @@ async def extract_tasks_from_emails(
         )
     
     # Categories that should generate tasks
-    ACTIONABLE_CATEGORIES = ['required_action', 'team_action', 'optional_action']
+    ACTIONABLE_CATEGORIES = ['required_personal_action', 'team_action', 'optional_action']
     JOB_CATEGORIES = ['job_listing']
     EVENT_CATEGORIES = ['optional_event']
     SUMMARY_CATEGORIES = ['fyi', 'newsletter']
@@ -1042,7 +1053,7 @@ async def extract_tasks_from_emails(
                         if action_result and action_result.get('action_required'):
                             # Determine priority
                             priority = 'high' if 'urgent' in email.get('subject', '').lower() else 'medium'
-                            if ai_category == 'required_action':
+                            if ai_category == 'required_personal_action':
                                 priority = 'high'
                             
                             # Parse due date

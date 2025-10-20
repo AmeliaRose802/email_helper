@@ -14,10 +14,10 @@ const FYI: React.FC = () => {
     refetch,
   } = useGetTasksQuery({ page: 1, per_page: 1000 });
 
-  // Filter for FYI tasks
+  // Filter for FYI tasks - hide completed ones
   const fyiTasks = useMemo(() => {
     if (!taskData?.tasks) return [];
-    return taskData.tasks.filter(task => task.category === 'fyi');
+    return taskData.tasks.filter(task => task.category === 'fyi' && task.status !== 'done');
   }, [taskData?.tasks]);
 
   const handleToggleRead = async (task: Task) => {
@@ -169,12 +169,12 @@ const FYI: React.FC = () => {
                     {/* Show only summary text without extra email metadata */}
                     <div style={{
                       fontSize: '15px',
-                      color: isDone ? '#6c757d' : '#00E6FF',
+                      color: isDone ? '#6c757d' : '#D8D8E8',
                       textDecoration: isDone ? 'line-through' : 'none',
                       lineHeight: '1.6',
                     }}>
                       {/* Extract bullet points if present, otherwise show full description */}
-                      {task.description.split('\n').map((line, idx) => {
+                      {task.description?.split('\n').map((line, idx) => {
                         const trimmedLine = line.trim();
                         if (!trimmedLine) return null;
                         

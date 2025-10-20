@@ -16,31 +16,36 @@ Setup guides for getting started with Email Helper:
 - [User Setup Guide](setup/USER_SETUP.md) - Complete user setup instructions
 - [Microsoft Graph API Setup](setup/GRAPH_API_SETUP.md) - Configure Graph API access
 - [OAuth Implementation](setup/OAUTH_IMPLEMENTATION.md) - OAuth authentication setup
+- [Electron Setup](setup/ELECTRON_SETUP.md) - Desktop application setup
+- [Frontend Localhost Setup](setup/FRONTEND_LOCALHOST_SETUP.md) - Frontend development setup
 
 ### ✨ Features
 Detailed guides for specific features:
 
 - [Enhanced Deduplication Guide](features/ENHANCED_DEDUPLICATION_GUIDE.md) - AI-powered action item deduplication
 - [Holistic Analysis Feature](features/holistic_analysis_feature_guide.md) - Comprehensive inbox analysis
+- [Synthwave Style Guide](features/Synthwave_Style_Guide.md) - UI theme and styling guidelines
+- [Quick Reference Animations](features/QUICK_REFERENCE_ANIMATIONS.md) - UI animation documentation
+- [React Classification Implementation](features/REACT_CLASSIFICATION_IMPLEMENTATION.md) - Email classification UI
 
 ### 🔧 Technical Documentation
 Technical details and architecture:
 
 - [Technical Summary](technical/technical_summary.md) - System architecture and design
 - [Email Analysis Summary](technical/email_analysis_summary.md) - Email analysis algorithms
+- [COM Email Provider](technical/COM_EMAIL_PROVIDER.md) - Outlook COM integration documentation
+- [COM AI Service Adapter](technical/COM_AI_SERVICE_ADAPTER.md) - AI service integration
+- [Outlook COM Fix](technical/OUTLOOK_COM_FIX.md) - Outlook COM troubleshooting
+
+### 🐛 Troubleshooting
+Diagnostic and troubleshooting guides:
+
+- [Troubleshooting Guide](TROUBLESHOOTING.md) - General troubleshooting
+- [Error Diagnosis Guide](troubleshooting/ERROR_DIAGNOSIS_GUIDE.md) - Detailed error diagnosis
 
 ### 🏗️ Implementation Details
-AI-generated implementation summaries:
-
-- [Adapter Pattern Implementation](implementation/ADAPTER_PATTERN_IMPLEMENTATION.md) - Backend integration adapters (T0.1)
-- [Accuracy Dashboard Implementation](implementation/ACCURACY_DASHBOARD_IMPLEMENTATION_SUMMARY.md)
-- [Aggressive Cleanup Complete](implementation/AGGRESSIVE_CLEANUP_COMPLETE.md)
-- [AI Classification Improvements](implementation/AI_CLASSIFICATION_IMPROVEMENTS.md)
-- [Block 4 Implementation](implementation/BLOCK4_IMPLEMENTATION_SUMMARY.md)
-- [Cleanup Summary](implementation/CLEANUP_SUMMARY.md)
-- [Deferred Processing Implementation](implementation/DEFERRED_PROCESSING_IMPLEMENTATION.md)
-- [Feature Protection](implementation/FEATURE_PROTECTION_README.md)
-- [Task Completion Fix](implementation/TASK_COMPLETION_FIX_SUMMARY.md)
+AI-generated implementation summaries have been removed to reduce clutter. 
+Implementation details should be documented in the code itself or in feature-specific docs.
 
 ### 📋 Specifications
 Detailed specifications for developers (see `../specs/`):

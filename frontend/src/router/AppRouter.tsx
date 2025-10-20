@@ -43,101 +43,57 @@ const SimpleNav: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-const router = createHashRouter([
+const router = createHashRouter(
+  [
+    {
+      path: '/',
+      element: <SimpleNav><EmailList /></SimpleNav>,
+      errorElement: <SimpleNav><div style={{ padding: '40px', textAlign: 'center' }}><h2>Page Error</h2><p>Something went wrong. <a href="#/">Go to Inbox</a></p></div></SimpleNav>,
+    },
+    {
+      path: '/dashboard',
+      element: <SimpleNav><Dashboard /></SimpleNav>,
+    },
+    {
+      path: '/emails',
+      element: <SimpleNav><EmailList /></SimpleNav>,
+    },
+    {
+      path: '/emails/:id',
+      element: <SimpleNav><EmailDetail /></SimpleNav>,
+    },
+    {
+      path: '/tasks',
+      element: <SimpleNav><TaskList /></SimpleNav>,
+    },
+    {
+      path: '/newsletters',
+      element: <SimpleNav><Newsletters /></SimpleNav>,
+    },
+    {
+      path: '/fyi',
+      element: <SimpleNav><FYI /></SimpleNav>,
+    },
+    {
+      path: '/accuracy',
+      element: <SimpleNav><AccuracyDashboard /></SimpleNav>,
+    },
+    {
+      path: '/settings',
+      element: <SimpleNav><Settings /></SimpleNav>,
+    },
+    {
+      path: '*',
+      element: <SimpleNav><div style={{ padding: '40px', textAlign: 'center' }}><h2>404 - Page Not Found</h2><p>The page you're looking for doesn't exist. <a href="#/">Go to Inbox</a></p></div></SimpleNav>,
+    },
+  ],
   {
-    path: '/',
-    element: <SimpleNav><EmailList /></SimpleNav>,
-  },
-  {
-    path: '/dashboard',
-    element: <SimpleNav><Dashboard /></SimpleNav>,
-  },
-  {
-    path: '/emails',
-    element: <SimpleNav><EmailList /></SimpleNav>,
-  },
-  {
-    path: '/emails/:id',
-    element: <SimpleNav><EmailDetail /></SimpleNav>,
-  },
-  {
-    path: '/tasks',
-    element: <SimpleNav><TaskList /></SimpleNav>,
-  },
-  {
-    path: '/newsletters',
-    element: <SimpleNav><Newsletters /></SimpleNav>,
-  },
-  {
-    path: '/fyi',
-    element: <SimpleNav><FYI /></SimpleNav>,
-  },
-  {
-    path: '/accuracy',
-    element: <SimpleNav><AccuracyDashboard /></SimpleNav>,
-  },
-  {
-    path: '/settings',
-    element: <SimpleNav><Settings /></SimpleNav>,
-  },
-  // {
-  //   path: '/login',
-  //   element: <Login />,
-  // },
-  // {
-  //   path: '/demo-tasks',
-  //   element: <TaskList />, // Temporary unprotected route for demo
-  // },
-  // {
-  //   path: '/',
-  //   element: (
-  //     <ProtectedRoute>
-  //       <Layout />
-  //     </ProtectedRoute>
-  //   ),
-  //   children: [
-  //     {
-  //       index: true,
-  //       element: <Dashboard />,
-  //     },
-  //     {
-  //       path: 'emails',
-  //       element: <EmailList />,
-  //     },
-  //     {
-  //       path: 'emails/:id',
-  //       element: <EmailDetail />,
-  //     },
-  //     {
-  //       path: 'tasks',
-  //       element: <TaskList />,
-  //     },
-  //     {
-  //       path: 'tasks/:id',
-  //       element: <div>Task Detail (T8)</div>, // Placeholder for T8
-  //     },
-  //     {
-  //       path: 'settings',
-  //       element: <Settings />,
-  //     },
-  //   ],
-  // },
-  // {
-  //   path: '*',
-  //   element: (
-  //     <div
-  //       style={{
-  //         padding: '2rem',
-  //         textAlign: 'center',
-  //       }}
-  //     >
-  //       <h1>404 - Page Not Found</h1>
-  //       <p>The page you're looking for doesn't exist.</p>
-  //       <a href="/">Go back to Dashboard</a>
-  //     </div>
-  //   ),
-  // },
-]);
+    future: {
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+    },
+  }
+);
 
 const AppRouter: React.FC = () => {
   try {

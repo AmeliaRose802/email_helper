@@ -37,7 +37,7 @@ const EmailList: React.FC = () => {
     isLoading,
     error,
     refetch,
-  } = useGetEmailsQuery({ limit: 10000 });
+  } = useGetEmailsQuery({ limit: 50000 });
 
   // Current data
   const currentData = emailData;
@@ -421,30 +421,6 @@ const EmailList: React.FC = () => {
     flexWrap: 'wrap' as const,
   };
 
-  const titleStyle = {
-    margin: 0,
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#333',
-  };
-
-  const statsStyle = {
-    fontSize: '14px',
-    color: '#6c757d',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  };
-
-  const contentStyle = {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    padding: '16px 24px',
-    gap: '16px',
-    minHeight: 0, // Important for virtual scrolling
-  };
-
   const listContainerStyle = {
     flex: 1,
     backgroundColor: '#fff',
@@ -527,11 +503,11 @@ const EmailList: React.FC = () => {
   }
 
   return (
-    <div style={containerStyle}>
+    <div className="email-list-container">
       {/* Header */}
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>Inbox</h1>
-        <div style={statsStyle}>
+      <div className="email-list-header">
+        <h1 className="email-list-title">Inbox</h1>
+        <div className="email-list-stats">
           {currentData && (
             <>
               <span>
@@ -600,25 +576,7 @@ const EmailList: React.FC = () => {
             }
           }}
           disabled={isApplyingToOutlook || isExtractingTasks || isClassifying || classifiedEmailsRef.current.size === 0}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: isApplyingToOutlook || isExtractingTasks || isClassifying || classifiedEmailsRef.current.size === 0
-              ? '#6c757d' 
-              : '#28a745',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '16px',
-            fontWeight: '700',
-            cursor: isApplyingToOutlook || isExtractingTasks || isClassifying || classifiedEmailsRef.current.size === 0
-              ? 'not-allowed' 
-              : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            transition: 'all 0.2s ease',
-            boxShadow: '0 3px 6px rgba(0,0,0,0.15)',
-          }}
+          className="email-approve-button"
           title={
             isClassifying 
               ? 'Please wait for classification to complete'
@@ -633,7 +591,7 @@ const EmailList: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div style={contentStyle}>
+      <div className="email-content-area">
         {/* Classification Progress Bar */}
         {isClassifying && classificationProgress.total > 0 ? (
           <ProgressBar
@@ -653,33 +611,16 @@ const EmailList: React.FC = () => {
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '12px 16px',
-            backgroundColor: '#f8f9fa',
-            borderRadius: '8px',
-            border: '1px solid #e0e0e0',
-          }}>
+          <div className="email-pagination">
             <button
               onClick={handlePreviousPage}
               disabled={currentConversationPage === 0}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: currentConversationPage === 0 ? '#e0e0e0' : '#007acc',
-                color: currentConversationPage === 0 ? '#6c757d' : '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: currentConversationPage === 0 ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-              }}
+              className="email-pagination-button"
             >
               ← Previous 10 Conversations
             </button>
             
-            <span style={{ fontSize: '14px', color: '#6c757d' }}>
+            <span className="email-pagination-info">
               Showing conversations {currentConversationPage * CONVERSATIONS_PER_PAGE + 1}-
               {Math.min((currentConversationPage + 1) * CONVERSATIONS_PER_PAGE, totalConversations)} of {totalConversations}
             </span>
@@ -687,16 +628,7 @@ const EmailList: React.FC = () => {
             <button
               onClick={handleNextPage}
               disabled={currentConversationPage >= totalPages - 1}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: currentConversationPage >= totalPages - 1 ? '#e0e0e0' : '#007acc',
-                color: currentConversationPage >= totalPages - 1 ? '#6c757d' : '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: currentConversationPage >= totalPages - 1 ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-              }}
+              className="email-pagination-button"
             >
               Next 10 Conversations →
             </button>

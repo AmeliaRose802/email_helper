@@ -27,10 +27,13 @@ const TaskList: React.FC = () => {
     per_page: 1000, // Get all tasks for Kanban board
   });
 
-  // Filter tasks client-side for better UX
+  // Filter tasks client-side for better UX - exclude newsletters and FYI (they have their own tabs)
   const filteredTasks = useMemo(() => {
     if (!taskData?.tasks) return [];
-    return filterTasks(taskData.tasks, filters);
+    const tasksWithoutNewslettersAndFYI = taskData.tasks.filter(
+      task => task.category !== 'newsletter' && task.category !== 'fyi'
+    );
+    return filterTasks(tasksWithoutNewslettersAndFYI, filters);
   }, [taskData?.tasks, filters]);
 
   const handleFilterChange = (newFilters: TaskFilter) => {

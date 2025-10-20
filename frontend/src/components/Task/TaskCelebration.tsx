@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import '@/styles/task-celebration.css';
 
 interface TaskCelebrationProps {
   onComplete?: () => void;

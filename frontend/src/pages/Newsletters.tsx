@@ -14,10 +14,10 @@ const Newsletters: React.FC = () => {
     refetch,
   } = useGetTasksQuery({ page: 1, per_page: 1000 });
 
-  // Filter for newsletter tasks
+  // Filter for newsletter tasks - hide completed ones
   const newsletterTasks = useMemo(() => {
     if (!taskData?.tasks) return [];
-    return taskData.tasks.filter(task => task.category === 'newsletter');
+    return taskData.tasks.filter(task => task.category === 'newsletter' && task.status !== 'done');
   }, [taskData?.tasks]);
 
   const handleToggleRead = async (task: Task) => {
@@ -167,12 +167,12 @@ const Newsletters: React.FC = () => {
                       {/* Show only summary without extra noise - clean newsletter format */}
                       <div style={{
                         fontSize: '15px',
-                        color: isDone ? '#6c757d' : '#00E6FF',
+                        color: isDone ? '#6c757d' : '#D8D8E8',
                         lineHeight: '1.7',
                         whiteSpace: 'pre-wrap',
                       }}>
                         {/* Clean up description - remove email headers and format paragraphs */}
-                        {task.description.split('\n\n').map((paragraph, idx) => {
+                        {task.description?.split('\n\n').map((paragraph, idx) => {
                           const trimmedPara = paragraph.trim();
                           
                           // Skip email headers and metadata

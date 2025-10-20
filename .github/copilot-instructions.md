@@ -121,11 +121,74 @@ This is an intelligent email management system that helps users process, categor
 ### Directory Structure
 
 - `src/` - Core application code
-- `test/` - Unit and integration tests
+- `backend/` - FastAPI backend services
+- `frontend/` - React frontend application
+- `electron/` - Electron desktop wrapper
+- `test/` - Unit and integration tests for src/
+- `backend/tests/` - Backend API tests
 - `prompts/` - AI prompt templates
-- `docs/` - Documentation and guides
+- `docs/` - Documentation and guides (organized by category)
+- `scripts/` - Reusable setup and utility scripts
 - `runtime_data/` - Generated data and temporary files
 - `user_specific_data/` - User configuration and personalization
+- `todo/` - Development task tracking (DO NOT MODIFY)
+
+### Documentation Organization
+
+**CRITICAL: All documentation must go in the `docs/` folder in the correct subfolder:**
+
+- **docs/features/** - Feature-specific guides (UI features, deduplication, analysis, etc.)
+- **docs/setup/** - Setup and configuration guides (OAuth, Graph API, Electron, etc.)
+- **docs/technical/** - Technical documentation (architecture, COM integration, APIs)
+- **docs/troubleshooting/** - Diagnostic and troubleshooting guides
+
+**Root-level docs:** Only `README.md`, `QUICK_START.md`, and `LICENSE` should be in root.
+
+**NEVER create these files:**
+- Implementation summaries (e.g., `*_IMPLEMENTATION_SUMMARY.md`, `FIXES_COMPLETED.md`, `*_SUMMARY.md`)
+- Completion reports (e.g., `*_COMPLETE.md`, `*_DONE.md`)
+- Temporary notes (e.g., `COMMIT_MESSAGE.txt`, `AI_SERVICE_FIX_SUMMARY.md`)
+- Progress reports or task completion logs
+- Status documents (e.g., `FIXES_COMPLETED.md`, `PROGRESS.md`)
+
+**CRITICAL:** NEVER EVER create summary files, completion reports, or progress documents. This includes files in `runtime_data/` or any other directory. Implementation details belong in git commits and code comments ONLY.
+
+**Why:** Implementation details belong in code comments and git history, not as separate summary documents. If documentation is needed, add it to the appropriate feature or technical doc.
+
+### Script Organization
+
+**Reusable scripts go in `scripts/`:**
+- Setup scripts (Azure OAuth, OpenAI, user templates)
+- Utility scripts (accuracy reports, diagnostics)
+- Deployment scripts (localhost startup, prerequisite checks)
+
+**One-off scripts belong NOWHERE - delete them:**
+- Database migration scripts (run once, then delete)
+- Manual test scripts (use proper test framework instead)
+- Diagnostic scripts (convert to proper troubleshooting docs)
+- Fix scripts (apply fix, commit, delete script)
+
+**Root-level scripts are ONLY for:**
+- Application entry points (`email_manager_main.py`, `run_backend.py`)
+- App launchers (`launch-desktop.ps1`, `restart-app.ps1`)
+### Test Organization
+
+**Proper test locations:**
+- `test/` - Tests for `src/` modules (legacy desktop app)
+- `backend/tests/` - Tests for `backend/` API and services
+- `frontend/tests/` - Tests for React frontend components
+
+**NEVER create these in root:**
+- `test_*.py` files outside test directories
+- `check_*.py` diagnostic scripts
+- `fix_*.py` one-off fix scripts
+- `manual_*.py` manual testing scripts
+
+**If you need to test something:**
+1. Write a proper test in the appropriate test directory
+2. Use existing test frameworks and patterns
+3. Follow test naming conventions
+4. Run tests with `pytest` or existing test runners
 
 ### Naming Conventions
 
@@ -133,6 +196,7 @@ This is an intelligent email management system that helps users process, categor
 - Use descriptive names that indicate purpose
 - Group related functionality in appropriately named modules
 - Keep file names concise but clear
+- Avoid prefixes like `test_`, `fix_`, `check_` in root directory
 
 ## Common Patterns
 
@@ -197,11 +261,29 @@ def call_ai_service(prompt, data):
 1. Create feature branches for new functionality
 2. Write tests before implementing features (TDD when appropriate)
 3. **RUN AND VERIFY ALL TESTS PASS** - Execute the test suite frequently during development
-4. Update documentation for public APIs
+4. Update documentation **in the appropriate docs/ subfolder** for new features
 5. Test integration with existing components
 6. **Run full test suite before commits** - Ensure nothing is broken
 7. Submit pull requests with clear descriptions
 8. **Include test results in PR descriptions** - Show that tests pass and cover new functionality
+
+### Documentation Guidelines During Development
+
+**When adding new features:**
+- Update existing docs in `docs/features/` if the feature already has documentation
+- Create new docs in `docs/features/` only for major user-facing features
+- Add technical details to `docs/technical/` if architecture changes
+
+**NEVER create:**
+- Summary files about what you just did (use git commit messages instead)
+- Implementation reports (document in code comments and technical docs)
+- Temporary notes or completion checklists (use todo/ or issue tracker)
+
+**Version control tells the story:**
+- Git commits explain what changed and why
+- Git history shows implementation progress
+- Code comments explain how it works
+- Official docs explain how to use it
 
 ## Debugging Tips
 

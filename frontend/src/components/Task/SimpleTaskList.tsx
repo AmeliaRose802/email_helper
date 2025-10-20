@@ -177,13 +177,11 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
   };
 
   const groupedTasks = {
-    'Required Personal Actions': tasks.filter(t => t.category?.includes('required') && !t.category?.includes('team')),
-    'Team Actions': tasks.filter(t => t.category?.includes('team')),
-    'Optional Actions': tasks.filter(t => t.category?.includes('optional') && !t.category?.includes('event') && !t.category?.includes('job')),
-    'Job Listings': tasks.filter(t => t.category?.includes('job')),
-    'Events': tasks.filter(t => t.category?.includes('event')),
-    'Newsletters': tasks.filter(t => t.category === 'newsletter'),
-    'FYI': tasks.filter(t => t.category === 'fyi'),
+    'Required Personal Actions': tasks.filter(t => t.category?.includes('required') && !t.category?.includes('team') && t.category !== 'newsletter' && t.category !== 'fyi'),
+    'Team Actions': tasks.filter(t => t.category?.includes('team') && t.category !== 'newsletter' && t.category !== 'fyi'),
+    'Optional Actions': tasks.filter(t => t.category?.includes('optional') && !t.category?.includes('event') && !t.category?.includes('job') && t.category !== 'newsletter' && t.category !== 'fyi'),
+    'Job Listings': tasks.filter(t => t.category?.includes('job') && t.category !== 'newsletter' && t.category !== 'fyi'),
+    'Events': tasks.filter(t => t.category?.includes('event') && t.category !== 'newsletter' && t.category !== 'fyi'),
     'Other': tasks.filter(t => !t.category || (!t.category.includes('required') && !t.category.includes('team') && !t.category.includes('optional') && !t.category.includes('job') && !t.category.includes('event') && t.category !== 'newsletter' && t.category !== 'fyi'))
   };
 
@@ -278,7 +276,7 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
                     )}
                   </div>
 
-                  {/* Description */}
+                  {/* Description - Show AI summary or shortened version */}
                   {task.description && (
                     <div
                       style={{
@@ -289,7 +287,14 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
                         wordBreak: 'break-word'
                       }}
                     >
-                      {task.description}
+                      {/* Show only first paragraph or first 200 chars for readability */}
+                      {(() => {
+                        const firstParagraph = task.description.split('\n\n')[0];
+                        const shortDescription = firstParagraph.length > 200 
+                          ? firstParagraph.substring(0, 200) + '...'
+                          : firstParagraph;
+                        return shortDescription;
+                      })()}
                     </div>
                   )}
 
