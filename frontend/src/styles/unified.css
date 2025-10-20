@@ -2902,3 +2902,484 @@ button:disabled, a:disabled {
   gap: 4px;
   cursor: pointer;
 }
+
+/* ============================================
+   PAGE CONTAINER STYLES
+   ============================================ */
+.page-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #f8f9fa;
+  padding: 24px;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #333;
+}
+
+.page-stats {
+  font-size: 14px;
+  color: #6c757d;
+  margin-top: 8px;
+}
+
+.page-content {
+  flex: 1;
+  background-color: #fff;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+/* ============================================
+   FYI PAGE STYLES
+   ============================================ */
+.fyi-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px 16px;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  opacity: 1;
+}
+
+.fyi-item--done {
+  background-color: #f5f5f5;
+  border-color: #d0d0d0;
+  opacity: 0.6;
+}
+
+.fyi-item__checkbox {
+  width: 16px;
+  height: 16px;
+  margin-right: 12px;
+  margin-top: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.fyi-item__content {
+  flex: 1;
+}
+
+.fyi-item__text {
+  font-size: 15px;
+  color: #D8D8E8;
+  line-height: 1.6;
+}
+
+.fyi-item__text--done {
+  color: #6c757d;
+  text-decoration: line-through;
+}
+
+.fyi-item__line {
+  margin-bottom: 4px;
+  padding-left: 0;
+}
+
+.fyi-item__bullet {
+  margin-right: 8px;
+}
+
+.fyi-item__delete-btn {
+  padding: 4px 8px;
+  background-color: transparent;
+  border: 1px solid #dc3545;
+  border-radius: 4px;
+  color: #dc3545;
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.fyi-item__delete-btn:hover {
+  background-color: #dc3545;
+  color: white;
+}
+
+/* ============================================
+   NEWSLETTER PAGE STYLES
+   ============================================ */
+.newsletter-item {
+  padding: 16px;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+
+.newsletter-item--done {
+  background-color: #f5f5f5;
+  border-color: #d0d0d0;
+  opacity: 0.7;
+}
+
+.newsletter-item__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.newsletter-item__checkbox {
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.newsletter-item__content {
+  flex: 1;
+}
+
+.newsletter-item__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.newsletter-item__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.newsletter-item__title--done {
+  color: #6c757d;
+  text-decoration: line-through;
+}
+
+.newsletter-item__delete-btn {
+  padding: 4px 8px;
+  background-color: transparent;
+  border: 1px solid #dc3545;
+  border-radius: 4px;
+  color: #dc3545;
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.newsletter-item__delete-btn:hover {
+  background-color: #dc3545;
+  color: white;
+}
+
+.newsletter-item__summary {
+  font-size: 14px;
+  color: #D8D8E8;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.newsletter-item__summary--done {
+  color: #6c757d;
+  text-decoration: line-through;
+}
+
+.newsletter-item__highlights {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-left: 3px solid #007acc;
+  border-radius: 4px;
+}
+
+.newsletter-item__highlights-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #007acc;
+  margin-bottom: 8px;
+}
+
+.newsletter-item__highlights-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.newsletter-item__highlight {
+  font-size: 13px;
+  color: #495057;
+  margin-bottom: 6px;
+  line-height: 1.5;
+}
+
+/* ========================================
+   ACCURACY DASHBOARD STYLES
+   ======================================== */
+
+/* Overall Accuracy Card */
+.accuracy-overall-card {
+  background-color: #fff;
+  border-radius: 12px;
+  border: 2px solid #007acc;
+  padding: 24px;
+  margin-bottom: 24px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.accuracy-overall-card__icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.accuracy-overall-card__percentage {
+  font-size: 48px;
+  font-weight: 700;
+  color: #007acc;
+  margin: 8px 0;
+}
+
+.accuracy-overall-card__label {
+  font-size: 18px;
+  color: #6c757d;
+  margin: 0;
+}
+
+.accuracy-overall-card__count {
+  font-size: 14px;
+  color: #8A8886;
+  margin-top: 8px;
+}
+
+/* Stats Grid */
+.accuracy-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Stat Card */
+.accuracy-stat-card {
+  background-color: #fff;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.accuracy-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Accuracy level border colors */
+.accuracy-stat-card--excellent {
+  border-left: 4px solid #28a745;
+}
+
+.accuracy-stat-card--good {
+  border-left: 4px solid #17a2b8;
+}
+
+.accuracy-stat-card--fair {
+  border-left: 4px solid #ffc107;
+}
+
+.accuracy-stat-card--poor {
+  border-left: 4px solid #fd7e14;
+}
+
+.accuracy-stat-card--needs-improvement {
+  border-left: 4px solid #dc3545;
+}
+
+.accuracy-stat-card__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.accuracy-stat-card__percentage {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.accuracy-stat-card__percentage--excellent {
+  color: #28a745;
+}
+
+.accuracy-stat-card__percentage--good {
+  color: #17a2b8;
+}
+
+.accuracy-stat-card__percentage--fair {
+  color: #ffc107;
+}
+
+.accuracy-stat-card__percentage--poor {
+  color: #fd7e14;
+}
+
+.accuracy-stat-card__percentage--needs-improvement {
+  color: #dc3545;
+}
+
+.accuracy-stat-card__fraction {
+  font-size: 14px;
+  color: #6c757d;
+  margin-bottom: 12px;
+}
+
+/* ML Metrics Grid */
+.accuracy-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.accuracy-metric {
+  text-align: center;
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.accuracy-metric--precision,
+.accuracy-metric--recall {
+  background-color: #f0f8ff;
+}
+
+.accuracy-metric--f1 {
+  background-color: #e7f3e7;
+}
+
+.accuracy-metric__label {
+  font-weight: 600;
+}
+
+.accuracy-metric__label--precision,
+.accuracy-metric__label--recall {
+  color: #007acc;
+}
+
+.accuracy-metric__label--f1 {
+  color: #28a745;
+}
+
+.accuracy-metric__value {
+  color: #495057;
+}
+
+/* Progress Bar */
+.accuracy-progress-bar {
+  width: 100%;
+  height: 6px;
+  background-color: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.accuracy-progress-bar__fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.accuracy-progress-bar__fill--excellent {
+  background-color: #28a745;
+}
+
+.accuracy-progress-bar__fill--good {
+  background-color: #17a2b8;
+}
+
+.accuracy-progress-bar__fill--fair {
+  background-color: #ffc107;
+}
+
+.accuracy-progress-bar__fill--poor {
+  background-color: #fd7e14;
+}
+
+.accuracy-progress-bar__fill--needs-improvement {
+  background-color: #dc3545;
+}
+
+/* Confusion Matrix Summary */
+.accuracy-confusion-summary {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #8A8886;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Legend */
+.accuracy-legend {
+  margin-top: 24px;
+  padding: 16px;
+  background-color: #fff;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.accuracy-legend__title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.accuracy-legend__items {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.accuracy-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.accuracy-legend__color-box {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.accuracy-legend__color-box--excellent {
+  background-color: #28a745;
+}
+
+.accuracy-legend__color-box--good {
+  background-color: #17a2b8;
+}
+
+.accuracy-legend__color-box--fair {
+  background-color: #ffc107;
+}
+
+.accuracy-legend__color-box--poor {
+  background-color: #fd7e14;
+}
+
+.accuracy-legend__color-box--needs-improvement {
+  background-color: #dc3545;
+}
+
+.accuracy-legend__label {
+  font-size: 12px;
+  color: #6c757d;
+}

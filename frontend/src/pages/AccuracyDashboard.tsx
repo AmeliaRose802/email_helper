@@ -79,229 +79,130 @@ const AccuracyDashboard: React.FC = () => {
     fetchAccuracyStats();
   }, []);
 
-  const containerStyle = {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    height: '100%',
-    backgroundColor: '#f8f9fa',
-    padding: '24px',
-  };
-
-  const headerStyle = {
-    marginBottom: '24px',
-  };
-
-  const titleStyle = {
-    margin: 0,
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: '16px',
-  };
-
-  const overallCardStyle = {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    border: '2px solid #007acc',
-    padding: '24px',
-    marginBottom: '24px',
-    textAlign: 'center' as const,
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-  };
-
-  const gridStyle = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: '16px',
-    flex: 1,
-    overflowY: 'auto' as const,
-  };
-
-  const statCardStyle = (accuracy: number) => ({
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    border: '1px solid #e0e0e0',
-    padding: '20px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-    transition: 'all 0.2s ease',
-    cursor: 'pointer',
-    borderLeft: `4px solid ${
-      accuracy >= 95 ? '#28a745' :
-      accuracy >= 90 ? '#17a2b8' :
-      accuracy >= 85 ? '#ffc107' :
-      accuracy >= 80 ? '#fd7e14' : '#dc3545'
-    }`,
-  });
-
-  const getAccuracyColor = (accuracy: number) => {
-    if (accuracy >= 95) return '#28a745';
-    if (accuracy >= 90) return '#17a2b8';
-    if (accuracy >= 85) return '#ffc107';
-    if (accuracy >= 80) return '#fd7e14';
-    return '#dc3545';
+  const getAccuracyLevel = (accuracy: number): string => {
+    if (accuracy >= 95) return 'excellent';
+    if (accuracy >= 90) return 'good';
+    if (accuracy >= 85) return 'fair';
+    if (accuracy >= 80) return 'poor';
+    return 'needs-improvement';
   };
 
   if (isLoading) {
     return (
-      <div style={containerStyle}>
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📊</div>
-          <h2 style={{ marginBottom: '8px', color: '#495057' }}>Loading Accuracy Stats</h2>
-          <p style={{ color: '#6c757d' }}>Please wait...</p>
+      <div className="page-container">
+        <div className="loading-container">
+          <div className="loading-container__icon">📊</div>
+          <h2 className="loading-container__title">Loading Accuracy Stats</h2>
+          <p className="loading-container__message">Please wait...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={containerStyle}>
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>📊 Accuracy Dashboard</h1>
-        <p style={{ color: '#6c757d', margin: 0 }}>
+    <div className="page-container">
+      <div className="page-header">
+        <h1 className="page-title">📊 Accuracy Dashboard</h1>
+        <p className="page-stats">
           AI classification accuracy statistics
         </p>
       </div>
 
       {/* Overall Accuracy */}
-      <div style={overallCardStyle}>
-        <div style={{ fontSize: '48px', marginBottom: '8px' }}>🎯</div>
-        <h2 style={{ fontSize: '48px', fontWeight: '700', color: '#007acc', margin: '8px 0' }}>
+      <div className="accuracy-overall-card">
+        <div className="accuracy-overall-card__icon">🎯</div>
+        <h2 className="accuracy-overall-card__percentage">
           {overallAccuracy.toFixed(1)}%
         </h2>
-        <p style={{ fontSize: '18px', color: '#6c757d', margin: 0 }}>
+        <p className="accuracy-overall-card__label">
           Overall Classification Accuracy
         </p>
-        <p style={{ fontSize: '14px', color: '#8A8886', marginTop: '8px' }}>
+        <p className="accuracy-overall-card__count">
           Based on {stats.reduce((sum, stat) => sum + stat.total, 0)} classified emails
         </p>
       </div>
 
       {/* Category Stats Grid */}
-      <div style={gridStyle}>
-        {stats.map((stat) => (
-          <div
-            key={stat.category}
-            style={statCardStyle(stat.accuracy)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-            }}
-          >
-            <h3 style={{ 
-              fontSize: '16px', 
-              fontWeight: '600', 
-              color: '#333',
-              marginBottom: '12px',
-            }}>
-              {stat.category}
-            </h3>
-            
-            <div style={{ 
-              fontSize: '32px', 
-              fontWeight: '700', 
-              color: getAccuracyColor(stat.accuracy),
-              marginBottom: '8px',
-            }}>
-              {stat.accuracy.toFixed(1)}%
-            </div>
-            
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#6c757d',
-              marginBottom: '12px',
-            }}>
-              {stat.correct} / {stat.total} correct
-            </div>
-            
-            {/* ML Metrics */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '8px',
-              marginBottom: '12px',
-              fontSize: '12px',
-            }}>
-              <div style={{ textAlign: 'center', padding: '6px', backgroundColor: '#f0f8ff', borderRadius: '4px' }}>
-                <div style={{ fontWeight: '600', color: '#007acc' }}>Precision</div>
-                <div style={{ color: '#495057' }}>{stat.precision.toFixed(1)}%</div>
+      <div className="accuracy-stats-grid">
+        {stats.map((stat) => {
+          const level = getAccuracyLevel(stat.accuracy);
+          return (
+            <div
+              key={stat.category}
+              className={`accuracy-stat-card accuracy-stat-card--${level}`}
+            >
+              <h3 className="accuracy-stat-card__title">
+                {stat.category}
+              </h3>
+              
+              <div className={`accuracy-stat-card__percentage accuracy-stat-card__percentage--${level}`}>
+                {stat.accuracy.toFixed(1)}%
               </div>
-              <div style={{ textAlign: 'center', padding: '6px', backgroundColor: '#f0f8ff', borderRadius: '4px' }}>
-                <div style={{ fontWeight: '600', color: '#007acc' }}>Recall</div>
-                <div style={{ color: '#495057' }}>{stat.recall.toFixed(1)}%</div>
+              
+              <div className="accuracy-stat-card__fraction">
+                {stat.correct} / {stat.total} correct
               </div>
-              <div style={{ textAlign: 'center', padding: '6px', backgroundColor: '#e7f3e7', borderRadius: '4px' }}>
-                <div style={{ fontWeight: '600', color: '#28a745' }}>F1</div>
-                <div style={{ color: '#495057' }}>{stat.f1.toFixed(1)}%</div>
+            
+              {/* ML Metrics */}
+              <div className="accuracy-metrics-grid">
+                <div className="accuracy-metric accuracy-metric--precision">
+                  <div className="accuracy-metric__label accuracy-metric__label--precision">Precision</div>
+                  <div className="accuracy-metric__value">{stat.precision.toFixed(1)}%</div>
+                </div>
+                <div className="accuracy-metric accuracy-metric--recall">
+                  <div className="accuracy-metric__label accuracy-metric__label--recall">Recall</div>
+                  <div className="accuracy-metric__value">{stat.recall.toFixed(1)}%</div>
+                </div>
+                <div className="accuracy-metric accuracy-metric--f1">
+                  <div className="accuracy-metric__label accuracy-metric__label--f1">F1</div>
+                  <div className="accuracy-metric__value">{stat.f1.toFixed(1)}%</div>
+                </div>
+              </div>
+              
+              {/* Progress bar */}
+              <div className="accuracy-progress-bar">
+                <div 
+                  className={`accuracy-progress-bar__fill accuracy-progress-bar__fill--${level}`}
+                  style={{ width: `${stat.accuracy}%` }}
+                />
+              </div>
+              
+              {/* Confusion Matrix Mini Summary */}
+              <div className="accuracy-confusion-summary">
+                <span>TP: {stat.truePositives}</span>
+                <span>FP: {stat.falsePositives}</span>
+                <span>FN: {stat.falseNegatives}</span>
               </div>
             </div>
-            
-            {/* Progress bar */}
-            <div style={{
-              width: '100%',
-              height: '6px',
-              backgroundColor: '#e0e0e0',
-              borderRadius: '3px',
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                width: `${stat.accuracy}%`,
-                height: '100%',
-                backgroundColor: getAccuracyColor(stat.accuracy),
-                transition: 'width 0.3s ease',
-              }} />
-            </div>
-            
-            {/* Confusion Matrix Mini Summary */}
-            <div style={{
-              marginTop: '8px',
-              fontSize: '11px',
-              color: '#8A8886',
-              display: 'flex',
-              justifyContent: 'space-between',
-            }}>
-              <span>TP: {stat.truePositives}</span>
-              <span>FP: {stat.falsePositives}</span>
-              <span>FN: {stat.falseNegatives}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Legend */}
-      <div style={{
-        marginTop: '24px',
-        padding: '16px',
-        backgroundColor: '#fff',
-        borderRadius: '8px',
-        border: '1px solid #e0e0e0',
-      }}>
-        <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: '#333' }}>
+      <div className="accuracy-legend">
+        <h4 className="accuracy-legend__title">
           Accuracy Rating Legend:
         </h4>
-        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' as const }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#28a745', borderRadius: '2px' }} />
-            <span style={{ fontSize: '12px', color: '#6c757d' }}>Excellent (95%+)</span>
+        <div className="accuracy-legend__items">
+          <div className="accuracy-legend__item">
+            <div className="accuracy-legend__color-box accuracy-legend__color-box--excellent" />
+            <span className="accuracy-legend__label">Excellent (95%+)</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#17a2b8', borderRadius: '2px' }} />
-            <span style={{ fontSize: '12px', color: '#6c757d' }}>Good (90-94%)</span>
+          <div className="accuracy-legend__item">
+            <div className="accuracy-legend__color-box accuracy-legend__color-box--good" />
+            <span className="accuracy-legend__label">Good (90-94%)</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#ffc107', borderRadius: '2px' }} />
-            <span style={{ fontSize: '12px', color: '#6c757d' }}>Fair (85-89%)</span>
+          <div className="accuracy-legend__item">
+            <div className="accuracy-legend__color-box accuracy-legend__color-box--fair" />
+            <span className="accuracy-legend__label">Fair (85-89%)</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#fd7e14', borderRadius: '2px' }} />
-            <span style={{ fontSize: '12px', color: '#6c757d' }}>Poor (80-84%)</span>
+          <div className="accuracy-legend__item">
+            <div className="accuracy-legend__color-box accuracy-legend__color-box--poor" />
+            <span className="accuracy-legend__label">Poor (80-84%)</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#dc3545', borderRadius: '2px' }} />
-            <span style={{ fontSize: '12px', color: '#6c757d' }}>Needs Improvement (&lt;80%)</span>
+          <div className="accuracy-legend__item">
+            <div className="accuracy-legend__color-box accuracy-legend__color-box--needs-improvement" />
+            <span className="accuracy-legend__label">Needs Improvement (&lt;80%)</span>
           </div>
         </div>
       </div>

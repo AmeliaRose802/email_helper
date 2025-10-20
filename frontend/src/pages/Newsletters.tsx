@@ -46,38 +46,13 @@ const Newsletters: React.FC = () => {
     }
   };
 
-  const containerStyle = {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    height: '100%',
-    backgroundColor: '#f8f9fa',
-    padding: '24px',
-  };
-
-  const headerStyle = {
-    marginBottom: '24px',
-  };
-
-  const titleStyle = {
-    margin: 0,
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#333',
-  };
-
-  const statsStyle = {
-    fontSize: '14px',
-    color: '#6c757d',
-    marginTop: '8px',
-  };
-
   if (isLoading) {
     return (
-      <div style={containerStyle}>
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📰</div>
-          <h2 style={{ marginBottom: '8px', color: '#495057' }}>Loading Newsletters</h2>
-          <p style={{ color: '#6c757d' }}>Please wait...</p>
+      <div className="page-container">
+        <div className="loading-container">
+          <div className="loading-container__icon">📰</div>
+          <h2 className="loading-container__title">Loading Newsletters</h2>
+          <p className="loading-container__message">Please wait...</p>
         </div>
       </div>
     );
@@ -85,21 +60,13 @@ const Newsletters: React.FC = () => {
 
   if (error) {
     return (
-      <div style={containerStyle}>
-        <div style={{ textAlign: 'center', color: '#dc3545', padding: '40px' }}>
-          <div style={{ fontSize: '24px', marginBottom: '8px' }}>⚠️</div>
+      <div className="page-container">
+        <div className="error-container">
+          <div className="text-2xl mb-sm">⚠️</div>
           <div>Error loading newsletters</div>
           <button 
             onClick={refetch}
-            style={{
-              marginTop: '16px',
-              padding: '8px 16px',
-              backgroundColor: '#007acc',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
+            className="synthwave-button mt-md"
           >
             Retry
           </button>
@@ -109,68 +76,40 @@ const Newsletters: React.FC = () => {
   }
 
   return (
-    <div style={containerStyle}>
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>📰 Newsletters</h1>
-        <div style={statsStyle}>
+    <div className="page-container">
+      <div className="page-header">
+        <h1 className="page-title">📰 Newsletters</h1>
+        <div className="page-stats">
           {newsletterTasks.length} newsletter{newsletterTasks.length !== 1 ? 's' : ''}
         </div>
       </div>
 
-      <div style={{ 
-        flex: 1,
-        backgroundColor: '#fff',
-        borderRadius: '8px',
-        border: '1px solid #e0e0e0',
-        padding: '16px',
-        overflowY: 'auto' as const,
-      }}>
+      <div className="page-content">
         {newsletterTasks.length === 0 ? (
-          <div style={{ 
-            padding: '48px 24px',
-            textAlign: 'center',
-            color: '#6c757d'
-          }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
-            <div style={{ fontSize: '18px', marginBottom: '8px' }}>No newsletters yet</div>
-            <div style={{ fontSize: '14px' }}>Extract tasks from emails to see newsletter summaries here</div>
+          <div className="empty-state">
+            <div className="empty-state__icon">📭</div>
+            <div className="empty-state__title">No newsletters yet</div>
+            <div className="empty-state__description">Extract tasks from emails to see newsletter summaries here</div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="flex-column gap-16">
             {newsletterTasks.map((task) => {
               const isDone = task.status === 'done';
               return (
                 <div
                   key={task.id}
-                  style={{
-                    padding: '16px',
-                    backgroundColor: isDone ? '#f5f5f5' : '#fff',
-                    border: `1px solid ${isDone ? '#d0d0d0' : '#e0e0e0'}`,
-                    borderRadius: '8px',
-                    opacity: isDone ? 0.6 : 1,
-                  }}
+                  className={`newsletter-item ${isDone ? 'newsletter-item--done' : ''}`}
                 >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <div className="newsletter-item__header">
                     <input
                       type="checkbox"
                       checked={isDone}
                       onChange={() => handleToggleRead(task)}
-                      style={{
-                        width: '18px',
-                        height: '18px',
-                        marginTop: '4px',
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                      }}
+                      className="newsletter-item__checkbox"
                     />
-                    <div style={{ flex: 1 }}>
+                    <div className="newsletter-item__content">
                       {/* Show only summary without extra noise - clean newsletter format */}
-                      <div style={{
-                        fontSize: '15px',
-                        color: isDone ? '#6c757d' : '#D8D8E8',
-                        lineHeight: '1.7',
-                        whiteSpace: 'pre-wrap',
-                      }}>
+                      <div className="newsletter-item__summary">
                         {/* Clean up description - remove email headers and format paragraphs */}
                         {task.description?.split('\n\n').map((paragraph, idx) => {
                           const trimmedPara = paragraph.trim();
@@ -184,10 +123,8 @@ const Newsletters: React.FC = () => {
                           if (!trimmedPara) return null;
                           
                           return (
-                            <p key={idx} style={{ 
-                              margin: idx === 0 ? '0 0 12px 0' : '12px 0',
-                              color: isDone ? '#6c757d' : '#D8D8E8',
-                              textDecoration: isDone ? 'line-through' : 'none',
+                            <p key={idx} className={`newsletter-item__summary ${isDone ? 'newsletter-item__summary--done' : ''}`} style={{
+                              margin: idx === 0 ? '0 0 12px 0' : '12px 0'
                             }}>
                               {trimmedPara}
                             </p>
@@ -197,29 +134,13 @@ const Newsletters: React.FC = () => {
                       
                       {/* Show key points if available */}
                       {task.metadata?.key_points && Array.isArray(task.metadata.key_points) && (task.metadata.key_points as unknown as string[]).length > 0 ? (
-                        <div style={{ 
-                          marginTop: '16px',
-                          padding: '12px',
-                          background: 'rgba(0, 230, 255, 0.05)',
-                          borderLeft: '3px solid var(--synthwave-cyan)',
-                          borderRadius: '4px'
-                        }}>
-                          <strong style={{ 
-                            fontSize: '13px', 
-                            color: 'var(--synthwave-cyan)',
-                            display: 'block',
-                            marginBottom: '8px'
-                          }}>
+                        <div className="newsletter-item__highlights">
+                          <strong className="newsletter-item__highlights-title">
                             Key Takeaways:
                           </strong>
-                          <ul style={{ margin: '0', paddingLeft: '20px' }}>
+                          <ul className="newsletter-item__highlights-list">
                             {(task.metadata.key_points as unknown as string[]).map((point: string, idx: number) => (
-                              <li key={idx} style={{ 
-                                fontSize: '14px', 
-                                marginBottom: '6px',
-                                color: '#A1A1B5',
-                                lineHeight: '1.5'
-                              }}>
+                              <li key={idx} className="newsletter-item__highlight">
                                 {String(point)}
                               </li>
                             ))}
@@ -229,16 +150,7 @@ const Newsletters: React.FC = () => {
                     </div>
                     <button
                       onClick={() => handleDelete(task.id)}
-                      style={{
-                        padding: '4px 8px',
-                        backgroundColor: 'transparent',
-                        border: '1px solid #dc3545',
-                        borderRadius: '4px',
-                        color: '#dc3545',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        flexShrink: 0,
-                      }}
+                      className="newsletter-item__delete-btn"
                       title="Delete"
                     >
                       🗑️
