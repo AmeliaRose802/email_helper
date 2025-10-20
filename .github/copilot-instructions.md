@@ -34,6 +34,16 @@ This is an intelligent email management system that helps users process, categor
 - Use descriptive variable and function names
 - Prefer composition over inheritance
 
+### Frontend Style (React/TypeScript)
+
+- **NEVER use inline styles** - All styling must be in CSS files
+- Use CSS classes from `frontend/src/styles/unified.css` for all component styling
+- Follow BEM naming convention for new CSS classes (e.g., `.component-name__element--modifier`)
+- Keep component-specific styles grouped together in the CSS file with clear section headers
+- Use CSS custom properties (variables) for colors, spacing, and other design tokens
+- Only use inline styles for truly dynamic values that cannot be expressed in CSS (e.g., calculated widths based on runtime data)
+- When creating new components, add corresponding CSS classes to `unified.css` first, then reference them in the component
+
 ### Error Handling
 
 - Use try-catch blocks for external API calls

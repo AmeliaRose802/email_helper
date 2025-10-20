@@ -227,28 +227,41 @@ class OutlookManager:
         except Exception as e:
             print(f"⚠️  Could not add category to email: {e}")
     
-    def get_recent_emails(self, days_back=7, max_emails=10000):
-        """Get recent emails from inbox"""
+    def get_recent_emails(self, days_back=None, max_emails=10000):
+        """Get recent emails from inbox
+        
+        Args:
+            days_back: Number of days to look back. If None, fetches ALL emails.
+            max_emails: Maximum number of emails to fetch (soft limit for small requests)
+        """
         if not self.inbox:
             raise Exception("Not connected to Outlook. Call connect_to_outlook() first.")
             
-        cutoff_date = datetime.now() - timedelta(days=days_back)
+        # Only apply date cutoff if specified
+        cutoff_date = datetime.now() - timedelta(days=days_back) if days_back else None
         
         recent_emails = []
         for item in self.inbox.Items:
             try:
                 # Only process MailItem objects (Class = 43)
                 if hasattr(item, 'Class') and item.Class == 43:
-                    if hasattr(item, 'ReceivedTime'):
-                        if item.ReceivedTime.replace(tzinfo=None) >= cutoff_date:
-                            recent_emails.append(item)
-                            if len(recent_emails) >= max_emails * 2:
-                                break
+                    # Check if we should apply date filtering
+                    should_include = True
+                    if cutoff_date is not None and hasattr(item, 'ReceivedTime'):
+                        # Only filter by date if cutoff is specified AND item has ReceivedTime
+                        should_include = item.ReceivedTime.replace(tzinfo=None) >= cutoff_date
+                    
+                    if should_include:
+                        recent_emails.append(item)
+                        # Only limit if max_emails is reasonable (< 50000)
+                        # For large requests, let it fetch everything
+                        if max_emails < 50000 and len(recent_emails) >= max_emails:
+                            break
             except Exception as e:
                 # Skip items that cause errors
                 continue
         
-        return recent_emails[:max_emails * 2]  # Get more emails to account for thread consolidation
+        return recent_emails  # Return all fetched emails
     
     def get_emails_with_full_conversations(self, days_back=7, max_emails=10000):
         """Get recent emails and include their full conversation threads"""
@@ -287,15 +300,16 @@ class OutlookManager:
                 if extended_cutoff is None or email_date >= extended_cutoff:
                     all_relevant_emails.append(email)
                 
-                # Limit processing to prevent slowdown
-                if len(recent_emails) >= max_emails * 2:
+                # For large requests, fetch everything without arbitrary limits
+                # Only limit for smaller requests to prevent slowdown
+                if max_emails < 50000 and len(recent_emails) >= max_emails:
                     break
                     
             except Exception:
                 continue
         
-        # Limit all_relevant_emails
-        all_relevant_emails = all_relevant_emails[:max_emails * 5]
+        # Keep all relevant emails for thread matching - no arbitrary 5x limit
+        # Thread consolidation will reduce the final count naturally
         
         if not recent_emails:
             return []

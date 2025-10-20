@@ -89,14 +89,8 @@ export const EmailItem: React.FC<EmailItemProps> = ({
   
   return (
     <div
-      className={`synthwave-email-item ${!email.is_read ? 'unread' : ''} ${isSelected ? 'selected' : ''} ${className}`}
+      className={`synthwave-email-item email-item__container ${!email.is_read ? 'unread' : ''} ${isSelected ? 'selected' : ''} ${className}`}
       onClick={handleClick}
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '12px',
-        cursor: 'pointer',
-      }}
     >
       {/* Selection checkbox */}
       <input
@@ -105,7 +99,7 @@ export const EmailItem: React.FC<EmailItemProps> = ({
         onChange={() => {}}
         onClick={handleCheckboxClick}
         title="Select email"
-        style={{ marginTop: '2px', cursor: 'pointer' }}
+        className="email-item__checkbox"
       />
       
       {/* Email content */}
@@ -151,22 +145,22 @@ export const EmailItem: React.FC<EmailItemProps> = ({
                 </span>
               )}
               {email.holistic_classification.deadline && (
-                <span style={{ fontSize: '11px', color: '#dc3545' }} title="Deadline">
+                <span className="email-item__flag--deadline" title="Deadline">
                   ⏰ {email.holistic_classification.deadline}
                 </span>
               )}
               {email.holistic_classification.blocking_others && (
-                <span style={{ fontSize: '11px', color: '#dc3545' }} title="Blocking other tasks">
+                <span className="email-item__flag--blocking" title="Blocking other tasks">
                   🚫 BLOCKING
                 </span>
               )}
               {email.holistic_classification.is_superseded && (
-                <span style={{ fontSize: '11px', color: '#6c757d', textDecoration: 'line-through' }} title="Superseded by newer email">
+                <span className="email-item__flag--superseded" title="Superseded by newer email">
                   Superseded
                 </span>
               )}
               {email.holistic_classification.is_duplicate && (
-                <span style={{ fontSize: '11px', color: '#6c757d' }} title="Duplicate email">
+                <span className="email-item__flag--duplicate" title="Duplicate email">
                   📋 Duplicate
                 </span>
               )}
@@ -192,34 +186,34 @@ export const EmailItem: React.FC<EmailItemProps> = ({
           
           {/* Priority indicator */}
           {email.importance && email.importance !== 'Normal' && (
-            <span title={`${email.importance} priority`} style={{ fontSize: '12px' }}>
+            <span title={`${email.importance} priority`} className="email-item__icon--priority">
               {getPriorityIcon(typeof email.importance === 'string' ? email.importance.toLowerCase() : 'normal')}
             </span>
           )}
           
           {/* Attachments indicator */}
           {email.has_attachments && (
-            <span title="Has attachments" style={{ fontSize: '12px' }}>
+            <span title="Has attachments" className="email-item__icon--attachment">
               📎
             </span>
           )}
           
           {/* Conversation indicator */}
           {email.conversation_id && (
-            <span title="Part of conversation" style={{ fontSize: '10px', color: '#6c757d' }}>
+            <span title="Part of conversation" className="email-item__icon--conversation">
               💬
             </span>
           )}
           
           {/* Quick classification dropdown */}
           {isLoadingMappings ? (
-            <span style={{ fontSize: '11px', color: '#6c757d', marginLeft: 'auto' }}>
+            <span className="email-item__date">
               Loading...
             </span>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+            <div className="email-item__actions">
               {/* Classification dropdown with visual styling */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div className="email-item__tasks-container">
                 <select
                   value={localCategory}
                   onChange={handleCategoryChange}
@@ -250,14 +244,7 @@ export const EmailItem: React.FC<EmailItemProps> = ({
               </div>
               
               <label 
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  fontSize: '11px', 
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  color: 'var(--synthwave-cyan)'
-                }} 
+                className="email-item__apply-label"
                 title="Apply changes to Outlook folders"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -269,7 +256,7 @@ export const EmailItem: React.FC<EmailItemProps> = ({
                     setApplyToOutlook(e.target.checked);
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  style={{ marginRight: '4px' }}
+                  className="mr-4"
                 />
                 Apply to Outlook
               </label>

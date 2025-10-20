@@ -107,7 +107,10 @@ Analyze this complete inbox context to identify the most relevant action items a
    - Detect actions resolved by subsequent messages; exclude them from "truly_relevant_actions" and list them under "superseded_actions".
 2) Current Relevance:
    - Separate still-needed actions from superseded/expired.
-   - Consider deadlines vs current_date and business impact per job role.
+   - **CRITICAL FOR EXPIRED ITEMS:** Parse ALL dates carefully. If an email mentions an event date or deadline, compare it to current_date ({{current_date}}).
+   - **Only mark as expired if:** event_date < current_date OR deadline_date < current_date (dates in the PAST).
+   - **Do NOT mark as expired if:** event_date > current_date OR deadline_date > current_date (dates in the FUTURE).
+   - Consider business impact per job role.
 3) Priority Ranking:
    - Rank by urgency/impact/dependencies; mark blocking_others where applicable.
 4) Smart Deduplication:

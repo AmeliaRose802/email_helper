@@ -220,6 +220,26 @@ class TestCOMEmailProviderOperations:
         assert exc_info.value.status_code == 401
         assert provider.authenticated is False
     
+    def test_get_emails_large_count(self, authenticated_provider):
+        """Test retrieving large number of emails (50000)."""
+        provider, mock_adapter = authenticated_provider
+        
+        # Simulate successful large fetch
+        large_email_list = [{'id': f'email{i}', 'subject': f'Email {i}'} for i in range(100)]
+        mock_adapter.get_emails.return_value = large_email_list
+        
+        emails = provider.get_emails(folder_name="Inbox", count=50000, offset=0)
+        
+        # Verify adapter was called with correct parameters
+        mock_adapter.get_emails.assert_called_once_with(
+            folder_name="Inbox",
+            count=50000,
+            offset=0
+        )
+        
+        # Verify we got results
+        assert len(emails) > 0
+    
     def test_get_email_content(self, authenticated_provider):
         """Test retrieving email content."""
         provider, mock_adapter = authenticated_provider

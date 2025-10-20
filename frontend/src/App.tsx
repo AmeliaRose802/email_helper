@@ -15,8 +15,8 @@ const App: React.FC = () => {
   } catch (error) {
     console.error('❌ Error in App component:', error);
     return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <h1 style={{ color: 'red' }}>Error Loading App</h1>
+      <div className="error-container">
+        <h1 className="error-container__title">Error Loading App</h1>
         <p>{error instanceof Error ? error.message : String(error)}</p>
       </div>
     );

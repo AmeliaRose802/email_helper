@@ -148,12 +148,12 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
     const now = new Date();
     const diffDays = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     
-    if (diffDays < 0) return <span style={{ color: '#dc3545', fontWeight: 'bold' }}>Overdue</span>;
-    if (diffDays === 0) return <span style={{ color: '#ffc107', fontWeight: 'bold' }}>Today</span>;
-    if (diffDays === 1) return <span style={{ color: '#17a2b8' }}>Tomorrow</span>;
-    if (diffDays <= 7) return <span style={{ color: '#6c757d' }}>In {diffDays} days</span>;
+    if (diffDays < 0) return <span className="simple-task-due-date overdue">Overdue</span>;
+    if (diffDays === 0) return <span className="simple-task-due-date today">Today</span>;
+    if (diffDays === 1) return <span className="simple-task-due-date tomorrow">Tomorrow</span>;
+    if (diffDays <= 7) return <span className="simple-task-due-date upcoming">In {diffDays} days</span>;
     
-    return <span style={{ color: '#6c757d' }}>{date.toLocaleDateString()}</span>;
+    return <span className="simple-task-due-date upcoming">{date.toLocaleDateString()}</span>;
   };
 
   const extractLinks = (task: Task): string[] => {
@@ -192,101 +192,48 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
     const totalCount = groupTasks.length;
 
     return (
-      <div key={groupName} style={{ marginBottom: '32px' }}>
-        <h2 style={{ 
-          fontSize: '20px', 
-          fontWeight: 'bold', 
-          marginBottom: '16px',
-          color: '#333',
-          borderBottom: '2px solid #007acc',
-          paddingBottom: '8px'
-        }}>
+      <div key={groupName} className="task-group">
+        <h2 className="task-group-header">
           {groupName} ({completedCount}/{totalCount} complete)
         </h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div className="task-group-items">
           {groupTasks.map(task => {
             const links = extractLinks(task);
             const isDone = task.status === 'done';
             
+            const taskItemClasses = [
+              'simple-task-item',
+              isDone && !recentlyCompleted.has(task.id) ? 'completed' : '',
+              recentlyCompleted.has(task.id) ? 'recently-completed' : ''
+            ].filter(Boolean).join(' ');
+
             return (
-              <div
-                key={task.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  padding: '12px 16px',
-                  backgroundColor: recentlyCompleted.has(task.id) 
-                    ? '#d4edda' 
-                    : isDone ? '#f0f0f0' : '#fff',
-                  border: recentlyCompleted.has(task.id)
-                    ? '2px solid #28a745'
-                    : `1px solid ${isDone ? '#d0d0d0' : '#e0e0e0'}`,
-                  borderRadius: '6px',
-                  transition: 'all 0.3s ease',
-                  opacity: isDone && !recentlyCompleted.has(task.id) ? 0.7 : 1,
-                  boxShadow: recentlyCompleted.has(task.id)
-                    ? '0 0 20px rgba(40, 167, 69, 0.5)'
-                    : isDone ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
-                  transform: recentlyCompleted.has(task.id) ? 'scale(1.02)' : 'scale(1)'
-                }}
-              >
+              <div key={task.id} className={taskItemClasses}>
                 {/* Checkbox */}
                 <input
                   type="checkbox"
                   checked={isDone}
                   onChange={() => handleToggleComplete(task)}
-                  style={{
-                    width: '20px',
-                    height: '20px',
-                    marginRight: '12px',
-                    marginTop: '2px',
-                    cursor: 'pointer',
-                    flexShrink: 0
-                  }}
+                  className="simple-task-checkbox"
                 />
                 
                 {/* Task Content */}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="simple-task-content">
                   {/* Title Row */}
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '8px',
-                    marginBottom: '4px',
-                    flexWrap: 'wrap'
-                  }}>
-                    <span style={{ fontSize: '16px' }}>{getCategoryIcon(task.category)}</span>
-                    <span style={{ fontSize: '16px' }}>{getPriorityEmoji(task.priority)}</span>
-                    <span
-                      style={{
-                        fontSize: '15px',
-                        fontWeight: '500',
-                        color: isDone ? '#6c757d' : '#333',
-                        textDecoration: isDone ? 'line-through' : 'none',
-                        flex: 1,
-                        wordBreak: 'break-word'
-                      }}
-                    >
+                  <div className="simple-task-title-row">
+                    <span className="simple-task-icon">{getCategoryIcon(task.category)}</span>
+                    <span className="simple-task-icon">{getPriorityEmoji(task.priority)}</span>
+                    <span className={`simple-task-title ${isDone ? 'completed' : ''}`}>
                       {task.title}
                     </span>
                     {task.due_date && (
-                      <span style={{ fontSize: '13px', whiteSpace: 'nowrap' }}>
-                        {formatDate(task.due_date)}
-                      </span>
+                      <>{formatDate(task.due_date)}</>
                     )}
                   </div>
 
                   {/* Description - Show AI summary or shortened version */}
                   {task.description && (
-                    <div
-                      style={{
-                        fontSize: '13px',
-                        color: '#6c757d',
-                        marginBottom: '8px',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word'
-                      }}
-                    >
+                    <div className="simple-task-description">
                       {/* Show only first paragraph or first 200 chars for readability */}
                       {(() => {
                         const firstParagraph = task.description.split('\n\n')[0];
@@ -300,33 +247,16 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
 
                   {/* Links - Prominently Displayed */}
                   {links.length > 0 && (
-                    <div style={{ 
-                      marginTop: '8px',
-                      padding: '8px 12px',
-                      backgroundColor: '#e7f3ff',
-                      border: '1px solid #b3d9ff',
-                      borderRadius: '4px'
-                    }}>
-                      <div style={{ 
-                        fontSize: '12px', 
-                        fontWeight: 'bold', 
-                        color: '#0066cc',
-                        marginBottom: '4px'
-                      }}>
+                    <div className="simple-task-links">
+                      <div className="simple-task-links-header">
                         🔗 Important Links:
                       </div>
                       {links.map((link, idx) => (
-                        <div key={idx} style={{ marginBottom: '2px' }}>
+                        <div key={idx} className="simple-task-link">
                           <a
                             href={link}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{
-                              fontSize: '13px',
-                              color: '#0066cc',
-                              textDecoration: 'underline',
-                              wordBreak: 'break-all'
-                            }}
                           >
                             {link}
                           </a>
@@ -337,23 +267,9 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
 
                   {/* Tags */}
                   {task.tags && task.tags.length > 0 && (
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '4px', 
-                      marginTop: '8px',
-                      flexWrap: 'wrap'
-                    }}>
+                    <div className="simple-task-tags">
                       {task.tags.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          style={{
-                            fontSize: '11px',
-                            padding: '2px 8px',
-                            backgroundColor: '#e0e0e0',
-                            borderRadius: '12px',
-                            color: '#555'
-                          }}
-                        >
+                        <span key={idx} className="simple-task-tag">
                           {tag}
                         </span>
                       ))}
@@ -364,17 +280,7 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
                 {/* Delete Button */}
                 <button
                   onClick={() => handleDelete(task.id)}
-                  style={{
-                    marginLeft: '12px',
-                    padding: '4px 8px',
-                    backgroundColor: 'transparent',
-                    border: '1px solid #dc3545',
-                    borderRadius: '4px',
-                    color: '#dc3545',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    flexShrink: 0
-                  }}
+                  className="simple-task-delete-btn"
                   title="Delete task"
                 >
                   🗑️
@@ -404,7 +310,7 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
   };
 
   return (
-    <div style={{ padding: '8px' }}>
+    <div className="simple-task-list">
       {/* Celebration Animation */}
       {showCelebration && (
         <TaskCelebration onComplete={() => setShowCelebration(false)} />
@@ -412,61 +318,23 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
 
       {/* Progress and Motivation Section */}
       {tasks.length > 0 && (
-        <div style={{
-          marginBottom: '24px',
-          padding: '20px',
-          backgroundColor: '#f0f8ff',
-          borderRadius: '12px',
-          border: '2px solid #007acc',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '12px'
-          }}>
-            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#007acc' }}>
+        <div className="simple-task-progress-section">
+          <div className="simple-task-progress-header">
+            <div className="simple-task-encouragement">
               {getEncouragementMessage()}
             </div>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>
+            <div className="simple-task-count">
               {completedCount}/{totalCount}
             </div>
           </div>
           
           {/* Progress Bar */}
-          <div style={{
-            width: '100%',
-            height: '24px',
-            backgroundColor: '#e0e0e0',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            position: 'relative'
-          }}>
-            <div style={{
-              width: `${completionPercentage}%`,
-              height: '100%',
-              background: 'linear-gradient(90deg, #28a745 0%, #20c997 100%)',
-              transition: 'width 0.5s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontWeight: 'bold',
-              fontSize: '13px'
-            }}>
+          <div className="simple-task-progress-bar-container">
+            <div className="simple-task-progress-bar" style={{ width: `${completionPercentage}%` }}>
               {completionPercentage > 10 && `${completionPercentage}%`}
             </div>
             {completionPercentage <= 10 && (
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                color: '#6c757d'
-              }}>
+              <div className="simple-task-progress-text-overlay">
                 {completionPercentage}%
               </div>
             )}
@@ -479,14 +347,10 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
       )}
       
       {tasks.length === 0 && (
-        <div style={{
-          textAlign: 'center',
-          padding: '60px 20px',
-          color: '#6c757d'
-        }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>📋</div>
-          <div style={{ fontSize: '18px' }}>No tasks yet</div>
-          <div style={{ fontSize: '14px', marginTop: '8px' }}>
+        <div className="simple-task-empty-state">
+          <div className="simple-task-empty-icon">📋</div>
+          <div className="simple-task-empty-title">No tasks yet</div>
+          <div className="simple-task-empty-description">
             Tasks will appear here after you extract them from emails
           </div>
         </div>

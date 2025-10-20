@@ -782,6 +782,8 @@ Preview: {body_preview}
         }
         
         inputs = self._create_email_inputs(email_content, context)
+        # Add current date to check if event has passed
+        inputs['current_date'] = datetime.now().strftime('%Y-%m-%d')
         result = self.execute_prompty('event_relevance_assessment.prompty', inputs)
         
         # Handle fallback responses

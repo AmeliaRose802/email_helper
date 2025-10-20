@@ -999,6 +999,64 @@ async def extract_tasks_from_emails(
         
         logger.info(f"[Task Extraction] Starting background processing for {len(request.email_ids)} emails")
         
+        # ===== HOLISTIC ANALYSIS: Detect expired events and superseded actions =====
+        holistic_reclassifications = {}  # Map email_id -> new category
+        
+        try:
+            # Fetch all emails for holistic analysis
+            emails_for_analysis = []
+            with db_manager.get_connection() as conn:
+                placeholders = ','.join('?' * len(request.email_ids))
+                cursor = conn.execute(
+                    f"SELECT id, subject, sender, body, date, ai_category FROM emails WHERE id IN ({placeholders})",
+                    request.email_ids
+                )
+                for row in cursor.fetchall():
+                    emails_for_analysis.append({
+                        'id': row[0],
+                        'subject': row[1],
+                        'sender': row[2],
+                        'body': row[3],
+                        'date': row[4],
+                        'ai_category': row[5]
+                    })
+            
+            if emails_for_analysis:
+                logger.info(f"[Holistic Analysis] Analyzing {len(emails_for_analysis)} emails for expired items and superseded actions")
+                holistic_result = await ai_service.analyze_holistically(emails_for_analysis)
+                
+                # Process expired items - reclassify to spam_to_delete
+                for expired in holistic_result.get('expired_items', []):
+                    email_id = expired.get('email_id')
+                    reason = expired.get('reason', 'Past deadline or event occurred')
+                    if email_id:
+                        holistic_reclassifications[email_id] = 'spam_to_delete'
+                        logger.info(f"[Holistic] 🗑️ Marking expired: {email_id[:30]}... - {reason}")
+                
+                # Process superseded actions - reclassify to work_relevant or fyi
+                for superseded in holistic_result.get('superseded_actions', []):
+                    original_id = superseded.get('original_email_id')
+                    superseded_by = superseded.get('superseded_by_email_id')
+                    reason = superseded.get('reason', 'Superseded by newer email')
+                    if original_id:
+                        holistic_reclassifications[original_id] = 'work_relevant'
+                        logger.info(f"[Holistic] ♻️ Marking superseded: {original_id[:30]}... by {superseded_by[:30]}... - {reason}")
+                
+                # Process duplicates - keep canonical, archive others
+                for dup_group in holistic_result.get('duplicate_groups', []):
+                    keep_id = dup_group.get('keep_email_id')
+                    archive_ids = dup_group.get('archive_email_ids', [])
+                    topic = dup_group.get('topic', 'Duplicate')
+                    for archive_id in archive_ids:
+                        if archive_id and archive_id != keep_id:
+                            holistic_reclassifications[archive_id] = 'spam_to_delete'
+                            logger.info(f"[Holistic] 📋 Archiving duplicate: {archive_id[:30]}... (keeping {keep_id[:30]}...) - {topic}")
+                
+                logger.info(f"[Holistic Analysis] Complete: {len(holistic_reclassifications)} emails reclassified")
+        except Exception as e:
+            logger.warning(f"[Holistic Analysis] Failed (continuing with individual processing): {e}")
+        # ===== END HOLISTIC ANALYSIS =====
+        
         for email_id in request.email_ids:
             try:
                 # Get email data from DATABASE (not Outlook - it's already synced)
@@ -1022,8 +1080,21 @@ async def extract_tasks_from_emails(
                     'ai_category': row[4]
                 }
                 
-                # Get AI category
-                ai_category = email.get('ai_category', '').lower()
+                # Apply holistic reclassification if available (overrides original AI category)
+                if email_id in holistic_reclassifications:
+                    ai_category = holistic_reclassifications[email_id].lower()
+                    logger.info(f"[Holistic Override] Email {email_id[:30]}... reclassified to: {ai_category}")
+                    
+                    # Update database with new classification
+                    with db_manager.get_connection() as conn:
+                        conn.execute(
+                            "UPDATE emails SET ai_category = ? WHERE id = ?",
+                            (ai_category, email_id)
+                        )
+                        conn.commit()
+                else:
+                    # Get AI category
+                    ai_category = email.get('ai_category', '').lower()
                 
                 if not ai_category:
                     # Classify if needed (with rate limiting delay)

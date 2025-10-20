@@ -109,11 +109,12 @@ class OutlookEmailAdapter(EmailProvider):
             raise RuntimeError("Not connected to Outlook. Call connect() first.")
         
         try:
-            # Get emails from OutlookManager
-            # Note: get_recent_emails only supports Inbox and takes days_back/max_emails
-            # We ignore folder_name for now and use max_emails for count
+            # Get emails from OutlookManager (Inbox only)
+            # For large counts (50000), fetch ALL emails without date restrictions
+            # For smaller counts, use reasonable time windows to improve performance
+            days_back = None if count >= 50000 else (365 if count >= 1000 else 30)
             emails = self.outlook_manager.get_recent_emails(
-                days_back=365,  # Get emails from past year
+                days_back=days_back,
                 max_emails=count + offset  # Get enough for offset + count
             )
             

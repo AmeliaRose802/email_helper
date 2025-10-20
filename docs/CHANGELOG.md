@@ -8,6 +8,33 @@
 
 ## 🚀 Recent Improvements
 
+### Automatic Holistic Analysis for Expired Events (October 2025)
+
+**Status:** ✅ COMPLETED
+
+**Problem:** Holistic analysis was a manual/optional step that users had to trigger explicitly. Past events and expired deadlines were not being automatically reclassified during task extraction.
+
+**Solution:** Integrated holistic analysis directly into the task extraction workflow to automatically detect and reclassify:
+- Past events (conferences, webinars that already occurred)
+- Expired deadlines (surveys, RSVPs, registrations with past due dates)
+- Superseded actions (original emails replaced by updates)
+- Duplicate emails (same content from multiple threads)
+
+**Implementation:**
+- Holistic analysis now runs automatically at the start of task extraction
+- Expired items are reclassified to `spam_to_delete` before task creation
+- Superseded actions are reclassified to `work_relevant` for reference
+- Event relevance assessment now includes current date context
+- Enhanced prompts with explicit temporal logic instructions
+
+**Files Modified:**
+- `backend/api/emails.py` - Added holistic analysis to task extraction flow
+- `prompts/event_relevance_assessment.prompty` - Added current date check
+- `prompts/holistic_inbox_analyzer.prompty` - Enhanced temporal reasoning
+- `src/ai_processor.py` - Pass current date to event relevance checks
+
+**Tests:** `backend/tests/test_holistic_expired_events.py` - 4 passing tests verify expired event detection
+
 ### Email Classification Accuracy Enhancement
 
 **Status:** ✅ COMPLETED
@@ -45,8 +72,10 @@
 
 ### Holistic Inbox Analysis
 The system now performs comprehensive inbox analysis that:
+- **Automatically runs during task extraction** (no manual trigger needed)
 - Considers full inbox context when categorizing emails
 - Detects cross-email relationships and dependencies
+- **Identifies and reclassifies expired events and past deadlines**
 - Prioritizes based on overall workload and deadlines
 - Provides better context for action item classification
 

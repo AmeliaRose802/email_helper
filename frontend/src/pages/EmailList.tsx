@@ -39,6 +39,18 @@ const EmailList: React.FC = () => {
     refetch,
   } = useGetEmailsQuery({ limit: 50000 });
 
+  // Debug logging to diagnose email loading issues
+  useEffect(() => {
+    console.log('[EmailList Debug] Query state:', {
+      isLoading,
+      hasError: !!error,
+      error: error,
+      hasData: !!emailData,
+      emailCount: emailData?.emails?.length || 0,
+      totalEmails: emailData?.total || 0
+    });
+  }, [isLoading, error, emailData]);
+
   // Current data
   const currentData = emailData;
   const currentLoading = isLoading;
@@ -46,6 +58,12 @@ const EmailList: React.FC = () => {
 
   // Group emails by conversation (like Python app)
   const conversationGroups = useMemo(() => {
+    console.log('[EmailList Debug] Building conversation groups from data:', {
+      hasData: !!currentData,
+      emailsArray: currentData?.emails,
+      emailCount: currentData?.emails?.length || 0
+    });
+    
     if (!currentData?.emails) return [];
     
     const groups = new Map<string, Email[]>();
@@ -59,7 +77,7 @@ const EmailList: React.FC = () => {
     });
     
     // Convert to array and sort by latest email date (most recent first)
-    return Array.from(groups.entries())
+    const result = Array.from(groups.entries())
       .map(([conversationId, emails]) => ({
         conversationId,
         emails: emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
@@ -71,6 +89,14 @@ const EmailList: React.FC = () => {
         representativeEmail: emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
       }))
       .sort((a, b) => b.latestDate.getTime() - a.latestDate.getTime());
+    
+    console.log('[EmailList Debug] Conversation groups built:', {
+      totalGroups: result.length,
+      firstGroup: result[0],
+      groupSizes: result.slice(0, 5).map(g => g.emails.length)
+    });
+    
+    return result;
   }, [currentData?.emails]);
 
   // Get current page of conversations
@@ -196,6 +222,12 @@ const EmailList: React.FC = () => {
   // Get emails from current page conversations with classification
   const currentPageEmails = useMemo(() => {
     const emails = currentPageConversations.flatMap(conv => conv.emails);
+    
+    console.log('[EmailList Debug] currentPageEmails calculation:', {
+      conversationsOnPage: currentPageConversations.length,
+      totalEmailsFromConversations: emails.length,
+      sampleConversation: currentPageConversations[0]
+    });
     
     return emails.map(email => {
       // Check ref first for persisted classifications
@@ -476,25 +508,49 @@ const EmailList: React.FC = () => {
 
   // Error state
   if (currentError) {
+    console.error('[EmailList] Error loading emails:', currentError);
+    const errorMessage = 'message' in currentError ? currentError.message : 
+                         'data' in currentError ? JSON.stringify(currentError.data) :
+                         'status' in currentError ? `HTTP ${currentError.status}` :
+                         'Unknown error';
+    
     return (
       <div style={containerStyle}>
         <div style={{...headerStyle, justifyContent: 'center'}}>
-          <div style={{ textAlign: 'center', color: '#dc3545' }}>
-            <div style={{ fontSize: '24px', marginBottom: '8px' }}>⚠️</div>
-            <div>Error loading emails</div>
+          <div style={{ textAlign: 'center', color: '#dc3545', padding: '40px' }}>
+            <div style={{ fontSize: '24px', marginBottom: '16px' }}>⚠️</div>
+            <h2 style={{ marginBottom: '16px' }}>Error Loading Emails</h2>
+            <div style={{ 
+              backgroundColor: '#f8d7da', 
+              border: '1px solid #f5c6cb', 
+              borderRadius: '4px',
+              padding: '16px',
+              marginBottom: '16px',
+              maxWidth: '600px',
+              margin: '0 auto 16px',
+              textAlign: 'left'
+            }}>
+              <strong>Error Details:</strong><br/>
+              {errorMessage}
+            </div>
+            <p style={{ marginBottom: '16px', color: '#6c757d' }}>
+              Make sure the backend server is running on http://localhost:8000
+            </p>
             <button 
               onClick={refetch}
               style={{
-                marginTop: '16px',
-                padding: '8px 16px',
+                marginTop: '8px',
+                padding: '12px 24px',
                 backgroundColor: '#007acc',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: '500'
               }}
             >
-              Retry
+              🔄 Retry
             </button>
           </div>
         </div>
