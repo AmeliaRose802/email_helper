@@ -1,63 +1,40 @@
+/**
+ * REAL Settings Page E2E Tests - NO MOCKING
+ * Tests actual API interactions with real database operations
+ * 
+ * Requirements:
+ * - Backend server must be running on localhost:8000
+ * - Frontend must be accessible on localhost:8080
+ * - Tests perform real CRUD operations on actual database
+ */
+
 import { test, expect } from '@playwright/test';
 
-test.describe('Settings Page Tests', () => {
+test.describe('Settings Page - REAL API Tests', () => {
   test.beforeEach(async ({ page }) => {
-    // Mock settings API
-    await page.route('**/api/settings', async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            username: 'Test User',
-            job_context: 'Software Engineer working on email management systems',
-            newsletter_interests: 'DevOps, Azure, React, AI/ML',
-            azure_openai_endpoint: 'https://test.openai.azure.com/',
-            azure_openai_deployment: 'gpt-4',
-            custom_prompts: {},
-            ado_area_path: 'Project\\Team\\Area',
-            ado_pat: ''
-          })
-        });
-      } else if (route.request().method() === 'PUT') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            success: true,
-            message: 'Settings updated successfully',
-            settings: JSON.parse(await route.request().postData() || '{}')
-          })
-        });
-      } else if (route.request().method() === 'DELETE') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            success: true,
-            message: 'Settings reset to defaults',
-            settings: {}
-          })
-        });
-      }
-    });
-
-    // Navigate to settings page
-    await page.goto('http://localhost:5173/settings');
-    await page.waitForLoadState('networkidle');
+    // NO MOCKING - Connect to real backend
+    // Navigate to settings page (using hash routing)
+    await page.goto('http://localhost:8080/#/settings');
+    
+    // Wait for page to fully load
+    await page.waitForSelector('h1:has-text("Settings")', { timeout: 10000 });
   });
 
-  test('should load and display settings', async ({ page }) => {
-    // Wait for settings to load
-    await page.waitForSelector('h1:has-text("Settings")');
-    
-    // Verify page title
+  test('should load settings page with real data from backend', async ({ page }) => {
+    // Verify page loaded
     await expect(page.locator('h1')).toContainText('Settings');
     
-    // Verify tabs are present
-    await expect(page.locator('button:has-text("User Profile")')).toBeVisible();
-    await expect(page.locator('button:has-text("AI Configuration")')).toBeVisible();
-    await expect(page.locator('button:has-text("Custom Prompts")')).toBeVisible();
+    // Wait for actual API call to complete (no mocks!)
+    await page.waitForTimeout(2000);
+    
+    // Verify form fields exist
+    await expect(page.locator('input[name="username"], #username')).toBeVisible();
+    await expect(page.locator('textarea[name="job_context"], #jobContext')).toBeVisible();
+    await expect(page.locator('textarea[name="newsletter_interests"], #newsletterInterests')).toBeVisible();
+    
+    // Log what we got from real API
+    const username = await page.locator('input[name="username"], #username').inputValue();
+    console.log('Real username from API:', username || '(empty)');
   });
 
   test('should display user profile settings', async ({ page }) => {
