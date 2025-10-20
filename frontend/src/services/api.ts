@@ -1,22 +1,18 @@
 // RTK Query API configuration for backend integration
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { BaseQueryApi, FetchArgs } from '@reduxjs/toolkit/query/react';
-import type { RootState } from '@/store/store';
 import { apiConfig, debugLog } from '@/config/api';
 
-// Base query with authentication
+// Base query with authentication (disabled for desktop app)
 const baseQuery = fetchBaseQuery({
   baseUrl: apiConfig.baseURL, // Use configured backend URL
-  prepareHeaders: (headers, { getState }) => {
-    const token = (getState() as RootState).auth.token;
-    if (token) {
-      headers.set('authorization', `Bearer ${token}`);
-    }
+  prepareHeaders: (headers) => {
+    // Skip authentication for desktop app - always allow requests
     headers.set('content-type', 'application/json');
     
     // Debug logging
     debugLog('API Request Headers', {
-      hasToken: !!token,
+      desktopMode: true,
+      authDisabled: true,
       headers: Object.fromEntries(headers.entries()),
     });
     
@@ -24,41 +20,22 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
-// Base query with token refresh logic
-const baseQueryWithReauth = async (args: string | FetchArgs, api: BaseQueryApi, extraOptions: object) => {
-  let result = await baseQuery(args, api, extraOptions);
-
-  if (result.error && result.error.status === 401) {
-    // Try to refresh token
-    const refreshToken = (api.getState() as RootState).auth.refreshToken;
-    if (refreshToken) {
-      const refreshResult = await baseQuery(
-        {
-          url: '/auth/refresh',
-          method: 'POST',
-        },
-        api,
-        extraOptions
-      );
-
-      if (refreshResult.data) {
-        // Retry original request with new token
-        result = await baseQuery(args, api, extraOptions);
-      } else {
-        // Refresh failed, logout user
-        api.dispatch({ type: 'auth/logout' });
-      }
-    }
-  }
-
-  return result;
-};
+// Base query without token refresh (not needed for desktop app)
+const baseQueryWithReauth = baseQuery;
 
 // Main API slice
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['User', 'Email', 'Task', 'AIClassification'],
+  // Keep cached data for 5 minutes after component unmounts
+  keepUnusedDataFor: 300, // 5 minutes in seconds
+  // Prevent automatic refetching on component remount
+  refetchOnMountOrArgChange: false,
+  // Prevent automatic refetching on window focus
+  refetchOnFocus: false,
+  // Prevent automatic refetching when network reconnects
+  refetchOnReconnect: false,
   endpoints: (builder) => ({
     // Health check endpoint
     healthCheck: builder.query<

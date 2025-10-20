@@ -143,19 +143,55 @@ class COMAIService:
             Classification result dictionary
         """
         try:
+            # Parse email content into components
+            lines = email_content.split('\n')
+            subject = ""
+            sender = ""
+            body = email_content
+            
+            # Extract subject and sender from email text
+            for i, line in enumerate(lines[:10]):  # Check first 10 lines
+                if line.startswith('Subject:'):
+                    subject = line.replace('Subject:', '').strip()
+                elif line.startswith('From:'):
+                    sender = line.replace('From:', '').strip()
+                elif line.strip() == '' and (subject or sender):
+                    # Found blank line after headers
+                    body = '\n'.join(lines[i+1:])
+                    break
+            
+            # If no headers found, use full text as body
+            if not subject and not sender:
+                body = email_content
+            
+            # Import pandas if available for DataFrame support
+            try:
+                import pandas as pd
+                learning_data = pd.DataFrame()  # Empty DataFrame
+            except ImportError:
+                learning_data = []  # Fallback to empty list
+            
+            # Create email_content dict for AIProcessor
+            email_dict = {
+                'subject': subject,
+                'sender': sender,
+                'body': body
+            }
+            
             # Use the enhanced classification method with explanation
             result = self.ai_processor.classify_email_with_explanation(
-                email_content=email_content,
-                learning_data=[]  # Empty learning data for now
+                email_content=email_dict,
+                learning_data=learning_data
             )
             
             # Ensure result is in expected format
             if isinstance(result, dict):
                 category = result.get('category', 'work_relevant')
-                confidence = result.get('confidence', 0.8)
+                # Only use real confidence values from AI, no fake defaults
+                confidence = result.get('confidence')
                 
                 # Determine if review is required based on confidence thresholds
-                requires_review = self._requires_review(category, confidence)
+                requires_review = self._requires_review(category, confidence) if confidence is not None else True
                 
                 return {
                     'category': category,
@@ -363,20 +399,117 @@ class COMAIService:
         
         Args:
             email_content: Full email text
-            summary_type: Type of summary to generate
+            summary_type: Type of summary to generate ("brief", "detailed", "newsletter", "fyi")
             
         Returns:
             Summary result dictionary
         """
         try:
-            # Use prompty file for summary generation
+            # Parse email content into components for the prompty template
+            lines = email_content.split('\n')
+            subject = ""
+            sender = ""
+            body = email_content
+            
+            # Extract subject and sender from email text
+            for i, line in enumerate(lines[:10]):  # Check first 10 lines
+                if line.startswith('Subject:'):
+                    subject = line.replace('Subject:', '').strip()
+                elif line.startswith('From:'):
+                    sender = line.replace('From:', '').strip()
+                elif line.strip() == '' and (subject or sender):
+                    # Found blank line after headers
+                    body = '\n'.join(lines[i+1:])
+                    break
+            
+            # If no headers found, use full text as body
+            if not subject and not sender:
+                body = email_content
+            
+            # Load user context for newsletter/FYI summaries
+            context = ""
+            username = "User"
+            custom_interests = ""
+            try:
+                import os
+                import sqlite3
+                from pathlib import Path
+                
+                user_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'user_specific_data')
+                
+                # First try to load from database (preferred source)
+                try:
+                    db_path = Path(__file__).parent.parent.parent / 'runtime_data' / 'email_helper_history.db'
+                    if db_path.exists():
+                        conn = sqlite3.connect(str(db_path))
+                        cursor = conn.execute("SELECT username, job_context, newsletter_interests FROM user_settings WHERE user_id = 1")
+                        row = cursor.fetchone()
+                        if row:
+                            if row[0]:
+                                username = row[0]
+                            if row[1]:
+                                context = row[1]
+                            if row[2]:
+                                custom_interests = row[2]
+                        conn.close()
+                except Exception as db_error:
+                    # Fall back to file-based loading if database fails
+                    pass
+                
+                # Fall back to file-based loading if database had no data
+                if not context:
+                    job_context_path = os.path.join(user_data_dir, 'job_role_context.md')
+                    if os.path.exists(job_context_path):
+                        with open(job_context_path, 'r', encoding='utf-8') as f:
+                            context = f.read()
+                
+                if not custom_interests:
+                    custom_interests_path = os.path.join(user_data_dir, 'custom_interests.md')
+                    if os.path.exists(custom_interests_path):
+                        with open(custom_interests_path, 'r', encoding='utf-8') as f:
+                            custom_interests = f.read()
+                
+                if username == "User":
+                    username_path = os.path.join(user_data_dir, 'username.txt')
+                    if os.path.exists(username_path):
+                        with open(username_path, 'r', encoding='utf-8') as f:
+                            username = f.read().strip()
+            except Exception as ctx_error:
+                # Continue with defaults if context loading fails
+                pass
+            
+            # Use prompty file for summary generation with proper inputs
             inputs = {
-                "email_content": email_content
+                "context": context,
+                "username": username,
+                "subject": subject,
+                "sender": sender,
+                "date": "",  # Date not available in this context
+                "body": body
             }
             
-            # Execute the email_one_line_summary prompty for brief summaries
+            # Add custom_interests for newsletter summaries
+            if custom_interests:
+                inputs["custom_interests"] = custom_interests
+            
+            # Select the appropriate prompt based on summary type
+            if summary_type == "detailed":
+                # Detailed summaries use custom newsletter prompt with relevance filtering
+                if custom_interests:
+                    prompt_file = "newsletter_summary_custom.prompty"
+                else:
+                    # Fallback to standard newsletter summary if no custom interests defined
+                    prompt_file = "newsletter_summary.prompty"
+            elif summary_type == "fyi" or summary_type == "brief":
+                # FYI and brief summaries use fyi_summary.prompty
+                prompt_file = "fyi_summary.prompty"
+            else:
+                # Default to one-line summary
+                prompt_file = "email_one_line_summary.prompty"
+            
+            # Execute the appropriate prompty
             result = self.ai_processor.execute_prompty(
-                "email_one_line_summary.prompty",
+                prompt_file,
                 inputs=inputs
             )
             

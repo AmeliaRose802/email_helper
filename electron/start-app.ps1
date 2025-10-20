@@ -1,73 +1,142 @@
-# Email Helper Startup Script - Simple Working Version
+# Email Helper Startup Script - Production Ready Version
 Write-Host "🚀 Starting Email Helper..." -ForegroundColor Green
 
-# Clean up
+# Clean up any existing processes
+Write-Host "🧹 Cleaning up existing processes..." -ForegroundColor Yellow
 Get-Process -Name electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Get-Process -Name python -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
 # Free ports
-@(8001, 5173) | ForEach-Object {
+@(8000, 3000, 5173) | ForEach-Object {
     Get-NetTCPConnection -LocalPort $_ -ErrorAction SilentlyContinue | ForEach-Object { 
         Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue 
     }
 }
 
-Start-Sleep 1
+Start-Sleep 2
 
-# Start API server
-Write-Host "Starting API..." -ForegroundColor Cyan
-Start-Process -FilePath "python" -ArgumentList "simple_api.py" -WorkingDirectory "C:\Users\ameliapayne\email_helper" -WindowStyle Hidden
+# Verify project structure
+$ProjectRoot = "C:\Users\ameliapayne\email_helper"
+if (-not (Test-Path $ProjectRoot)) {
+    Write-Host "❌ Project directory not found: $ProjectRoot" -ForegroundColor Red
+    exit 1
+}
 
-# Start frontend server  
-Write-Host "Starting frontend..." -ForegroundColor Cyan
-Start-Process -FilePath "python" -ArgumentList "-m", "http.server", "5173" -WorkingDirectory "C:\Users\ameliapayne\email_helper" -WindowStyle Hidden
+# Start backend API server
+Write-Host "🔧 Starting Backend API..." -ForegroundColor Cyan
+$BackendJob = Start-Process -FilePath "python" -ArgumentList "run_backend.py" -WorkingDirectory $ProjectRoot -WindowStyle Hidden -PassThru
 
-# Wait for services
-Write-Host "Waiting for services..." -ForegroundColor Yellow
-Start-Sleep 6
+# Start React frontend  
+Write-Host "⚛️ Starting React Frontend..." -ForegroundColor Cyan
+$FrontendJob = Start-Process -FilePath "npx" -ArgumentList "vite", "--port", "3000" -WorkingDirectory "$ProjectRoot\frontend" -WindowStyle Hidden -PassThru
 
-# Test services with retry
-$maxRetries = 3
-$apiReady = $false
-$frontendReady = $false
+# Wait for services to initialize
+Write-Host "⏳ Waiting for services to initialize..." -ForegroundColor Yellow
+Start-Sleep 8
 
-for ($i = 1; $i -le $maxRetries; $i++) {
+# Test backend with retry logic
+$MaxRetries = 5
+$BackendReady = $false
+
+Write-Host "🔍 Testing Backend API..." -ForegroundColor Yellow
+for ($i = 1; $i -le $MaxRetries; $i++) {
     try {
-        $health = Invoke-RestMethod "http://localhost:8001/api/health" -TimeoutSec 3
-        Write-Host "✅ API ready at http://localhost:8001" -ForegroundColor Green
-        $apiReady = $true
-        break
+        $Health = Invoke-RestMethod "http://localhost:8000/health" -TimeoutSec 5
+        if ($Health.status -eq "healthy") {
+            Write-Host "✅ Backend API ready - Status: $($Health.status)" -ForegroundColor Green
+            Write-Host "   Database: $($Health.database)" -ForegroundColor Gray
+            Write-Host "   Version: $($Health.version)" -ForegroundColor Gray
+            $BackendReady = $true
+            break
+        }
     } catch {
-        Write-Host "⚠️ API attempt $i failed, retrying..." -ForegroundColor Yellow
-        Start-Sleep 2
+        Write-Host "⚠️ Backend API attempt $i/$MaxRetries failed, retrying..." -ForegroundColor Yellow
+        Start-Sleep 3
     }
 }
 
-for ($i = 1; $i -le $maxRetries; $i++) {
+# Test frontend with retry logic
+$FrontendReady = $false
+
+Write-Host "🔍 Testing React Frontend..." -ForegroundColor Yellow
+for ($i = 1; $i -le $MaxRetries; $i++) {
     try {
-        Invoke-WebRequest "http://localhost:5173/test-simple.html" -TimeoutSec 3 | Out-Null
-        Write-Host "✅ Frontend ready at http://localhost:5173" -ForegroundColor Green
-        $frontendReady = $true
-        break
+        # Test port connectivity instead of HTTP response code
+        $PortTest = Test-NetConnection -ComputerName localhost -Port 3001 -InformationLevel Quiet -WarningAction SilentlyContinue
+        if ($PortTest) {
+            # Port is open, now try HTTP request
+            try {
+                $Response = Invoke-WebRequest "http://localhost:3001" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+                Write-Host "✅ React Frontend ready - Status: $($Response.StatusCode)" -ForegroundColor Green
+                $FrontendReady = $true
+                break
+            } catch {
+                # Even if HTTP request fails, if port is open and listening, frontend is likely ready
+                if ($_.Exception.Message -match "404") {
+                    # 404 means server is responding but route not found - Vite is running
+                    Write-Host "✅ React Frontend ready - Vite dev server is running" -ForegroundColor Green
+                    $FrontendReady = $true
+                    break
+                }
+            }
+        }
+        Write-Host "⚠️ React Frontend attempt $i/$MaxRetries - port not ready, retrying..." -ForegroundColor Yellow
+        Start-Sleep 3
     } catch {
-        Write-Host "⚠️ Frontend attempt $i failed, retrying..." -ForegroundColor Yellow
-        Start-Sleep 2
+        Write-Host "⚠️ React Frontend attempt $i/$MaxRetries failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        Start-Sleep 3
     }
 }
 
-if (-not $apiReady) {
-    Write-Host "❌ API failed to start" -ForegroundColor Red
+# Check service status
+if (-not $BackendReady) {
+    Write-Host "❌ Backend API failed to start properly" -ForegroundColor Red
+    Write-Host "   Check logs for errors and ensure dependencies are installed" -ForegroundColor Yellow
 }
 
-if (-not $frontendReady) {
-    Write-Host "❌ Frontend failed to start" -ForegroundColor Red
+if (-not $FrontendReady) {
+    Write-Host "❌ React Frontend failed to start properly" -ForegroundColor Red
+    Write-Host "   Check if Node.js is installed and dependencies are ready" -ForegroundColor Yellow
 }
 
-Write-Host ""
-Write-Host "📧 Email Helper Dashboard" -ForegroundColor Cyan
-Write-Host "Opening in Electron..." -ForegroundColor Green
-Write-Host ""
-
-# Start electron directly
-Set-Location $PSScriptRoot
-npx electron main.js
+if ($BackendReady -and $FrontendReady) {
+    Write-Host ""
+    Write-Host "🎉 All services ready!" -ForegroundColor Green
+    Write-Host "📧 Email Helper Dashboard" -ForegroundColor Cyan
+    Write-Host "   Backend API: http://localhost:8000" -ForegroundColor Gray
+    Write-Host "   Frontend UI: http://localhost:3001" -ForegroundColor Gray
+    Write-Host "   API Docs: http://localhost:8000/docs" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "🖥️ Launching Electron App..." -ForegroundColor Green
+    
+    # Start Electron in a new window (non-blocking)
+    Set-Location $PSScriptRoot
+    $ElectronProcess = Start-Process -FilePath "npx" -ArgumentList "electron", "main.js" -WorkingDirectory $PSScriptRoot -PassThru
+    
+    Write-Host "✅ Electron app launched (PID: $($ElectronProcess.Id))" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "📝 Services are running in the background" -ForegroundColor Cyan
+    Write-Host "   To stop all services, close the Electron app or run:" -ForegroundColor Gray
+    Write-Host "   Get-Process python,node,electron | Stop-Process -Force" -ForegroundColor Gray
+    Write-Host ""
+} else {
+    Write-Host ""
+    Write-Host "❌ Services failed to start properly. Please check the configuration." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "📋 Troubleshooting:" -ForegroundColor Yellow
+    Write-Host "   1. Verify Python dependencies: pip install -r requirements.txt" -ForegroundColor Gray
+    Write-Host "   2. Verify Node.js dependencies: cd frontend && npm install" -ForegroundColor Gray
+    Write-Host "   3. Check port availability (8000, 3000)" -ForegroundColor Gray
+    Write-Host "   4. Review error logs above" -ForegroundColor Gray
+    
+    # Clean up failed processes
+    if ($BackendJob -and -not $BackendJob.HasExited) {
+        Stop-Process -Id $BackendJob.Id -Force -ErrorAction SilentlyContinue
+    }
+    if ($FrontendJob -and -not $FrontendJob.HasExited) {
+        Stop-Process -Id $FrontendJob.Id -Force -ErrorAction SilentlyContinue
+    }
+    
+    exit 1
+}

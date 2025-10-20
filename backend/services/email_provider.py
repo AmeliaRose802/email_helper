@@ -191,6 +191,8 @@ def get_email_provider_instance() -> EmailProvider:
             try:
                 from backend.services.com_email_provider import COMEmailProvider
                 _email_provider = COMEmailProvider()
+                # Auto-authenticate COM provider on startup
+                _email_provider.authenticate({})
             except ImportError as e:
                 # Fall back to other providers if COM not available
                 import logging
@@ -209,9 +211,13 @@ def get_email_provider_instance() -> EmailProvider:
                 redirect_uri=settings.graph_redirect_uri
             )
         
-        # Default to mock provider for development/testing
+        # Require properly configured email provider - no mock fallback
         if _email_provider is None:
-            _email_provider = MockEmailProvider()
+            raise RuntimeError(
+                "No email provider configured. Please configure either:\n"
+                "1. COM Adapter: Set use_com_backend=True in settings, or\n"
+                "2. Graph API: Set graph_client_id, graph_client_secret, and graph_tenant_id in settings"
+            )
     
     return _email_provider
 

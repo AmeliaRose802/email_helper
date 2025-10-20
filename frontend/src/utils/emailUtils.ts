@@ -3,14 +3,29 @@ import { format, isToday, isYesterday } from 'date-fns';
 import type { Email, EmailFilter } from '@/types/email';
 
 export const formatEmailDate = (dateString: string): string => {
-  const date = new Date(dateString);
+  if (!dateString) {
+    return 'No date';
+  }
   
-  if (isToday(date)) {
-    return format(date, 'HH:mm');
-  } else if (isYesterday(date)) {
-    return 'Yesterday';
-  } else {
-    return format(date, 'MMM d');
+  try {
+    const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date string:', dateString);
+      return 'Invalid date';
+    }
+    
+    if (isToday(date)) {
+      return format(date, 'HH:mm');
+    } else if (isYesterday(date)) {
+      return 'Yesterday';
+    } else {
+      return format(date, 'MMM d');
+    }
+  } catch (error) {
+    console.error('Error formatting date:', dateString, error);
+    return 'Invalid date';
   }
 };
 
@@ -27,12 +42,18 @@ export const getEmailPreview = (body: string, maxLength: number = 150): string =
 
 export const getCategoryColor = (category: string): string => {
   const colors: Record<string, string> = {
-    required_action: '#dc3545', // Red - urgent
-    team_action: '#fd7e14',     // Orange - important
-    job_listing: '#6f42c1',     // Purple - opportunities
-    optional_event: '#20c997',  // Teal - optional
-    fyi: '#6c757d',            // Gray - informational
-    newsletter: '#0dcaf0',      // Light blue - newsletters
+    // AI classification categories (matching Python app)
+    required_personal_action: '#dc3545', // Red - urgent personal action
+    team_action: '#fd7e14',              // Orange - team coordination
+    optional_action: '#ffc107',          // Yellow - optional tasks
+    job_listing: '#6f42c1',              // Purple - job opportunities
+    optional_event: '#20c997',           // Teal - events/meetings
+    work_relevant: '#0d6efd',            // Blue - work-related info
+    fyi: '#6c757d',                      // Gray - informational
+    newsletter: '#0dcaf0',               // Light blue - newsletters
+    spam_to_delete: '#dc3545',           // Red - spam
+    // Aliases for shorter names
+    required_action: '#dc3545',
   };
   
   return colors[category] || '#6c757d';
@@ -40,15 +61,21 @@ export const getCategoryColor = (category: string): string => {
 
 export const getCategoryLabel = (category: string): string => {
   const labels: Record<string, string> = {
-    required_action: 'Action Required',
-    team_action: 'Team Action',
-    job_listing: 'Job Listing',
-    optional_event: 'Optional Event',
-    fyi: 'FYI',
-    newsletter: 'Newsletter',
+    // AI classification categories (matching Python app)
+    required_personal_action: '🔴 Action Required',
+    team_action: '👥 Team Action',
+    optional_action: '📋 Optional',
+    job_listing: '💼 Job Listing',
+    optional_event: '📅 Optional Event',
+    work_relevant: '💼 Work Relevant',
+    fyi: 'ℹ️ FYI',
+    newsletter: '📰 Newsletter',
+    spam_to_delete: '🗑️ Spam',
+    // Aliases
+    required_action: '🔴 Action Required',
   };
   
-  return labels[category] || category;
+  return labels[category] || category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
 export const getPriorityIcon = (priority: string): string => {

@@ -1,5 +1,17 @@
 /* Main stylesheet for Email Helper web app */
 
+/* Import Synthwave Theme */
+@import './synthwave.css';
+
+/* Import Settings Page Styles */
+@import './settings.css';
+
+/* Import Tasks Page Styles */
+@import './tasks.css';
+
+/* Import Task Celebration Styles */
+@import './task-celebration.css';
+
 /* ===========================================
    Electron-specific Base Styles
    =========================================== */
@@ -633,6 +645,7 @@ html {
   background: rgba(255, 255, 255, 0.3);
   transform: translate(-50%, -50%);
   transition: width var(--transition-base), height var(--transition-base);
+  pointer-events: none !important;
 }
 
 .quick-actions button:hover {

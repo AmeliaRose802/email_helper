@@ -1,15 +1,63 @@
 // Email detail page for viewing individual emails
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useGetEmailByIdQuery, useMarkEmailReadMutation, useDeleteEmailMutation } from '@/services/emailApi';
+import { 
+  useGetEmailByIdQuery, 
+  useMarkEmailReadMutation, 
+  useDeleteEmailMutation,
+  useGetCategoryMappingsQuery,
+  useUpdateEmailClassificationMutation
+} from '@/services/emailApi';
 import { CategoryBadge } from '@/components/Email/CategoryBadge';
 import { formatEmailDate, getPriorityIcon } from '@/utils/emailUtils';
+
+// Helper function to convert URLs in text to clickable links
+const linkifyText = (text: string): string => {
+  // Regular expression to match URLs
+  const urlRegex = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+  
+  return text.replace(urlRegex, (url) => {
+    // Clean up common URL encoding issues
+    const cleanUrl = url
+      .replace(/%3A/g, ':')
+      .replace(/%2F/g, '/')
+      .replace(/%3F/g, '?')
+      .replace(/%3D/g, '=')
+      .replace(/%26/g, '&')
+      .replace(/%23/g, '#');
+    
+    return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>`;
+  });
+};
+
+// Helper function to format plain text email with basic HTML
+const formatPlainTextEmail = (text: string): string => {
+  if (!text) return '';
+  
+  // Convert URLs to links
+  let formatted = linkifyText(text);
+  
+  // Convert line breaks to <br> tags
+  formatted = formatted.replace(/\n/g, '<br>');
+  
+  // Convert double line breaks to paragraphs
+  formatted = formatted.replace(/(<br>){2,}/g, '</p><p>');
+  
+  // Wrap in paragraph tags
+  formatted = `<p>${formatted}</p>`;
+  
+  return formatted;
+};
 
 const EmailDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [markAsRead] = useMarkEmailReadMutation();
   const [deleteEmail] = useDeleteEmailMutation();
+  const [updateClassification, { isLoading: updateClassificationLoading }] = useUpdateEmailClassificationMutation();
+  const [showClassificationMenu, setShowClassificationMenu] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [applyToOutlook, setApplyToOutlook] = useState(true);
   
   const {
     data: email,
@@ -18,6 +66,12 @@ const EmailDetail: React.FC = () => {
   } = useGetEmailByIdQuery(id!, {
     skip: !id,
   });
+  
+  const { 
+    data: categoryMappings,
+    isLoading: categoryMappingsLoading,
+    error: categoryMappingsError
+  } = useGetCategoryMappingsQuery();
   
   // Mark as read when viewing
   useEffect(() => {
@@ -46,6 +100,29 @@ const EmailDetail: React.FC = () => {
       await markAsRead({ id: email.id, read: false }).unwrap();
     } catch (error) {
       console.error('Failed to mark as unread:', error);
+    }
+  };
+
+  const handleUpdateClassification = async (newCategory: string) => {
+    if (!email) return;
+    
+    try {
+      const result = await updateClassification({
+        emailId: email.id,
+        category: newCategory,
+        applyToOutlook,
+      }).unwrap();
+      
+      alert(result.message);
+      setShowClassificationMenu(false);
+      setSelectedCategory('');
+      setApplyToOutlook(true);
+      
+      // RTK Query will automatically update the cache and re-render
+      // No need to reload the page
+    } catch (error) {
+      console.error('Failed to update classification:', error);
+      alert('Failed to update classification');
     }
   };
   
@@ -218,12 +295,23 @@ const EmailDetail: React.FC = () => {
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
           }
           
+          .email-content {
+            line-height: 1.6;
+            color: #333;
+          }
+          
           .email-content p {
             margin-bottom: 16px;
+            margin-top: 0;
           }
           
           .email-content a {
             color: #007acc;
+            text-decoration: none;
+            word-break: break-all;
+          }
+          
+          .email-content a:hover {
             text-decoration: underline;
           }
           
@@ -233,6 +321,57 @@ const EmailDetail: React.FC = () => {
             margin: 16px 0;
             color: #6c757d;
             font-style: italic;
+          }
+          
+          .email-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin: 8px 0;
+          }
+          
+          .email-content pre {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #e0e0e0;
+          }
+          
+          .email-content code {
+            background-color: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+          }
+          
+          .email-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+          }
+          
+          .email-content table td,
+          .email-content table th {
+            border: 1px solid #e0e0e0;
+            padding: 8px;
+            text-align: left;
+          }
+          
+          .email-content table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+          }
+          
+          .email-content ul,
+          .email-content ol {
+            margin: 12px 0;
+            padding-left: 24px;
+          }
+          
+          .email-content li {
+            margin-bottom: 8px;
           }
         `}
       </style>
@@ -272,14 +411,46 @@ const EmailDetail: React.FC = () => {
       <div style={emailHeaderStyle}>
         <h1 style={subjectStyle}>{email.subject}</h1>
         
+        {/* AI Summary - Prominently displayed */}
+        {email.one_line_summary && (
+          <div style={{
+            backgroundColor: '#e7f3ff',
+            border: '2px solid #007acc',
+            borderRadius: '8px',
+            padding: '16px',
+            marginTop: '16px',
+            marginBottom: '16px',
+          }}>
+            <div style={{
+              fontSize: '13px',
+              fontWeight: '600',
+              color: '#0066cc',
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span style={{ fontSize: '16px' }}>💡</span>
+              AI Summary
+            </div>
+            <div style={{
+              fontSize: '15px',
+              color: '#333',
+              lineHeight: '1.5'
+            }}>
+              {email.one_line_summary}
+            </div>
+          </div>
+        )}
+        
         <div style={metaRowStyle}>
-          <div style={senderStyle}>From: {email.sender}</div>
-          <div style={recipientStyle}>To: {email.recipient}</div>
-          <div>{formatEmailDate(email.date)}</div>
+          <div style={senderStyle}>From: {email.sender || 'Unknown'}</div>
+          <div style={recipientStyle}>To: {email.recipient || 'Unknown'}</div>
+          <div>{email.date ? formatEmailDate(email.date) : email.received_time ? formatEmailDate(email.received_time) : 'No date'}</div>
         </div>
         
         <div style={metaRowStyle}>
-          <div>Date: {new Date(email.date).toLocaleString()}</div>
+          <div>Date: {email.date ? new Date(email.date).toLocaleString() : email.received_time ? new Date(email.received_time).toLocaleString() : 'Invalid Date'}</div>
           {email.folder_name && (
             <div>Folder: {email.folder_name}</div>
           )}
@@ -296,54 +467,169 @@ const EmailDetail: React.FC = () => {
             />
           ))}
           
-          {/* Priority indicator */}
-          {email.importance !== 'Normal' && (
-            <span 
-              style={{
-                padding: '4px 8px',
-                backgroundColor: email.importance === 'High' ? '#dc3545' : '#28a745',
-                color: 'white',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: '600',
-              }}
-            >
-              {getPriorityIcon(email.importance.toLowerCase())} {email.importance} Priority
-            </span>
-          )}
-          
-          {/* Attachments indicator */}
-          {email.has_attachments && (
-            <span 
-              style={{
-                padding: '4px 8px',
-                backgroundColor: '#17a2b8',
-                color: 'white',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: '600',
-              }}
-            >
-              📎 Has Attachments
-            </span>
-          )}
-          
-          {/* Read status */}
-          {!email.is_read && (
-            <span 
-              style={{
-                padding: '4px 8px',
-                backgroundColor: '#007acc',
-                color: 'white',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: '600',
-              }}
-            >
-              Unread
-            </span>
-          )}
+          {/* Classification modification button */}
+          <button
+            onClick={() => setShowClassificationMenu(!showClassificationMenu)}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: '#4a90e2',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              marginLeft: '12px'
+            }}
+          >
+            Change Classification
+          </button>
         </div>
+        
+        {/* Classification modification menu */}
+        {showClassificationMenu && (
+          <div style={{
+            marginTop: '16px',
+            padding: '16px',
+            backgroundColor: '#f8f9fa',
+            borderRadius: '8px',
+            border: '1px solid #dee2e6'
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '16px' }}>
+              Change Email Classification
+            </h3>
+            
+            {categoryMappingsLoading ? (
+              <div>Loading categories...</div>
+            ) : categoryMappingsError ? (
+              <div style={{ color: '#dc3545' }}>Error loading categories</div>
+            ) : (
+              <>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                    Select Category:
+                  </label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      borderRadius: '4px',
+                      border: '1px solid #ced4da',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="">-- Select a category --</option>
+                    {categoryMappings?.map((mapping) => (
+                      <option key={mapping.category} value={mapping.category}>
+                        {mapping.category.replace(/_/g, ' ').toUpperCase()}
+                        {mapping.folder_name ? ` → ${mapping.folder_name}` : ' (stays in inbox)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={applyToOutlook}
+                      onChange={(e) => setApplyToOutlook(e.target.checked)}
+                      style={{ marginRight: '8px' }}
+                    />
+                    <span>Apply to Outlook (move email to corresponding folder)</span>
+                  </label>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => handleUpdateClassification(selectedCategory)}
+                    disabled={!selectedCategory || updateClassificationLoading}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: selectedCategory ? '#28a745' : '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: selectedCategory ? 'pointer' : 'not-allowed',
+                      fontSize: '14px',
+                      opacity: selectedCategory ? 1 : 0.6
+                    }}
+                  >
+                    {updateClassificationLoading ? 'Updating...' : 'Update Classification'}
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setShowClassificationMenu(false);
+                      setSelectedCategory('');
+                      setApplyToOutlook(false);
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        
+        {/* Priority indicator */}
+        {email.importance && email.importance !== 'Normal' && (
+          <span 
+            style={{
+              padding: '4px 8px',
+              backgroundColor: email.importance === 'High' ? '#dc3545' : '#28a745',
+              color: 'white',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: '600',
+            }}
+          >
+            {getPriorityIcon(email.importance.toLowerCase())} {email.importance} Priority
+          </span>
+        )}
+        
+        {/* Attachments indicator */}
+        {email.has_attachments && (
+          <span 
+            style={{
+              padding: '4px 8px',
+              backgroundColor: '#17a2b8',
+              color: 'white',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: '600',
+            }}
+          >
+            📎 Has Attachments
+          </span>
+        )}
+        
+        {/* Read status */}
+        {!email.is_read && (
+          <span 
+            style={{
+              padding: '4px 8px',
+              backgroundColor: '#007acc',
+              color: 'white',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: '600',
+            }}
+          >
+            Unread
+          </span>
+        )}
       </div>
       
       {/* Email content */}
@@ -352,9 +638,13 @@ const EmailDetail: React.FC = () => {
           <div 
             dangerouslySetInnerHTML={{ __html: email.html_body }}
           />
+        ) : email.body ? (
+          <div 
+            dangerouslySetInnerHTML={{ __html: formatPlainTextEmail(email.body) }}
+          />
         ) : (
-          <div style={{ whiteSpace: 'pre-wrap' }}>
-            {email.body}
+          <div style={{ color: '#6c757d', fontStyle: 'italic', padding: '24px 0' }}>
+            No email content available
           </div>
         )}
       </div>

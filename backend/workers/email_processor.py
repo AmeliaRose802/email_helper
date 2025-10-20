@@ -38,31 +38,31 @@ class EmailProcessorWorker:
         self.logger.info("EmailProcessorWorker initialized")
     
     def _get_ai_service(self):
-        """Get AI service with fallback."""
+        """Get AI service - no fallback to mock."""
         try:
-            from backend.services.ai_service import ai_service
-            return ai_service
-        except ImportError:
-            self.logger.warning("AI service not available, using mock")
-            return MockAIService()
+            from backend.services.ai_service import get_ai_service
+            return get_ai_service()
+        except ImportError as e:
+            self.logger.error(f"AI service import failed: {e}")
+            raise ImportError(f"AI service required but not available: {e}")
     
     def _get_email_service(self):
-        """Get email service with fallback."""
+        """Get email service - no fallback to mock."""
         try:
-            from backend.services.email_provider import email_service
-            return email_service
-        except ImportError:
-            self.logger.warning("Email service not available, using mock")
-            return MockEmailService()
+            from backend.services.email_provider import get_email_provider
+            return get_email_provider()
+        except ImportError as e:
+            self.logger.error(f"Email service import failed: {e}")
+            raise ImportError(f"Email service required but not available: {e}")
     
     def _get_task_service(self):
-        """Get task service with fallback."""
+        """Get task service - no fallback to mock."""
         try:
-            from backend.services.task_service import task_service
-            return task_service
-        except ImportError:
-            self.logger.warning("Task service not available, using mock")
-            return MockTaskService()
+            from backend.services.task_service import get_task_service
+            return get_task_service()
+        except ImportError as e:
+            self.logger.error(f"Task service import failed: {e}")
+            raise ImportError(f"Task service required but not available: {e}")
     
     async def start(self):
         """Start the background worker."""
@@ -173,7 +173,7 @@ class EmailProcessorWorker:
             message="Retrieving email data..."
         ))
         
-        email_data = await self.email_service.get_email(email_id)
+        email_data = await self.email_service.get_email_content(email_id)
         if not email_data:
             raise ValueError(f"Email {email_id} not found")
         
@@ -184,7 +184,7 @@ class EmailProcessorWorker:
             message="Analyzing email content with AI..."
         ))
         
-        analysis_result = await self.ai_service.analyze_email(email_data)
+        analysis_result = await self.ai_service.generate_summary(email_data)
         
         # Step 3: Store results
         await job_queue.update_job_progress(job.id, JobProgress(
@@ -210,10 +210,10 @@ class EmailProcessorWorker:
         await job_queue.update_job_progress(job.id, JobProgress(
             step="Task Extraction",
             percentage=20,
-            message="Retrieving email analysis..."
+            message="Retrieving email data..."
         ))
         
-        email_data = await self.email_service.get_email(email_id)
+        email_data = await self.email_service.get_email_content(email_id)
         if not email_data:
             raise ValueError(f"Email {email_id} not found")
         
@@ -224,7 +224,7 @@ class EmailProcessorWorker:
             message="Extracting actionable tasks..."
         ))
         
-        tasks = await self.ai_service.extract_tasks(email_data)
+        tasks = await self.ai_service.extract_action_items(email_data)
         
         # Step 3: Create tasks in system
         await job_queue.update_job_progress(job.id, JobProgress(
@@ -260,7 +260,7 @@ class EmailProcessorWorker:
             message="Retrieving email data..."
         ))
         
-        email_data = await self.email_service.get_email(email_id)
+        email_data = await self.email_service.get_email_content(email_id)
         if not email_data:
             raise ValueError(f"Email {email_id} not found")
         
@@ -271,7 +271,7 @@ class EmailProcessorWorker:
             message="Determining email category..."
         ))
         
-        category_result = await self.ai_service.categorize_email(email_data)
+        category_result = await self.ai_service.classify_email(email_data)
         
         # Step 3: Update email category
         await job_queue.update_job_progress(job.id, JobProgress(
@@ -286,89 +286,6 @@ class EmailProcessorWorker:
             "email_id": email_id,
             "category": category_result,
             "processed_at": datetime.utcnow().isoformat()
-        }
-
-
-# Mock services for development
-class MockAIService:
-    """Mock AI service for development."""
-    
-    async def analyze_email(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Mock email analysis."""
-        await asyncio.sleep(2)  # Simulate processing time
-        return {
-            "sentiment": "neutral",
-            "priority": "medium",
-            "action_required": True,
-            "confidence": 0.85
-        }
-    
-    async def extract_tasks(self, email_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Mock task extraction."""
-        await asyncio.sleep(1.5)  # Simulate processing time
-        
-        if "meeting" in email_data.get("content", "").lower():
-            return [{
-                "title": "Attend meeting",
-                "description": "Meeting scheduled in email",
-                "priority": "medium",
-                "due_date": None
-            }]
-        
-        return []
-    
-    async def categorize_email(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Mock email categorization."""
-        await asyncio.sleep(1)  # Simulate processing time
-        
-        content = email_data.get("content", "").lower()
-        if "urgent" in content:
-            category = "urgent"
-        elif "meeting" in content:
-            category = "meetings"
-        elif "project" in content:
-            category = "projects"
-        else:
-            category = "general"
-        
-        return {
-            "category": category,
-            "confidence": 0.75,
-            "tags": [category]
-        }
-
-
-class MockEmailService:
-    """Mock email service for development."""
-    
-    async def get_email(self, email_id: str) -> Optional[Dict[str, Any]]:
-        """Mock get email."""
-        await asyncio.sleep(0.1)  # Simulate database lookup
-        return {
-            "id": email_id,
-            "subject": f"Sample Email {email_id}",
-            "content": "This is a sample email content for processing.",
-            "sender": "sender@example.com",
-            "received_at": datetime.utcnow().isoformat()
-        }
-    
-    async def update_email_category(self, email_id: str, category: Dict[str, Any]):
-        """Mock update email category."""
-        await asyncio.sleep(0.1)  # Simulate database update
-        return True
-
-
-class MockTaskService:
-    """Mock task service for development."""
-    
-    async def create_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Mock create task."""
-        await asyncio.sleep(0.1)  # Simulate database insert
-        
-        return {
-            "id": f"task_{hash(str(task_data))}"[:16],
-            "created_at": datetime.utcnow().isoformat(),
-            **task_data
         }
 
 

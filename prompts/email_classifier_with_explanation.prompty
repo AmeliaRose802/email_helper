@@ -123,8 +123,15 @@ Signals the action is on **another team** (classify as `fyi` unless a clear coun
 Return a JSON object with exactly this structure:
 {
   "category": "one_of_the_categories_listed_below",
+  "confidence": 0.95,
   "explanation": "brief_reason_for_this_categorization"
 }
+
+The confidence score should be a float between 0.0 and 1.0 indicating how confident you are in this classification:
+- 0.9-1.0: Very confident, clear category based on explicit indicators
+- 0.7-0.89: Confident, category is appropriate based on content patterns
+- 0.5-0.69: Moderate confidence, some ambiguity but category is most likely
+- Below 0.5: Low confidence, significant uncertainty in classification
 
 Valid categories: required_personal_action, team_action, optional_action, job_listing, optional_event, work_relevant, fyi, newsletter, spam_to_delete
 
@@ -133,19 +140,19 @@ The explanation should be 1-2 sentences explaining why this specific category wa
 ## Calibration Examples (few-shot)
 - Subject: "Request: Network Team to open firewall for svc-X"
   Body: "We've asked **Network Team** to open ports 8443/9443. They'll confirm once done."
-  → {"category": "fyi", "explanation": "Action is owned by Network Team, not our team. We're just being informed of the request status."}
+  → {"category": "fyi", "confidence": 0.92, "explanation": "Action is owned by Network Team, not our team. We're just being informed of the request status."}
 
 - Subject: "Compute Fabric: please review PR #1289 by EOD"
   Body: "@Compute-Fabric reviewers: need your approval to unblock rollout."
-  → {"category": "team_action", "explanation": "Explicit request for our team to review and approve a PR with a deadline."}
+  → {"category": "team_action", "confidence": 0.96, "explanation": "Explicit request for our team to review and approve a PR with a deadline."}
 
 - Subject: "Dependency outage in ContosoAuth"
   Body: "Owner: **ContosoAuth**. We'll monitor. No action for Compute Fabric."
-  → {"category": "fyi", "explanation": "Outage is owned by ContosoAuth team with no action required from us."}
+  → {"category": "fyi", "confidence": 0.94, "explanation": "Outage is owned by ContosoAuth team with no action required from us."}
 
 - Subject: "IMDS regression in our service (P1)"
   Body: "Owner: Compute Fabric. On-call to investigate and mitigate."
-  → {"category": "team_action", "explanation": "P1 incident owned by our team requiring immediate action from on-call."}
+  → {"category": "team_action", "confidence": 0.98, "explanation": "P1 incident owned by our team requiring immediate action from on-call."}
 
 user:
 ## Context Information

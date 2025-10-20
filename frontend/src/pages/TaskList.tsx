@@ -4,6 +4,7 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useGetTasksQuery } from '@/services/taskApi';
 import { TaskBoard } from '@/components/Task/TaskBoard';
+import { SimpleTaskList } from '@/components/Task/SimpleTaskList';
 import { TaskFilters } from '@/components/Task/TaskFilters';
 import { ProgressTracker } from '@/components/Task/ProgressTracker';
 import { TaskForm } from '@/components/Task/TaskForm';
@@ -14,7 +15,7 @@ const TaskList: React.FC = () => {
   const [filters, setFilters] = useState<TaskFilter>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
+  const [viewMode, setViewMode] = useState<'board' | 'list'>('list'); // Default to simple list
 
   const {
     data: taskData,
@@ -123,56 +124,10 @@ const TaskList: React.FC = () => {
               onRefresh={refetch}
             />
           ) : (
-            <div className="task-list-view">
-              <div className="task-items">
-                {filteredTasks.length === 0 ? (
-                  <div className="empty-state">
-                    <div className="empty-icon">📋</div>
-                    <h3>No tasks found</h3>
-                    <p>
-                      {Object.keys(filters).length > 0 
-                        ? 'Try adjusting your filters or create a new task.'
-                        : 'Get started by creating your first task.'
-                      }
-                    </p>
-                    <button 
-                      className="create-first-task-btn"
-                      onClick={() => setShowCreateForm(true)}
-                    >
-                      Create Task
-                    </button>
-                  </div>
-                ) : (
-                  filteredTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className={`task-item priority-${task.priority} status-${task.status}`}
-                      onClick={() => handleEditTask(task)}
-                    >
-                      <div className="task-header">
-                        <strong>{task.title}</strong>
-                        <span className={`task-status ${task.status}`}>
-                          {task.status.replace('-', ' ')}
-                        </span>
-                      </div>
-                      <div className="task-meta">
-                        <span className={`task-priority ${task.priority}`}>
-                          {task.priority} priority
-                        </span>
-                        <span className="task-category">{task.category.replace('_', ' ')}</span>
-                        {task.due_date && <span className="task-due-date">Due: {task.due_date}</span>}
-                      </div>
-                      {task.description && (
-                        <div className="task-description">
-                          {task.description.substring(0, 200)}
-                          {task.description.length > 200 && '...'}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            <SimpleTaskList 
+              tasks={filteredTasks}
+              onRefresh={refetch}
+            />
           )}
         </div>
 

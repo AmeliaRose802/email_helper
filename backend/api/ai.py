@@ -5,8 +5,11 @@ and summarization using existing AI processor functionality.
 """
 
 import time
+import json
+import asyncio
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from backend.models.ai_models import (
     EmailClassificationRequest, EmailClassificationResponse,
@@ -41,11 +44,21 @@ async def classify_email(
     try:
         start_time = time.time()
         
-        result = await ai_service.classify_email_async(
-            subject=request.subject,
-            content=request.content,
-            sender=request.sender,
+        # Build email content from components
+        email_text = f"Subject: {request.subject}\nFrom: {request.sender}\n\n{request.content}"
+        if request.context:
+            email_text += f"\n\nContext: {request.context}"
+        
+        # Classify the email
+        result = await ai_service.classify_email(
+            email_content=email_text,
             context=request.context
+        )
+        
+        # Also generate one-line summary
+        summary_result = await ai_service.generate_summary(
+            email_content=email_text,
+            summary_type="brief"
         )
         
         processing_time = time.time() - start_time
@@ -59,10 +72,11 @@ async def classify_email(
         
         return EmailClassificationResponse(
             category=result.get('category', 'work_relevant'),
-            confidence=result.get('confidence', 0.5),
+            confidence=result.get('confidence'),  # No fake default - None if AI didn't provide one
             reasoning=result.get('reasoning', 'Classification completed'),
             alternative_categories=result.get('alternatives', []),
-            processing_time=processing_time
+            processing_time=processing_time,
+            one_line_summary=summary_result.get('summary', '')  # Include one-line summary
         )
         
     except HTTPException:
@@ -243,3 +257,90 @@ async def ai_health_check(
                 "message": "AI services are not available"
             }
         )
+
+
+@router.post(
+    "/classify-batch-stream",
+    summary="Classify emails with streaming progress",
+    description="Classify multiple emails and stream progress updates in real-time"
+)
+async def classify_batch_stream(
+    email_ids: List[str],
+    current_user: User = Depends(get_current_user),
+    ai_service = Depends(get_ai_service)
+):
+    """Stream classification progress for batch email processing.
+    
+    This endpoint classifies multiple emails and streams progress updates
+    as Server-Sent Events (SSE) for real-time UI updates.
+    """
+    from backend.core.dependencies import get_email_provider
+    
+    async def generate_progress():
+        try:
+            email_provider = get_email_provider()
+            total = len(email_ids)
+            
+            # Send initial progress
+            yield f"data: {json.dumps({'current': 0, 'total': total, 'status': 'starting', 'message': 'Starting classification...'})}\n\n"
+            
+            for idx, email_id in enumerate(email_ids, 1):
+                try:
+                    # Fetch email data
+                    email = email_provider.get_email_by_id(email_id)
+                    
+                    if not email:
+                        yield f"data: {json.dumps({'current': idx, 'total': total, 'status': 'error', 'email_id': email_id, 'message': f'Email {email_id} not found'})}\n\n"
+                        continue
+                    
+                    # Send processing update
+                    yield f"data: {json.dumps({'current': idx, 'total': total, 'status': 'processing', 'email_id': email_id, 'message': f'Classifying email {idx}/{total}...'})}\n\n"
+                    
+                    # Build email content
+                    email_text = f"Subject: {email.get('subject', '')}\nFrom: {email.get('sender', '')}\n\n{email.get('body', '')}"
+                    
+                    # Classify email
+                    start_time = time.time()
+                    result = await ai_service.classify_email(
+                        email_content=email_text,
+                        context=None
+                    )
+                    processing_time = time.time() - start_time
+                    
+                    # Send success update with classification result
+                    # Only include confidence if AI actually provided one
+                    response_data = {
+                        'current': idx, 
+                        'total': total, 
+                        'status': 'success', 
+                        'email_id': email_id, 
+                        'category': result.get('category', 'work_relevant'),
+                        'processing_time': processing_time,
+                        'message': f'Classified email {idx}/{total}'
+                    }
+                    if result.get('confidence') is not None:
+                        response_data['confidence'] = result.get('confidence')
+                    
+                    yield f"data: {json.dumps(response_data)}\n\n"
+                    
+                    # Small delay to prevent overwhelming the AI service
+                    await asyncio.sleep(1)
+                    
+                except Exception as e:
+                    yield f"data: {json.dumps({'current': idx, 'total': total, 'status': 'error', 'email_id': email_id, 'error': str(e), 'message': f'Error classifying email {idx}/{total}'})}\n\n"
+            
+            # Send completion
+            yield f"data: {json.dumps({'current': total, 'total': total, 'status': 'complete', 'message': 'Classification complete'})}\n\n"
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'status': 'error', 'error': str(e), 'message': 'Classification failed'})}\n\n"
+    
+    return StreamingResponse(
+        generate_progress(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable buffering for Nginx
+        }
+    )

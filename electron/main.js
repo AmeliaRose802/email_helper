@@ -11,14 +11,15 @@
 const { app, BrowserWindow, Menu, Tray, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
-const isDev = process.env.NODE_ENV === 'development';
+// Always enable dev mode when running from source (not packaged)
+const isDev = !app.isPackaged;
 
 let mainWindow = null;
 let backendProcess = null;
 let tray = null;
 
 // Backend server configuration
-const BACKEND_PORT = 8001;
+const BACKEND_PORT = 8000;
 const BACKEND_HOST = 'localhost';
 
 /**
@@ -28,7 +29,7 @@ function startBackend() {
   console.log('Starting Python backend server...');
   
   const pythonExecutable = process.platform === 'win32' ? 'python' : 'python3';
-  const backendScript = path.join(app.getAppPath(), '..', 'simple_api.py');
+  const backendScript = path.join(app.getAppPath(), '..', 'run_backend.py');
   
   backendProcess = spawn(pythonExecutable, [backendScript], {
     cwd: path.join(app.getAppPath(), '..'),
@@ -93,145 +94,82 @@ function stopBackend() {
 async function createWindow() {
   // Don't start backend - it's started externally by the PowerShell script
 
+  // Set app icon
+  const iconPath = path.join(__dirname, 'assets', 'icon.png');
+  
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 800,
     minHeight: 600,
     title: 'Email Helper Dashboard',
+    icon: iconPath, // Set window icon
+    center: true, // Center the window on screen
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
       zoomFactor: 1.0,
       enableRemoteModule: false,
-      devTools: true, // Enable dev tools for debugging
-      webSecurity: false, // Allow cross-origin requests for development
-      allowRunningInsecureContent: true
+      devTools: isDev, // Only enable dev tools in development
+      webSecurity: true, // Enable web security
+      allowRunningInsecureContent: false // Disable insecure content
     },
     titleBarStyle: 'default', // Ensure proper title bar for Windows
     frame: true, // Use standard frame for proper click handling
-    show: false,
+    show: false, // Hide until ready
+    backgroundColor: '#ffffff', // White background while loading
   });
 
   // Force zoom level to 100%
   mainWindow.webContents.setZoomFactor(1.0);
 
-  // Load the frontend with timeout
-  const frontendUrl = 'http://localhost:5173/test-simple.html';
-  console.log('Loading frontend from:', frontendUrl);
-  
-  const loadWithTimeout = (url, timeoutMs = 10000) => {
-    return Promise.race([
-      mainWindow.loadURL(url),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Load timeout')), timeoutMs)
-      )
-    ]);
-  };
-  
-  try {
-    await loadWithTimeout(frontendUrl, 8000);
-    console.log('Frontend loaded successfully');
-  } catch (error) {
-    console.error('Failed to load frontend from', frontendUrl, error);
-    // Fallback: try to load test page
-    const fallbackUrl = 'http://localhost:5173/test-simple.html';
-    console.log('Trying fallback:', fallbackUrl);
-    try {
-      await loadWithTimeout(fallbackUrl, 5000);
-    } catch (fallbackError) {
-      console.error('Fallback also failed, loading local file:', fallbackError);
-      // Last resort: load a local file
-      const localFile = path.join(__dirname, '..', 'test-dashboard.html');
-      try {
-        await mainWindow.loadFile(localFile);
-      } catch (localError) {
-        console.error('Even local file failed:', localError);
-      }
-    }
-  }
-  
-  // Enable dev tools for debugging button issues
-  mainWindow.webContents.openDevTools();
-  
-  // Inject button debugging script with timeout protection
-  setTimeout(() => {
-    mainWindow.webContents.executeJavaScript(`
-      console.log('🔧 Injecting button debug helpers...');
-      
-      // Wait for React to load with timeout
-      const debugTimeout = setTimeout(() => {
-        console.log('Debug injection timeout, trying anyway...');
-        debugButtons();
-      }, 5000);
-      
-      function debugButtons() {
-        try {
-          const buttons = document.querySelectorAll('button, .action-button');
-          console.log('Found buttons:', buttons.length);
-          
-          buttons.forEach((btn, index) => {
-            console.log(\`Button \${index + 1}:\`, {
-              text: btn.textContent?.trim(),
-              disabled: btn.disabled,
-              style: {
-                pointerEvents: window.getComputedStyle(btn).pointerEvents,
-                zIndex: window.getComputedStyle(btn).zIndex,
-                position: window.getComputedStyle(btn).position
-              }
-            });
-            
-            // Force enable clicking
-            btn.style.pointerEvents = 'auto';
-            btn.style.zIndex = '9999';
-            btn.style.position = 'relative';
-            
-            // Add visual debug on hover
-            btn.addEventListener('mouseenter', () => {
-              btn.style.border = '2px solid red';
-              console.log('🐭 Mouse over:', btn.textContent?.trim());
-            });
-            
-            btn.addEventListener('mouseleave', () => {
-              btn.style.border = '';
-            });
-            
-            // Log all click events
-            btn.addEventListener('click', (e) => {
-              console.log('🎯 BUTTON CLICKED!', btn.textContent?.trim());
-              btn.style.background = 'lime';
-              setTimeout(() => btn.style.background = '', 2000);
-            }, true);
-          });
-          
-          clearTimeout(debugTimeout);
-        } catch (error) {
-          console.error('Error in button debug:', error);
-        }
-      }
-      
-      setTimeout(debugButtons, 2000);
-    `).catch(err => {
-      console.error('Failed to inject debug script:', err);
-    });
-  }, 1000);
-
-  // Show window when ready
-  mainWindow.once('ready-to-show', () => {
+  // Register event listeners BEFORE loading URL (critical!)
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('✅ Page finished loading, showing window immediately');
     mainWindow.show();
-    console.log('Window shown');
+    mainWindow.focus();
+    
+    // Open DevTools for debugging
+    if (isDev) {
+      console.log('🔧 Opening DevTools for debugging...');
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
   });
 
-  // Log any loading errors
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    console.error('Failed to load:', errorCode, errorDescription);
+    console.error('❌ Failed to load:', errorCode, errorDescription);
+    // Show window anyway so user can see the error
+    if (mainWindow && !mainWindow.isVisible()) {
+      console.log('Showing window despite load failure');
+      mainWindow.show();
+    }
   });
 
   mainWindow.webContents.on('console-message', (event, level, message) => {
-    // Always log console messages for debugging
     const levelName = ['', 'INFO', 'WARNING', 'ERROR'][level] || 'LOG';
     console.log(`[Renderer ${levelName}] ${message}`);
+  });
+
+  // Absolute safety fallback: Show window after 5 seconds no matter what
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      console.log('⏰ SAFETY TIMEOUT: Forcing window to show after 5 seconds');
+      mainWindow.show();
+      mainWindow.focus();
+      if (isDev) {
+        mainWindow.webContents.openDevTools({ mode: 'detach' });
+      }
+    }
+  }, 5000);
+
+  // Load the React frontend - simple approach, no complex error handling
+  const reactDevUrl = 'http://localhost:3001';
+  console.log('Loading React frontend from:', reactDevUrl);
+  
+  mainWindow.loadURL(reactDevUrl).catch(error => {
+    console.error('Load URL failed:', error);
+    mainWindow.show(); // Show window even on error
   });
 
   // Handle window close

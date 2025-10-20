@@ -1,4 +1,4 @@
-// Redux Toolkit store configuration
+// Redux Toolkit store configuration - RE-ENABLED API MIDDLEWARE
 import { configureStore } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
 import { apiSlice } from '@/services/api';

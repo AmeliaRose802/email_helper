@@ -10,17 +10,18 @@ import type {
 
 export const aiApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    // Classify single email
-    classifyEmail: builder.mutation<EmailClassification, { email_id: string; use_cache?: boolean }>(
-      {
-        query: ({ email_id, use_cache = true }) => ({
-          url: '/api/ai/classify',
-          method: 'POST',
-          body: { email_id, use_cache },
-        }),
-        invalidatesTags: [{ type: 'AIClassification', id: 'LIST' }],
-      }
-    ),
+    // Classify single email by email data
+    classifyEmail: builder.mutation<
+      { category: string; confidence: number; reasoning: string; alternative_categories: string[]; processing_time: number; one_line_summary?: string },
+      { subject: string; sender: string; content: string; context?: string }
+    >({
+      query: (emailData) => ({
+        url: '/api/ai/classify',
+        method: 'POST',
+        body: emailData,
+      }),
+      invalidatesTags: [{ type: 'AIClassification', id: 'LIST' }],
+    }),
 
     // Batch classify multiple emails
     classifyEmailBatch: builder.mutation<BatchClassificationResponse, BatchClassificationRequest>({

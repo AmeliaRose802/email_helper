@@ -33,11 +33,13 @@ comprehensive error handling for robust operation with the Outlook COM interface
 # Conditional import for Windows-only dependency
 try:
     import win32com.client
+    import pythoncom
     WIN32COM_AVAILABLE = True
 except ImportError:
     WIN32COM_AVAILABLE = False
     # Define dummy for type hints when not available
     win32com = None
+    pythoncom = None
 
 import os
 from datetime import datetime, timedelta
@@ -89,6 +91,13 @@ class OutlookManager:
     def connect_to_outlook(self):
         """Connect to Outlook application"""
         try:
+            # Initialize COM on this thread (required for multi-threaded environments)
+            # Use try/except because it might already be initialized
+            try:
+                pythoncom.CoInitialize()
+            except:
+                pass  # Already initialized on this thread
+            
             self.outlook = win32com.client.Dispatch("Outlook.Application")
             self.namespace = self.outlook.GetNamespace("MAPI")
             
@@ -107,29 +116,50 @@ class OutlookManager:
             self._setup_outlook_folders()
             
         except Exception as e:
-            print(f"❌ Failed to connect to Outlook: {str(e)}")
+            print(f"[ERROR] Failed to connect to Outlook: {str(e)}", flush=True)
             raise
     
     def _setup_outlook_folders(self):
         """Set up Outlook folders for organizing emails with proper hierarchy"""
         try:
+            print("\n=== Setting up Outlook folders ===")
             # Get the Inbox folder and main mail root
             inbox_folder = self.inbox
             mail_root = inbox_folder.Parent  # This gets the main Mail folder (parent of Inbox)
+            print(f"Inbox: {inbox_folder.Name}")
+            print(f"Mail root: {mail_root.Name}")
             
+            print(f"\nCreating {len(INBOX_CATEGORIES)} inbox category folders:")
             # Create inbox folders (actionable items)
             for category, folder_name in INBOX_CATEGORIES.items():
                 folder = self._create_folder_if_not_exists(inbox_folder, folder_name)
                 self.folders[category] = folder
+                if folder:
+                    print(f"  [OK] {category} -> {folder.Name} (under Inbox)")
+                else:
+                    print(f"  [FAIL] {category} -> {folder_name} (failed)")
             
+            print(f"\nCreating {len(NON_INBOX_CATEGORIES)} mail root category folders:")
             # Create non-inbox folders (reference/FYI items) at mail root level
             for category, folder_name in NON_INBOX_CATEGORIES.items():
                 folder = self._create_folder_if_not_exists(mail_root, folder_name)
                 self.folders[category] = folder
+                if folder:
+                    print(f"  [OK] {category} -> {folder.Name} (under Mail root)")
+                else:
+                    print(f"  [FAIL] {category} -> {folder_name} (failed)")
             
             # Create Done folder at mail root level for completed tasks
+            print(f"\nCreating Done folder:")
             done_folder = self._create_folder_if_not_exists(mail_root, "Done")
             self.folders['done'] = done_folder
+            if done_folder:
+                print(f"  [OK] done -> {done_folder.Name} (under Mail root)")
+            else:
+                print(f"  [FAIL] done -> Done (failed)")
+            
+            print(f"\n[OK] Folder setup complete. Total folders in dictionary: {len(self.folders)}")
+            print(f"=== End folder setup ===\n")
                 
         except Exception as e:
             print(f"⚠️  Warning: Could not set up Outlook folders: {e}")
@@ -148,7 +178,7 @@ class OutlookManager:
             return new_folder
                     
         except Exception as e:
-            print(f"⚠️  Could not create/access folder '{folder_name}': {e}")
+            print(f"[WARNING] Could not create/access folder '{folder_name}': {e}")
             return None
     
     def move_email_to_category(self, email, category):
@@ -197,21 +227,30 @@ class OutlookManager:
         except Exception as e:
             print(f"⚠️  Could not add category to email: {e}")
     
-    def get_recent_emails(self, days_back=7, max_emails=100):
+    def get_recent_emails(self, days_back=7, max_emails=10000):
         """Get recent emails from inbox"""
         if not self.inbox:
             raise Exception("Not connected to Outlook. Call connect_to_outlook() first.")
             
         cutoff_date = datetime.now() - timedelta(days=days_back)
         
-        recent_emails = [
-            email for email in self.inbox.Items
-            if email.ReceivedTime.replace(tzinfo=None) >= cutoff_date
-        ][:max_emails * 2]  # Get more emails to account for thread consolidation
+        recent_emails = []
+        for item in self.inbox.Items:
+            try:
+                # Only process MailItem objects (Class = 43)
+                if hasattr(item, 'Class') and item.Class == 43:
+                    if hasattr(item, 'ReceivedTime'):
+                        if item.ReceivedTime.replace(tzinfo=None) >= cutoff_date:
+                            recent_emails.append(item)
+                            if len(recent_emails) >= max_emails * 2:
+                                break
+            except Exception as e:
+                # Skip items that cause errors
+                continue
         
-        return recent_emails
+        return recent_emails[:max_emails * 2]  # Get more emails to account for thread consolidation
     
-    def get_emails_with_full_conversations(self, days_back=7, max_emails=100):
+    def get_emails_with_full_conversations(self, days_back=7, max_emails=10000):
         """Get recent emails and include their full conversation threads"""
         if not self.inbox:
             raise Exception("Not connected to Outlook. Call connect_to_outlook() first.")

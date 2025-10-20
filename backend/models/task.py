@@ -8,8 +8,11 @@ from enum import Enum
 
 class TaskStatus(str, Enum):
     """Task status enumeration."""
+    TODO = "todo"
     PENDING = "pending"
-    IN_PROGRESS = "in_progress" 
+    IN_PROGRESS = "in-progress" 
+    REVIEW = "review"
+    DONE = "done"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
@@ -26,9 +29,12 @@ class TaskBase(BaseModel):
     """Base task model."""
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
-    status: TaskStatus = TaskStatus.PENDING
+    status: TaskStatus = TaskStatus.TODO
     priority: TaskPriority = TaskPriority.MEDIUM
+    category: Optional[str] = None
     due_date: Optional[datetime] = None
+    tags: Optional[list[str]] = None
+    metadata: Optional[dict] = None
 
 
 class TaskCreate(TaskBase):
@@ -79,7 +85,7 @@ class TaskInDB(TaskBase):
 
 class Task(TaskBase):
     """Task model for API responses."""
-    id: int
+    id: str  # String for frontend compatibility
     created_at: datetime
     updated_at: datetime
     email_id: Optional[str] = None

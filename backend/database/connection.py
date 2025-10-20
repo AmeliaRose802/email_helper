@@ -43,7 +43,7 @@ class DatabaseManager:
             migrations = DatabaseMigrations(self.db_path)
             migrations.apply_migrations()
         except Exception as e:
-            print(f"Warning: Could not apply migrations: {e}")
+            print(f"[WARNING] Could not apply migrations: {e}", flush=True)
         
         # Always ensure our API tables exist
         self._create_basic_structure()
@@ -83,9 +83,12 @@ class DatabaseManager:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     title TEXT NOT NULL,
                     description TEXT,
-                    status TEXT DEFAULT 'pending',
+                    status TEXT DEFAULT 'todo',
                     priority TEXT DEFAULT 'medium',
+                    category TEXT,
                     due_date TIMESTAMP,
+                    tags TEXT,
+                    metadata TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     email_id TEXT,
@@ -96,7 +99,7 @@ class DatabaseManager:
             ''')
             
             conn.commit()
-            print("📋 Basic database structure created")
+            print("[DB] Basic database structure verified", flush=True)
     
     @contextmanager
     def get_connection(self) -> Generator[sqlite3.Connection, None, None]:

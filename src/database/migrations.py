@@ -99,17 +99,17 @@ class DatabaseMigrations:
                 elif next_version == 3:
                     self._migrate_to_v3()
                 else:
-                    print(f"⚠️ Unknown migration version: {next_version}")
+                    print(f"[WARNING] Unknown migration version: {next_version}")
                     return False
                 
                 self.current_version = next_version
-                print(f"✅ Applied migration to version {next_version}")
+                print(f"[OK] Applied migration to version {next_version}")
             
-            print(f"📊 Database is up to date at version {self.current_version}")
+            print(f"[INFO] Database is up to date at version {self.current_version}")
             return True
             
         except Exception as e:
-            print(f"❌ Migration failed: {e}")
+            print(f"[ERROR] Migration failed: {e}")
             return False
     
     def _migrate_to_v1(self):
@@ -227,10 +227,10 @@ class DatabaseMigrations:
             with sqlite3.connect(self.db_path) as source:
                 with sqlite3.connect(backup_path) as backup:
                     source.backup(backup)
-            print(f"📦 Database backed up to: {backup_path}")
+            print(f"[BACKUP] Database backed up to: {backup_path}")
             return backup_path
         except Exception as e:
-            print(f"⚠️ Backup failed: {e}")
+            print(f"[WARNING] Backup failed: {e}")
             return ""
     
     def store_accuracy_metrics(self, metrics_data: Dict) -> bool:
@@ -258,7 +258,7 @@ class DatabaseMigrations:
                 conn.commit()
             return True
         except Exception as e:
-            print(f"⚠️ Error storing accuracy metrics: {e}")
+            print(f"[WARNING] Error storing accuracy metrics: {e}")
             return False
     
     def store_task_resolution(self, resolution_data: Dict) -> bool:
@@ -289,7 +289,7 @@ class DatabaseMigrations:
                 conn.commit()
             return True
         except Exception as e:
-            print(f"⚠️ Error storing task resolution: {e}")
+            print(f"[WARNING] Error storing task resolution: {e}")
             return False
     
     def get_metrics_history(self, days_back: int = 30) -> List[Dict]:
@@ -305,7 +305,7 @@ class DatabaseMigrations:
                 
                 return [dict(row) for row in cursor.fetchall()]
         except Exception as e:
-            print(f"⚠️ Error retrieving metrics history: {e}")
+            print(f"[WARNING] Error retrieving metrics history: {e}")
             return []
     
     def get_resolution_history(self, days_back: int = 30) -> List[Dict]:
@@ -322,5 +322,5 @@ class DatabaseMigrations:
                 
                 return [dict(row) for row in cursor.fetchall()]
         except Exception as e:
-            print(f"⚠️ Error retrieving resolution history: {e}")
+            print(f"[WARNING] Error retrieving resolution history: {e}")
             return []

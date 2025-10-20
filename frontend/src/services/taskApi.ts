@@ -111,9 +111,8 @@ export const taskApi = apiSlice.injectEndpoints({
     // Move task to different status (for drag-and-drop)
     moveTask: builder.mutation<Task, { id: string; status: 'todo' | 'in-progress' | 'review' | 'done' }>({
       query: ({ id, status }) => ({
-        url: `/api/tasks/${id}/status`,
+        url: `/api/tasks/${id}/status?status=${status}`,
         method: 'PUT',
-        body: { status },
       }),
       // Optimistic update for immediate UI feedback
       onQueryStarted({ id, status }, { dispatch, queryFulfilled }) {

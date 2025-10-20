@@ -16,10 +16,11 @@ class EmailClassificationRequest(BaseModel):
 class EmailClassificationResponse(BaseModel):
     """Response model for email classification."""
     category: str = Field(..., description="Classified email category")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Classification confidence score")
+    confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Classification confidence score (None if AI didn't provide one)")
     reasoning: str = Field(..., description="Explanation for the classification")
     alternative_categories: List[str] = Field(default=[], description="Alternative category suggestions")
     processing_time: float = Field(..., description="Processing time in seconds")
+    one_line_summary: Optional[str] = Field(None, description="AI-generated one-line summary")
 
 
 class ActionItemRequest(BaseModel):

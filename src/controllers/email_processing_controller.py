@@ -57,9 +57,9 @@ class EmailProcessingController:
         # Connect to Outlook first
         try:
             self.outlook_manager.connect_to_outlook()
-            log_callback("✅ Connected to Outlook successfully")
+            log_callback("[OK] Connected to Outlook successfully")
         except Exception as e:
-            log_callback(f"❌ Failed to connect to Outlook: {e}")
+            log_callback(f"[ERROR] Failed to connect to Outlook: {e}")
             raise
         
         log_callback("📧 Retrieving conversations...")

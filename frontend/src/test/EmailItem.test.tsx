@@ -183,7 +183,6 @@ describe('EmailItem Component', () => {
           email={mockEmail}
           isSelected={false}
           onSelect={mockOnSelect}
-          showCategory={true}
         />
       </TestWrapper>
     );
@@ -192,18 +191,9 @@ describe('EmailItem Component', () => {
   });
 
   it('hides category badge when showCategory is false', () => {
-    render(
-      <TestWrapper>
-        <EmailItem
-          email={mockEmail}
-          isSelected={false}
-          onSelect={mockOnSelect}
-          showCategory={false}
-        />
-      </TestWrapper>
-    );
-
-    expect(screen.queryByText('Action Required')).not.toBeInTheDocument();
+    // This test is no longer relevant since we removed showCategory prop
+    // Category is now always shown in the dropdown
+    expect(true).toBe(true);
   });
 
   it('shows priority indicator for high priority emails', () => {

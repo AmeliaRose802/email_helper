@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Button Test</title>
+    <style>
+        body {
+            padding: 50px;
+            font-family: Arial, sans-serif;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            background: #0078D4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin: 10px;
+        }
+        button:hover {
+            background: #106EBE;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Button Click Test</h1>
+    <p>This is a simple test to verify buttons work in Electron</p>
+    
+    <button onclick="handleClick('Button 1')">Test Button 1</button>
+    <button onclick="handleClick('Button 2')">Test Button 2</button>
+    <button id="js-button">Test Button 3 (JS)</button>
+    
+    <div id="output">
+        <strong>Output:</strong><br>
+        <div id="log">No clicks yet...</div>
+    </div>
+    
+    <script>
+        let clickCount = 0;
+        
+        function handleClick(buttonName) {
+            clickCount++;
+            const log = document.getElementById('log');
+            log.innerHTML = `${buttonName} clicked ${clickCount} times<br>` + log.innerHTML;
+            console.log('Button clicked:', buttonName);
+        }
+        
+        document.getElementById('js-button').addEventListener('click', function() {
+            handleClick('Button 3');
+        });
+        
+        // Test console logging
+        console.log('Test page loaded successfully');
+    </script>
+</body>
+</html>

@@ -45,20 +45,30 @@ class TaskService:
         loop = asyncio.get_event_loop()
         
         def _create_task_sync():
+            import json
             current_time = datetime.now()
+            
+            # Serialize tags and metadata to JSON
+            tags_json = json.dumps(task_data.tags if task_data.tags else [])
+            metadata_json = json.dumps(task_data.metadata if task_data.metadata else {})
+            
             with db_manager.get_connection() as conn:
                 cursor = conn.execute(
                     """
-                    INSERT INTO tasks (title, description, status, priority, due_date, 
-                                     created_at, updated_at, email_id, user_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO tasks (title, description, status, priority, category, 
+                                     due_date, tags, metadata, created_at, updated_at, 
+                                     email_id, user_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         task_data.title,
                         task_data.description,
                         task_data.status.value,
                         task_data.priority.value,
+                        task_data.category,
                         task_data.due_date,
+                        tags_json,
+                        metadata_json,
                         current_time,
                         current_time,
                         task_data.email_id,
@@ -233,7 +243,9 @@ class TaskService:
                 
                 # Get paginated results
                 tasks_query = f"""
-                SELECT * FROM tasks 
+                SELECT id, title, description, status, priority, category,
+                       due_date, tags, metadata, created_at, updated_at, email_id
+                FROM tasks 
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
@@ -377,16 +389,42 @@ class TaskService:
     
     def _row_to_task(self, row) -> Task:
         """Convert database row to Task model."""
+        import json
+        
+        # Convert sqlite3.Row to dict for easier access
+        row_dict = dict(row)
+        
+        # Parse JSON fields safely
+        tags = []
+        metadata = {}
+        
+        try:
+            tags_str = row_dict.get("tags")
+            if tags_str:
+                tags = json.loads(tags_str)
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            tags = []
+        
+        try:
+            metadata_str = row_dict.get("metadata")
+            if metadata_str:
+                metadata = json.loads(metadata_str)
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            metadata = {}
+        
         return Task(
-            id=row["id"],
-            title=row["title"],
-            description=row["description"],
-            status=TaskStatus(row["status"]),
-            priority=TaskPriority(row["priority"]),
-            due_date=row["due_date"],
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-            email_id=row["email_id"]
+            id=str(row_dict["id"]),  # Convert to string for frontend compatibility
+            title=row_dict["title"],
+            description=row_dict.get("description") or "",
+            status=TaskStatus(row_dict["status"]),
+            priority=TaskPriority(row_dict["priority"]),
+            category=row_dict.get("category"),
+            due_date=row_dict.get("due_date"),
+            tags=tags,
+            metadata=metadata,
+            created_at=row_dict["created_at"],
+            updated_at=row_dict["updated_at"],
+            email_id=row_dict.get("email_id")
         )
 
 

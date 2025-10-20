@@ -15,6 +15,7 @@ from backend.services.job_queue import job_queue, ProcessingPipeline, Processing
 from backend.services.websocket_manager import websocket_manager
 from backend.workers.email_processor import email_processor_worker
 from backend.api.auth import get_current_user
+from backend.models.user import UserInDB
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +59,14 @@ class JobStatusResponse(BaseModel):
 @router.post("/processing/start", response_model=Dict[str, Any])
 async def start_processing(
     request: StartProcessingRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: UserInDB = Depends(get_current_user)
 ):
     """Start email processing pipeline for multiple emails."""
     try:
-        user_id = current_user.get("user_id", "anonymous")
+        # Get user_id from UserInDB object
+        user_id = getattr(current_user, 'id', 'anonymous')
+        if isinstance(user_id, int):
+            user_id = str(user_id)
         
         if not request.email_ids:
             raise HTTPException(status_code=400, detail="No email IDs provided")
@@ -94,7 +98,7 @@ async def start_processing(
 @router.get("/processing/{pipeline_id}/status", response_model=ProcessingStatusResponse)
 async def get_processing_status(
     pipeline_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: UserInDB = Depends(get_current_user)
 ):
     """Get processing pipeline status."""
     try:
@@ -104,7 +108,7 @@ async def get_processing_status(
             raise HTTPException(status_code=404, detail="Pipeline not found")
         
         # Check user access (basic check)
-        user_id = current_user.get("user_id", "anonymous")
+        user_id = str(getattr(current_user, 'id', 'anonymous'))
         if pipeline.user_id != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
         
@@ -134,7 +138,7 @@ async def get_processing_status(
 @router.get("/processing/{pipeline_id}/jobs", response_model=List[JobStatusResponse])
 async def get_pipeline_jobs(
     pipeline_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: UserInDB = Depends(get_current_user)
 ):
     """Get all jobs in a processing pipeline."""
     try:
@@ -144,7 +148,7 @@ async def get_pipeline_jobs(
             raise HTTPException(status_code=404, detail="Pipeline not found")
         
         # Check user access
-        user_id = current_user.get("user_id", "anonymous")
+        user_id = str(getattr(current_user, 'id', 'anonymous'))
         if pipeline.user_id != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
         
@@ -175,7 +179,7 @@ async def get_pipeline_jobs(
 @router.post("/processing/{pipeline_id}/cancel")
 async def cancel_processing(
     pipeline_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: UserInDB = Depends(get_current_user)
 ):
     """Cancel processing pipeline."""
     try:
@@ -185,7 +189,7 @@ async def cancel_processing(
             raise HTTPException(status_code=404, detail="Pipeline not found")
         
         # Check user access
-        user_id = current_user.get("user_id", "anonymous")
+        user_id = str(getattr(current_user, 'id', 'anonymous'))
         if pipeline.user_id != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
         
@@ -211,7 +215,7 @@ async def cancel_processing(
 
 @router.get("/processing/stats")
 async def get_processing_stats(
-    current_user: dict = Depends(get_current_user)
+    current_user: UserInDB = Depends(get_current_user)
 ):
     """Get processing system statistics."""
     try:
@@ -219,7 +223,7 @@ async def get_processing_stats(
         websocket_stats = await websocket_manager.get_stats()
         
         # Get basic queue stats (would be more detailed with Redis/Celery)
-        user_id = current_user.get("user_id", "anonymous")
+        user_id = str(getattr(current_user, 'id', 'anonymous'))
         user_pipelines = [p for p in job_queue._pipelines.values() if p.user_id == user_id]
         
         total_pipelines = len(user_pipelines)

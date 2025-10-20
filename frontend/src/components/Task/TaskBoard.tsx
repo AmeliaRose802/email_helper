@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TaskColumn } from './TaskColumn';
 import type { TaskStatus } from './TaskColumn';
 import { useMoveTaskMutation, useDeleteTaskMutation } from '@/services/taskApi';
 import type { Task } from '@/types/task';
+import { TaskCelebration } from './TaskCelebration';
 
 interface TaskBoardProps {
   tasks: Task[];
@@ -26,10 +27,20 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 }) => {
   const [moveTask, { isLoading: isMoving }] = useMoveTaskMutation();
   const [deleteTask, { isLoading: isDeleting }] = useDeleteTaskMutation();
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const handleTaskMove = async (taskId: string, newStatus: TaskStatus) => {
     try {
+      // Find the task being moved
+      const task = tasks.find(t => t.id === taskId);
+      const wasNotDone = task && task.status !== 'done';
+      
       await moveTask({ id: taskId, status: newStatus }).unwrap();
+      
+      // Show celebration if task was just completed
+      if (wasNotDone && newStatus === 'done') {
+        setShowCelebration(true);
+      }
     } catch (error) {
       console.error('Failed to move task:', error);
       // In a real app, you'd show a user-friendly error notification
@@ -85,6 +96,10 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           <div className="loading-spinner"></div>
           <p>{isMoving ? 'Moving task...' : 'Deleting task...'}</p>
         </div>
+      )}
+      
+      {showCelebration && (
+        <TaskCelebration onComplete={() => setShowCelebration(false)} />
       )}
     </div>
   );

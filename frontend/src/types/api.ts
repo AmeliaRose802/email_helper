@@ -16,6 +16,8 @@ export interface ApiError {
 export interface PaginationParams {
   page?: number;
   per_page?: number;
+  limit?: number;  // Alternative to per_page (for limit/offset pagination)
+  offset?: number;  // Alternative to page (for limit/offset pagination)
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
 }

@@ -303,6 +303,72 @@ class AIService:
         except Exception as e:
             raise RuntimeError(f"Summary generation failed: {e}")
     
+    async def analyze_holistically(
+        self,
+        emails: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Perform holistic analysis across multiple emails.
+        
+        Args:
+            emails: List of email dictionaries with content
+            
+        Returns:
+            Dict containing holistic analysis results with truly_relevant_actions,
+            superseded_actions, duplicate_groups, and expired_items
+        """
+        self._ensure_initialized()
+        
+        loop = asyncio.get_event_loop()
+        
+        try:
+            result = await loop.run_in_executor(
+                None,
+                self._analyze_holistically_sync,
+                emails
+            )
+            return result
+        except Exception as e:
+            return {
+                "truly_relevant_actions": [],
+                "superseded_actions": [],
+                "duplicate_groups": [],
+                "expired_items": [],
+                "error": str(e)
+            }
+    
+    def _analyze_holistically_sync(self, emails: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Synchronous holistic analysis for thread pool execution."""
+        try:
+            # Convert emails to format expected by AIProcessor
+            email_data_list = []
+            for email in emails:
+                email_data = {
+                    'entry_id': email.get('id', ''),
+                    'subject': email.get('subject', ''),
+                    'sender': email.get('sender', email.get('from', '')),
+                    'sender_name': email.get('sender_name', email.get('from', '')),
+                    'received_time': email.get('date', email.get('received_time', '')),
+                    'body': email.get('body', email.get('content', ''))
+                }
+                email_data_list.append(email_data)
+            
+            # Use AIProcessor's holistic analysis
+            analysis, notes = self.ai_processor.analyze_inbox_holistically(email_data_list)
+            
+            if not analysis:
+                return {
+                    "truly_relevant_actions": [],
+                    "superseded_actions": [],
+                    "duplicate_groups": [],
+                    "expired_items": [],
+                    "notes": notes
+                }
+            
+            return analysis
+            
+        except Exception as e:
+            raise RuntimeError(f"Holistic analysis failed: {e}")
+    
     async def get_available_templates(self) -> Dict[str, Any]:
         """Get list of available prompt templates.
         

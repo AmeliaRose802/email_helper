@@ -1,16 +1,32 @@
 # Email Helper - AI-Powered Email Management System
 
-This repo is an experiment in vibe codign with no human intervention. Please do not take it as reflective of my general code quality practices
-
 An intelligent email classification and management system designed for professionals with ADHD who need focused, actionable email summaries.
 
-## 🚀 Quick Setup
+## 🚀 Quick Setup - Desktop App (Recommended)
 
-### Option 1: One-Command Start (Recommended)
+### Launch the Desktop App
+```bash
+# Windows - Double-click launcher
+launch-desktop.bat
+
+# Or use PowerShell
+./launch-desktop.ps1
+
+# Or use npm
+npm run electron:dev
+```
+
+The desktop app provides:
+- Native Windows application experience
+- Auto-starting backend server
+- System tray integration
+- No login required
+
+### Web App Alternative
 ```bash
 npm start
 ```
-This will start both the React frontend and API backend automatically!
+This will start the React frontend and API backend for browser use.
 
 ### Option 2: Localhost Development Setup
 

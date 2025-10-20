@@ -48,8 +48,8 @@ export const emailApi = apiSlice.injectEndpoints({
     }),
 
     // Get email statistics
-    getEmailStats: builder.query<EmailStats, void>({
-      query: () => '/api/emails/stats',
+    getEmailStats: builder.query<EmailStats, number>({
+      query: (limit = 100) => `/api/emails/stats?limit=${limit}`,
       providesTags: [{ type: 'Email', id: 'STATS' }],
     }),
 
@@ -108,6 +108,103 @@ export const emailApi = apiSlice.injectEndpoints({
         { type: 'Email', id: 'LIST' },
       ],
     }),
+
+    // Get category to folder mappings
+    getCategoryMappings: builder.query<
+      Array<{ category: string; folder_name: string; stays_in_inbox: boolean }>,
+      void
+    >({
+      query: () => '/api/emails/category-mappings',
+    }),
+
+    // Update email classification
+    updateEmailClassification: builder.mutation<
+      { success: boolean; message: string; email_id?: string },
+      { emailId: string; category: string; applyToOutlook: boolean }
+    >({
+      query: ({ emailId, category, applyToOutlook }) => ({
+        url: `/api/emails/${emailId}/classification`,
+        method: 'PUT',
+        body: {
+          category,
+          apply_to_outlook: applyToOutlook,
+        },
+      }),
+      // Optimistic update for better UX
+      async onQueryStarted({ emailId, category }, { dispatch, queryFulfilled }) {
+        // Optimistically update the individual email cache
+        const patchResult = dispatch(
+          emailApi.util.updateQueryData('getEmailById', emailId, (draft) => {
+            draft.ai_category = category as any;
+            draft.categories = [category];
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          // Revert on error
+          patchResult.undo();
+        }
+      },
+      invalidatesTags: (_result, _error, { emailId }) => [
+        { type: 'Email', id: emailId },
+        { type: 'Email', id: 'LIST' },
+      ],
+    }),
+
+    // Bulk apply classifications to Outlook
+    bulkApplyToOutlook: builder.mutation<
+      { success: boolean; processed: number; successful: number; failed: number; errors: string[] },
+      { emailIds: string[]; applyToOutlook?: boolean }
+    >({
+      query: ({ emailIds, applyToOutlook = true }) => ({
+        url: '/api/emails/bulk-apply-to-outlook',
+        method: 'POST',
+        body: {
+          email_ids: emailIds,
+          apply_to_outlook: applyToOutlook,
+        },
+      }),
+      invalidatesTags: [
+        { type: 'Email', id: 'LIST' },
+        { type: 'Email', id: 'STATS' },
+      ],
+    }),
+
+    // Sync classified emails to database
+    syncEmailsToDatabase: builder.mutation<
+      { success: boolean; synced_count: number; message: string },
+      { emails: any[] }
+    >({
+      query: (data) => ({
+        url: '/api/emails/sync-to-database',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: [
+        { type: 'Email', id: 'LIST' },
+        { type: 'Email', id: 'STATS' },
+      ],
+    }),
+
+    // Extract tasks from emails
+    extractTasksFromEmails: builder.mutation<
+      { status: string; message: string; email_count: number },
+      { email_ids: string[] }
+    >({
+      query: (data) => ({
+        url: '/api/emails/extract-tasks',
+        method: 'POST',
+        body: {
+          email_ids: data.email_ids,
+          apply_to_outlook: false,
+        },
+      }),
+      invalidatesTags: [
+        { type: 'Task', id: 'LIST' },
+        { type: 'Task', id: 'STATS' },
+      ],
+    }),
   }),
 });
 
@@ -120,4 +217,9 @@ export const {
   useMarkEmailReadMutation,
   useDeleteEmailMutation,
   useMoveEmailMutation,
+  useGetCategoryMappingsQuery,
+  useUpdateEmailClassificationMutation,
+  useBulkApplyToOutlookMutation,
+  useSyncEmailsToDatabaseMutation,
+  useExtractTasksFromEmailsMutation,
 } = emailApi;

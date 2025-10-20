@@ -1,8 +1,7 @@
 // Individual email item component with AI categorization
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMarkEmailReadMutation } from '@/services/emailApi';
-import { CategoryBadge } from './CategoryBadge';
+import { useMarkEmailReadMutation, useGetCategoryMappingsQuery, useUpdateEmailClassificationMutation } from '@/services/emailApi';
 import { formatEmailDate, getEmailPreview, getPriorityIcon } from '@/utils/emailUtils';
 import type { Email } from '@/types/email';
 
@@ -10,7 +9,7 @@ interface EmailItemProps {
   email: Email;
   isSelected: boolean;
   onSelect: () => void;
-  showCategory?: boolean;
+  onEmailClick?: (emailId: string) => void; // Optional callback for custom click handling
   className?: string;
 }
 
@@ -18,11 +17,40 @@ export const EmailItem: React.FC<EmailItemProps> = ({
   email,
   isSelected,
   onSelect,
-  showCategory = true,
+  onEmailClick,
   className = '',
 }) => {
   const navigate = useNavigate();
   const [markAsRead] = useMarkEmailReadMutation();
+  const [updateClassification, { isLoading: isUpdating }] = useUpdateEmailClassificationMutation();
+  const { data: categoryMappings, isLoading: isLoadingMappings } = useGetCategoryMappingsQuery();
+  
+  const [applyToOutlook, setApplyToOutlook] = useState(true);
+  const [localCategory, setLocalCategory] = useState(email.ai_category || '');
+  
+  // Sync local category with email prop when it changes
+  React.useEffect(() => {
+    setLocalCategory(email.ai_category || '');
+  }, [email.ai_category]);
+  
+  // Ensure categoryMappings is an array
+  const mappings = Array.isArray(categoryMappings) ? categoryMappings : [];
+  
+  // Get color for category
+  const getCategoryColor = (category: string): string => {
+    const colors: Record<string, string> = {
+      'required_personal_action': '#dc3545',  // Red
+      'team_action': '#fd7e14',               // Orange
+      'optional_action': '#ffc107',           // Yellow
+      'job_listing': '#6f42c1',               // Purple
+      'optional_event': '#20c997',            // Teal
+      'work_relevant': '#0dcaf0',             // Cyan
+      'fyi': '#6c757d',                       // Gray
+      'newsletter': '#0d6efd',                // Blue
+      'spam_to_delete': '#212529',            // Dark
+    };
+    return colors[category] || '#007acc';
+  };
   
   const handleClick = async () => {
     // Mark as read if unread
@@ -34,13 +62,43 @@ export const EmailItem: React.FC<EmailItemProps> = ({
       }
     }
     
-    // Navigate to email detail
-    navigate(`/emails/${email.id}`);
+    // Use custom click handler if provided, otherwise navigate
+    if (onEmailClick) {
+      onEmailClick(email.id);
+    } else {
+      navigate(`/emails/${email.id}`);
+    }
   };
   
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSelect();
+  };
+  
+  const handleCategoryChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    e.stopPropagation();
+    const category = e.target.value;
+    
+    if (!category) return;
+    
+    // Update local state immediately for responsive UI
+    setLocalCategory(category);
+    
+    try {
+      await updateClassification({
+        emailId: email.id,
+        category,
+        applyToOutlook,
+      }).unwrap();
+      
+      // RTK Query will automatically invalidate cache and update UI
+      // No need to manually trigger refresh
+    } catch (error) {
+      console.error('Failed to update classification:', error);
+      alert('Failed to update classification. Please try again.');
+      // Revert local state on error
+      setLocalCategory(email.ai_category || '');
+    }
   };
   
   const containerStyle = {
@@ -76,11 +134,15 @@ export const EmailItem: React.FC<EmailItemProps> = ({
   };
   
   const senderStyle = {
-    fontSize: '14px',
-    fontWeight: email.is_read ? '500' : '700',
-    color: '#333',
-    minWidth: '120px',
+    fontSize: '11px',
+    fontWeight: email.is_read ? '400' : '500',
+    color: '#8A8886',
+    minWidth: '100px',
+    maxWidth: '150px',
     flexShrink: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
   };
   
   const subjectStyle = {
@@ -171,7 +233,7 @@ export const EmailItem: React.FC<EmailItemProps> = ({
         {/* Header with sender and timestamp */}
         <div style={headerStyle}>
           <div style={senderStyle}>
-            {email.sender}
+            {email.sender || 'Unknown Sender'}
           </div>
           <div style={timestampStyle}>
             {formatEmailDate(email.date)}
@@ -180,28 +242,86 @@ export const EmailItem: React.FC<EmailItemProps> = ({
         
         {/* Subject */}
         <div className="subject" style={subjectStyle}>
-          {email.subject}
+          {email.subject || '(No Subject)'}
         </div>
         
-        {/* Preview */}
-        <div style={previewStyle}>
-          {getEmailPreview(email.body, 120)}
-        </div>
+        {/* One-line AI Summary (prioritize over body preview) */}
+        {email.one_line_summary ? (
+          <div style={{ ...previewStyle, fontWeight: '500', color: '#007acc', fontStyle: 'italic' }}>
+            💡 {email.one_line_summary}
+          </div>
+        ) : (
+          /* Fallback to body preview if no AI summary */
+          <div style={previewStyle}>
+            {email.body ? getEmailPreview(email.body, 120) : '(No content)'}
+          </div>
+        )}
         
         {/* Metadata and indicators */}
         <div style={metaStyle}>
-          {/* AI Category Badge */}
-          {showCategory && email.categories && email.categories.length > 0 && (
-            <CategoryBadge 
-              category={email.categories[0]} 
-              size="small"
-            />
+          {/* Holistic Classification Info */}
+          {email.holistic_classification && (
+            <>
+              {email.holistic_classification.priority && (
+                <span 
+                  style={{ 
+                    fontSize: '11px', 
+                    padding: '2px 6px', 
+                    borderRadius: '3px',
+                    backgroundColor: email.holistic_classification.priority === 'high' ? '#dc3545' : 
+                                     email.holistic_classification.priority === 'medium' ? '#ffc107' : '#28a745',
+                    color: '#fff',
+                    fontWeight: '600'
+                  }}
+                  title={`Priority: ${email.holistic_classification.priority}`}
+                >
+                  {email.holistic_classification.priority.toUpperCase()}
+                </span>
+              )}
+              {email.holistic_classification.deadline && (
+                <span style={{ fontSize: '11px', color: '#dc3545' }} title="Deadline">
+                  ⏰ {email.holistic_classification.deadline}
+                </span>
+              )}
+              {email.holistic_classification.blocking_others && (
+                <span style={{ fontSize: '11px', color: '#dc3545' }} title="Blocking other tasks">
+                  🚫 BLOCKING
+                </span>
+              )}
+              {email.holistic_classification.is_superseded && (
+                <span style={{ fontSize: '11px', color: '#6c757d', textDecoration: 'line-through' }} title="Superseded by newer email">
+                  Superseded
+                </span>
+              )}
+              {email.holistic_classification.is_duplicate && (
+                <span style={{ fontSize: '11px', color: '#6c757d' }} title="Duplicate email">
+                  📋 Duplicate
+                </span>
+              )}
+            </>
+          )}
+          
+          {/* Classification status indicator */}
+          {email.classification_status === 'pending' && (
+            <span style={{ fontSize: '12px', color: '#6c757d' }} title="Waiting for AI classification">
+              ⏳ Pending...
+            </span>
+          )}
+          {email.classification_status === 'classifying' && (
+            <span style={{ fontSize: '12px', color: '#007acc' }} title="AI is classifying this email">
+              ⟳ Classifying...
+            </span>
+          )}
+          {email.classification_status === 'error' && (
+            <span style={{ fontSize: '12px', color: '#dc3545' }} title="Classification failed">
+              ⚠️ Classification failed
+            </span>
           )}
           
           {/* Priority indicator */}
-          {email.importance !== 'Normal' && (
+          {email.importance && email.importance !== 'Normal' && (
             <span title={`${email.importance} priority`} style={{ fontSize: '12px' }}>
-              {getPriorityIcon(email.importance.toLowerCase())}
+              {getPriorityIcon(typeof email.importance === 'string' ? email.importance.toLowerCase() : 'normal')}
             </span>
           )}
           
@@ -221,7 +341,83 @@ export const EmailItem: React.FC<EmailItemProps> = ({
               </span>
             )}
           </div>
+          
+          {/* Quick classification dropdown */}
+          {isLoadingMappings ? (
+            <span style={{ fontSize: '11px', color: '#6c757d', marginLeft: 'auto' }}>
+              Loading...
+            </span>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+              {/* Classification dropdown with visual styling */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <select
+                  value={localCategory}
+                  onChange={handleCategoryChange}
+                  onClick={(e) => e.stopPropagation()}
+                  disabled={isUpdating}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    backgroundColor: localCategory ? getCategoryColor(localCategory) : (isUpdating ? '#e9ecef' : '#fff'),
+                    color: localCategory ? '#fff' : '#333',
+                    border: '1px solid #ced4da',
+                    borderRadius: '4px',
+                    cursor: isUpdating ? 'not-allowed' : 'pointer',
+                    minWidth: '140px',
+                    fontWeight: localCategory ? '600' : '400',
+                  }}
+                  title={email.ai_confidence ? `Classification confidence: ${Math.round(email.ai_confidence * 100)}%` : "Change classification"}
+                >
+                  <option value="" style={{ backgroundColor: '#fff', color: '#333' }}>-- Classify --</option>
+                  {mappings.map((mapping) => (
+                    <option key={mapping.category} value={mapping.category} style={{ backgroundColor: '#fff', color: '#333' }}>
+                      {mapping.category.replace(/_/g, ' ').toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+                {/* Confidence indicator */}
+                {email.ai_confidence && localCategory && (
+                  <span 
+                    style={{ 
+                      fontSize: '10px', 
+                      color: email.ai_confidence >= 0.8 ? '#28a745' : email.ai_confidence >= 0.6 ? '#ffc107' : '#dc3545',
+                      fontWeight: '600'
+                    }}
+                    title={`Confidence: ${Math.round(email.ai_confidence * 100)}%`}
+                  >
+                    {Math.round(email.ai_confidence * 100)}%
+                  </span>
+                )}
+              </div>
+              
+              <label 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  fontSize: '11px', 
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }} 
+                title="Apply changes to Outlook folders"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={applyToOutlook}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    setApplyToOutlook(e.target.checked);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ marginRight: '4px' }}
+                />
+                Apply to Outlook
+              </label>
+            </div>
+          )}
         </div>
+        
       </div>
     </div>
   );

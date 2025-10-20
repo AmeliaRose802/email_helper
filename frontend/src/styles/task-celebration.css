@@ -1,0 +1,124 @@
+/* Task Celebration Animation - Synthwave Theme */
+
+.task-celebration {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.celebration-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.celebration-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 2rem;
+  animation: celebrate 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation-delay: var(--particle-delay, 0s);
+  opacity: 0;
+}
+
+@keyframes celebrate {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: 
+      translate(
+        calc(-50% + var(--particle-x, 0)), 
+        calc(-50% + var(--particle-y, 0))
+      ) 
+      scale(var(--particle-scale, 1)) 
+      rotate(var(--particle-rotation, 0));
+  }
+}
+
+.celebration-message {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: message-bounce 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.celebration-text {
+  font-size: 3rem;
+  font-weight: bold;
+  color: #FF00E6;
+  text-shadow: 
+    0 0 10px rgba(255, 0, 230, 0.8),
+    0 0 20px rgba(255, 0, 230, 0.6),
+    0 0 30px rgba(255, 0, 230, 0.4),
+    0 0 40px rgba(0, 230, 255, 0.3);
+  animation: text-glow 1.5s ease-in-out;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+@keyframes message-bounce {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  85% {
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes text-glow {
+  0%, 100% {
+    text-shadow: 
+      0 0 10px rgba(255, 0, 230, 0.8),
+      0 0 20px rgba(255, 0, 230, 0.6),
+      0 0 30px rgba(255, 0, 230, 0.4);
+  }
+  50% {
+    text-shadow: 
+      0 0 20px rgba(255, 0, 230, 1),
+      0 0 30px rgba(255, 0, 230, 0.8),
+      0 0 40px rgba(255, 0, 230, 0.6),
+      0 0 50px rgba(0, 230, 255, 0.4),
+      0 0 60px rgba(0, 230, 255, 0.2);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .celebration-text {
+    font-size: 2rem;
+  }
+  
+  .celebration-particle {
+    font-size: 1.5rem;
+  }
+}

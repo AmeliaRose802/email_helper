@@ -57,14 +57,25 @@ def get_com_email_provider():
             logger.info("Initializing COM email provider")
             _com_email_provider = COMEmailProvider()
             
-            # Authenticate/connect to Outlook
-            if not _com_email_provider.authenticate({}):
+            # Authenticate/connect to Outlook with retries
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    if _com_email_provider.authenticate({}):
+                        logger.info("COM email provider initialized successfully")
+                        break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"COM connection attempt {attempt + 1} failed, retrying...")
+                        import time
+                        time.sleep(0.5)
+                    else:
+                        raise
+            else:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Failed to connect to Outlook COM interface"
+                    detail="Failed to connect to Outlook COM interface after retries"
                 )
-            
-            logger.info("COM email provider initialized successfully")
             
         except ImportError as e:
             logger.error(f"COM email provider not available: {e}")
@@ -162,11 +173,16 @@ def get_email_provider():
         # Check for COM provider preference
         if getattr(settings, 'use_com_backend', False):
             try:
-                logger.info("Using COM email provider (configured)")
+                logger.info("Attempting to use COM email provider...")
                 _email_provider = get_com_email_provider()
+                logger.info("COM email provider initialized successfully")
                 return _email_provider
             except HTTPException as e:
-                logger.warning(f"COM provider unavailable, falling back: {e.detail}")
+                logger.warning(f"COM provider unavailable: {e.detail}")
+                logger.info("Falling back to alternative email provider...")
+            except Exception as e:
+                logger.error(f"COM provider error: {str(e)}")
+                logger.info("Falling back to alternative email provider...")
         
         # Fall back to existing provider selection logic
         try:

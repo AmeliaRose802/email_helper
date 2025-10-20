@@ -18,10 +18,18 @@ Thread Safety:
 
 import sys
 import logging
+import asyncio
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from fastapi import HTTPException
+
+try:
+    import pythoncom
+    PYTHONCOM_AVAILABLE = True
+except ImportError:
+    PYTHONCOM_AVAILABLE = False
+    pythoncom = None
 
 # Add src to Python path for adapter imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -35,6 +43,24 @@ try:
 except ImportError:
     COM_AVAILABLE = False
     OutlookEmailAdapter = None
+
+
+# Category mappings from Python version (outlook_manager.py)
+INBOX_CATEGORIES = {
+    'required_personal_action': 'Required Actions (Me)',
+    'optional_action': 'Optional Actions',
+    'job_listing': 'Job Listings',
+    'work_relevant': 'Work Relevant'
+}
+
+NON_INBOX_CATEGORIES = {
+    'team_action': 'Team Actions',
+    'optional_event': 'Optional Events',
+    'fyi': 'FYI',
+    'newsletter': 'Newsletters',
+    'general_information': 'Summarized',
+    'spam_to_delete': 'ai_deleted'
+}
 
 
 class COMEmailProvider(EmailProvider):
@@ -98,28 +124,51 @@ class COMEmailProvider(EmailProvider):
             HTTPException: If connection fails with error details
         """
         try:
-            self.logger.info("Attempting to connect to Outlook COM interface")
+            self.logger.info("Attempting to connect to Outlook COM interface...")
             
             success = self.adapter.connect()
             
             if success:
                 self.authenticated = True
-                self.logger.info("Successfully connected to Outlook")
+                self.logger.info("Successfully connected to Outlook COM interface")
                 return True
             else:
                 self.authenticated = False
-                self.logger.error("Failed to connect to Outlook")
+                error_msg = (
+                    "Could not connect to Outlook. "
+                    "Please ensure Microsoft Outlook is running and you have access to it."
+                )
+                self.logger.error(error_msg)
                 raise HTTPException(
                     status_code=503,
-                    detail="Could not connect to Outlook. Ensure Outlook is running."
+                    detail=error_msg
                 )
                 
+        except HTTPException:
+            # Re-raise HTTP exceptions as-is
+            raise
         except Exception as e:
             self.authenticated = False
-            self.logger.error(f"Outlook connection error: {e}")
+            error_detail = str(e)
+            self.logger.error(f"Outlook COM connection error: {error_detail}")
+            
+            # Provide helpful error messages based on common issues
+            if "pywintypes.com_error" in error_detail or "-2147221005" in error_detail:
+                helpful_msg = (
+                    "Cannot connect to Outlook COM interface. "
+                    "Please ensure Microsoft Outlook is running and not blocked by security policies."
+                )
+            elif "CoInitialize" in error_detail:
+                helpful_msg = (
+                    "COM initialization error. "
+                    "The application may need to run in a different threading mode."
+                )
+            else:
+                helpful_msg = f"Outlook connection failed: {error_detail}"
+            
             raise HTTPException(
                 status_code=503,
-                detail=f"Outlook connection failed: {str(e)}"
+                detail=helpful_msg
             )
     
     def get_emails(
@@ -157,9 +206,25 @@ class COMEmailProvider(EmailProvider):
             )
         
         try:
+            # Initialize COM on this thread (required for multi-threaded servers)
+            if PYTHONCOM_AVAILABLE:
+                try:
+                    pythoncom.CoInitialize()
+                except:
+                    pass  # Already initialized on this thread
+            
             self.logger.debug(
                 f"Retrieving emails from {folder_name}: count={count}, offset={offset}"
             )
+            
+            # Reconnect adapter to ensure COM objects are on this thread
+            if not self.adapter.connect():
+                self.logger.warning("Adapter connection failed, retrying...")
+                # Retry once
+                import time
+                time.sleep(0.2)
+                if not self.adapter.connect():
+                    raise RuntimeError("Failed to connect to Outlook after retry")
             
             emails = self.adapter.get_emails(
                 folder_name=folder_name,
@@ -182,7 +247,65 @@ class COMEmailProvider(EmailProvider):
                 detail=f"Failed to retrieve emails: {str(e)}"
             )
     
-    def get_email_content(self, email_id: str) -> Dict[str, Any]:
+    def get_email_by_id(self, email_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single email by its ID.
+        
+        Args:
+            email_id: Email EntryID from Outlook
+        
+        Returns:
+            Email dictionary if found, None otherwise
+        
+        Raises:
+            HTTPException: If not authenticated or retrieval fails
+        """
+        if not self.authenticated:
+            raise HTTPException(
+                status_code=401,
+                detail="Not authenticated. Call authenticate() first."
+            )
+        
+        try:
+            # Initialize COM on this thread
+            if PYTHONCOM_AVAILABLE:
+                try:
+                    pythoncom.CoInitialize()
+                except:
+                    pass
+            
+            self.logger.debug(f"Retrieving email by ID: {email_id}")
+            
+            # Reconnect to ensure COM objects are on this thread
+            self.adapter.connect()
+            
+            # Use adapter's get_email_by_id if available, otherwise search
+            if hasattr(self.adapter, 'get_email_by_id'):
+                email = self.adapter.get_email_by_id(email_id)
+            else:
+                # Fallback: search through recent emails
+                # This is inefficient but works as a fallback
+                all_emails = self.adapter.get_emails(folder_name="Inbox", count=500)
+                email = next((e for e in all_emails if e.get('id') == email_id), None)
+            
+            if email:
+                self.logger.info(f"Found email: {email_id}")
+            else:
+                self.logger.warning(f"Email not found: {email_id}")
+            
+            return email
+            
+        except RuntimeError as e:
+            self.logger.error(f"Connection error: {e}")
+            self.authenticated = False
+            raise HTTPException(status_code=401, detail=str(e))
+        except Exception as e:
+            self.logger.error(f"Error retrieving email by ID: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to retrieve email: {str(e)}"
+            )
+
+    async def get_email_content(self, email_id: str) -> Dict[str, Any]:
         """Get full email content by ID.
         
         Retrieves complete email details including full body content.
@@ -203,21 +326,9 @@ class COMEmailProvider(EmailProvider):
             )
         
         try:
-            self.logger.debug(f"Retrieving email content for ID: {email_id}")
-            
-            # Get full body content
-            body = self.adapter.get_email_body(email_id)
-            
-            if body is not None:
-                # Return email with full body
-                # Note: This is a simplified version. In a real implementation,
-                # you might want to retrieve all email fields again
-                return {
-                    'id': email_id,
-                    'body': body
-                }
-            
-            return None
+            # Run sync COM operations in thread pool to avoid blocking
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, self._get_email_content_sync, email_id)
             
         except RuntimeError as e:
             self.logger.error(f"Connection error: {e}")
@@ -229,6 +340,79 @@ class COMEmailProvider(EmailProvider):
                 status_code=500,
                 detail=f"Failed to retrieve email content: {str(e)}"
             )
+    
+    def _get_email_content_sync(self, email_id: str) -> Dict[str, Any]:
+        """Synchronous helper to get email content (runs in thread pool)."""
+        # Initialize COM on this thread
+        if PYTHONCOM_AVAILABLE:
+            try:
+                pythoncom.CoInitialize()
+            except:
+                pass
+        
+        self.logger.debug(f"Retrieving email content for ID: {email_id}")
+        
+        # Reconnect to ensure COM objects are on this thread
+        self.adapter.connect()
+        
+        # Get full email metadata first
+        try:
+            mail = self.adapter.outlook.Session.GetItemFromID(email_id)
+            
+            # Parse received time
+            received_time = None
+            try:
+                if hasattr(mail, 'ReceivedTime'):
+                    received_dt = mail.ReceivedTime
+                    if received_dt:
+                        # Convert to Python datetime
+                        from datetime import datetime
+                        if hasattr(received_dt, 'strftime'):
+                            received_time = received_dt.strftime('%Y-%m-%dT%H:%M:%S')
+                        else:
+                            # Try to parse COM date
+                            import pywintypes
+                            try:
+                                py_dt = pywintypes.Time(received_dt)
+                                received_time = py_dt.strftime('%Y-%m-%dT%H:%M:%S')
+                            except:
+                                received_time = str(received_dt)
+            except Exception as e:
+                self.logger.warning(f"Could not parse ReceivedTime: {e}")
+            
+            # Get full body content
+            body = self.adapter.get_email_body(email_id)
+            
+            # Return complete email with metadata
+            return {
+                'id': email_id,
+                'subject': mail.Subject if hasattr(mail, 'Subject') else '',
+                'sender': mail.SenderEmailAddress if hasattr(mail, 'SenderEmailAddress') else '',
+                'recipient': mail.To if hasattr(mail, 'To') else '',
+                'body': body or '',
+                'date': received_time,
+                'received_time': received_time,
+                'is_read': mail.UnRead == 0 if hasattr(mail, 'UnRead') else True,
+                'has_attachments': mail.Attachments.Count > 0 if hasattr(mail, 'Attachments') else False,
+                'importance': self._map_importance(mail.Importance) if hasattr(mail, 'Importance') else 'Normal',
+                'categories': list(mail.Categories.split(',')) if hasattr(mail, 'Categories') and mail.Categories else [],
+                'conversation_id': mail.ConversationID if hasattr(mail, 'ConversationID') else None
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting email metadata: {e}")
+            # Fallback to just body if metadata fails
+            body = self.adapter.get_email_body(email_id)
+            if body is not None:
+                return {
+                    'id': email_id,
+                    'body': body,
+                    'subject': 'Unknown',
+                    'sender': 'Unknown',
+                    'recipient': '',
+                    'date': None,
+                    'received_time': None
+                }
+            return None
     
     def get_folders(self) -> List[Dict[str, str]]:
         """List available email folders.
@@ -246,7 +430,17 @@ class COMEmailProvider(EmailProvider):
             )
         
         try:
+            # Initialize COM on this thread
+            if PYTHONCOM_AVAILABLE:
+                try:
+                    pythoncom.CoInitialize()
+                except:
+                    pass
+            
             self.logger.debug("Retrieving folder list")
+            
+            # Reconnect to ensure COM objects are on this thread
+            self.adapter.connect()
             
             folders = self.adapter.get_folders()
             
@@ -283,7 +477,17 @@ class COMEmailProvider(EmailProvider):
             )
         
         try:
+            # Initialize COM on this thread
+            if PYTHONCOM_AVAILABLE:
+                try:
+                    pythoncom.CoInitialize()
+                except:
+                    pass
+            
             self.logger.debug(f"Marking email as read: {email_id}")
+            
+            # Reconnect to ensure COM objects are on this thread
+            self.adapter.connect()
             
             success = self.adapter.mark_as_read(email_id)
             
@@ -325,27 +529,34 @@ class COMEmailProvider(EmailProvider):
             )
         
         try:
-            self.logger.debug(f"Moving email {email_id} to {destination_folder}")
+            # Initialize COM on this thread
+            if PYTHONCOM_AVAILABLE:
+                try:
+                    pythoncom.CoInitialize()
+                except:
+                    pass
+            
+            self.logger.info(f"[COM Provider] Moving email {email_id[:20]}... to folder: '{destination_folder}'")
+            
+            # Reconnect to ensure COM objects are on this thread
+            self.adapter.connect()
             
             success = self.adapter.move_email(email_id, destination_folder)
             
             if success:
-                self.logger.info(f"Moved email to {destination_folder}")
+                self.logger.info(f"[COM Provider] [OK] Successfully moved email to '{destination_folder}'")
             else:
-                self.logger.warning(f"Failed to move email to {destination_folder}")
+                self.logger.warning(f"[COM Provider] [FAIL] Failed to move email to '{destination_folder}'")
             
             return success
             
         except RuntimeError as e:
-            self.logger.error(f"Connection error: {e}")
+            self.logger.error(f"[COM Provider] Connection error while moving email: {e}")
             self.authenticated = False
-            raise HTTPException(status_code=401, detail=str(e))
+            return False  # Return False instead of raising to allow batch processing to continue
         except Exception as e:
-            self.logger.error(f"Error moving email: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to move email: {str(e)}"
-            )
+            self.logger.error(f"[COM Provider] Error moving email to {destination_folder}: {e}")
+            return False  # Return False instead of raising to allow batch processing to continue
     
     def get_conversation_thread(self, conversation_id: str) -> List[Dict[str, Any]]:
         """Get all emails in a conversation thread.
@@ -370,7 +581,17 @@ class COMEmailProvider(EmailProvider):
             )
         
         try:
+            # Initialize COM on this thread
+            if PYTHONCOM_AVAILABLE:
+                try:
+                    pythoncom.CoInitialize()
+                except:
+                    pass
+            
             self.logger.debug(f"Retrieving conversation thread: {conversation_id}")
+            
+            # Reconnect to ensure COM objects are on this thread
+            self.adapter.connect()
             
             # Get recent emails and filter by conversation ID
             # Note: This is a basic implementation. For better performance,

@@ -7,8 +7,9 @@ routers, and configuration for the Email Helper mobile backend.
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
+from datetime import datetime
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -24,22 +25,33 @@ from backend.api import auth
 async def lifespan(app: FastAPI):
     """Application lifespan management."""
     # Startup
-    print("Starting Email Helper API...")
-    print(f"Database path: {db_manager.db_path}")
+    print("=" * 80, flush=True)
+    print("*** Starting Email Helper API - CUSTOM CORS VERSION ***", flush=True)
+    print("=" * 80, flush=True)
+    print(f"Startup time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+    print(f"Database path: {db_manager.db_path}", flush=True)
+    print(f"Backend file: {__file__}", flush=True)
+    print("=" * 80, flush=True)
     
     # Ensure database is ready
     try:
         with db_manager.get_connection() as conn:
             cursor = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
             table_count = cursor.fetchone()[0]
-            print(f"Database initialized with {table_count} tables")
+            print(f"Database initialized with {table_count} tables", flush=True)
+            print("CORS: Configured to allow ALL origins (*)", flush=True)
+            print("=" * 80, flush=True)
+            print("Backend is READY and watching for changes...", flush=True)
+            print("=" * 80, flush=True)
     except Exception as e:
-        print(f"Database initialization warning: {e}")
+        print(f"Database initialization warning: {e}", flush=True)
     
     yield
     
     # Shutdown
-    print("Shutting down Email Helper API...")
+    print("\n" + "=" * 80, flush=True)
+    print("Shutting down Email Helper API...", flush=True)
+    print("=" * 80, flush=True)
 
 
 # Create FastAPI app
@@ -52,13 +64,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware for React Native integration
+# Configure CORS to allow all origins
+# Updated: 2025-10-17 18:24 - Fixed allow_credentials conflict
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=settings.cors_allow_credentials,
-    allow_methods=settings.cors_allow_methods,
-    allow_headers=settings.cors_allow_headers,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,  # Must be False when using wildcard origins
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"]
 )
 
 
@@ -142,6 +156,10 @@ app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 from backend.api import processing
 app.include_router(processing.router, prefix="/api", tags=["processing"])
 
+# Import and include settings router
+from backend.api import settings as settings_api
+app.include_router(settings_api.router, prefix="/api", tags=["settings"])
+
 
 # Service factory integration for existing services
 def get_service_factory():
@@ -199,3 +217,4 @@ if __name__ == "__main__":
         reload=settings.debug,
         log_level="info"
     )
+

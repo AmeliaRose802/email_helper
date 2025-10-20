@@ -6,8 +6,9 @@ settings while maintaining compatibility with the existing Email Helper infrastr
 
 import os
 import sys
-from typing import Optional
-from pydantic import Field
+import json
+from typing import Optional, List, Union
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 from pathlib import Path
 
@@ -39,11 +40,11 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 30
     
-    # CORS settings
-    cors_origins: list = Field(default=["*"])
+    # CORS settings - Allow all origins for development
+    cors_origins: List[str] = Field(default_factory=lambda: ["*"])
     cors_allow_credentials: bool = True
-    cors_allow_methods: list = Field(default=["*"])
-    cors_allow_headers: list = Field(default=["*"])
+    cors_allow_methods: List[str] = Field(default_factory=lambda: ["*"])
+    cors_allow_headers: List[str] = Field(default_factory=lambda: ["*"])
     
     # Database settings
     database_url: Optional[str] = None
@@ -61,13 +62,16 @@ class Settings(BaseSettings):
     graph_redirect_uri: str = "http://localhost:8000/auth/callback"
     
     # COM Adapter settings (for Windows + Outlook integration)
-    use_com_backend: bool = False  # Enable COM email provider and AI service
+    use_com_backend: bool = True  # Enable COM email provider and AI service for localhost
     com_connection_timeout: int = 30  # Seconds to wait for COM connection
     com_retry_attempts: int = 3  # Number of retry attempts for COM operations
     email_provider: Optional[str] = None  # Email provider: 'com' or 'graph'
     
-    # Localhost development settings
-    require_authentication: bool = True  # Set to False for localhost development without auth
+    # Localhost development settings (disabled for desktop app)
+    require_authentication: bool = False  # Set to False for localhost development without auth
+    
+    # Email processing settings
+    email_processing_limit: int = 100  # Default number of emails to process for stats
     
     model_config = {
         "env_file": ".env",

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Button Click Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      background: #f5f5f5;
+    }
+    .test-section {
+      background: white;
+      padding: 30px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    button {
+      background: linear-gradient(135deg, #0078D4, #106EBE);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 16px;
+      transition: all 0.25s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+      min-height: 44px;
+    }
+    button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+    button:active {
+      transform: translateY(-1px);
+    }
+    #log {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .log-entry {
+      margin: 5px 0;
+      padding: 3px 0;
+      border-bottom: 1px solid #333;
+    }
+    .success { color: #4ec9b0; }
+    .info { color: #9cdcfe; }
+    .warning { color: #dcdcaa; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Button Click Diagnostic Test</h1>
+  
+  <div class="test-section">
+    <h2>Test 1: Inline onclick</h2>
+    <button onclick="log('✅ Inline onclick works!', 'success')">
+      📥 Inline onClick
+    </button>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 2: addEventListener</h2>
+    <button id="btn2">
+      📋 addEventListener
+    </button>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 3: React-style event attachment</h2>
+    <button id="btn3">
+      📝 Programmatic onClick
+    </button>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 4: With complex styles (matching app)</h2>
+    <button id="btn4" style="background: linear-gradient(135deg, #0078D4, #106EBE); user-select: none;">
+      ⚡ Styled Button
+    </button>
+  </div>
+
+  <div class="test-section">
+    <h2>Event Log</h2>
+    <div id="log"></div>
+    <button onclick="document.getElementById('log').innerHTML = ''">Clear Log</button>
+  </div>
+
+  <script>
+    let logCount = 0;
+    
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${++logCount}] ${new Date().toLocaleTimeString()} - ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+      console.log(message);
+    }
+
+    // Test 2: addEventListener
+    document.getElementById('btn2').addEventListener('click', () => {
+      log('✅ addEventListener works!', 'success');
+    });
+
+    // Test 3: Direct property assignment (React-like)
+    document.getElementById('btn3').onclick = () => {
+      log('✅ Programmatic onclick works!', 'success');
+    };
+
+    // Test 4: Complex styled button
+    document.getElementById('btn4').addEventListener('click', () => {
+      log('✅ Complex styled button works!', 'success');
+    });
+
+    // Global event monitoring
+    let clickCount = 0;
+    let mousedownCount = 0;
+    let mouseupCount = 0;
+
+    document.addEventListener('click', (e) => {
+      log(`🖱️ Click #${++clickCount} on ${e.target.tagName}`, 'info');
+    }, true);
+
+    document.addEventListener('mousedown', (e) => {
+      log(`⬇️ Mousedown #${++mousedownCount}`, 'info');
+    }, true);
+
+    document.addEventListener('mouseup', (e) => {
+      log(`⬆️ Mouseup #${++mouseupCount}`, 'info');
+    }, true);
+
+    // Initial log
+    log('🚀 Test page loaded successfully', 'success');
+    log('📊 Monitoring all mouse events...', 'info');
+  </script>
+</body>
+</html>

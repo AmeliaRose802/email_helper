@@ -5,12 +5,15 @@ Write-Host "🧹 Cleaning up processes..." -ForegroundColor Yellow
 Get-Process -Name electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Get-Process -Name python -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
-# Free port 8000
-$conn = Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
-if ($conn) {
-    Write-Host "🔓 Freeing port 8000..." -ForegroundColor Yellow
-    $conn | Select-Object -ExpandProperty OwningProcess | ForEach-Object {
-        Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
+# Free ports 8000 and 3000
+$ports = @(8000, 3000)
+foreach ($port in $ports) {
+    $conn = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+    if ($conn) {
+        Write-Host "🔓 Freeing port $port..." -ForegroundColor Yellow
+        $conn | Select-Object -ExpandProperty OwningProcess | ForEach-Object {
+            Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 

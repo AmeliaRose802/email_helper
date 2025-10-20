@@ -12,6 +12,11 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
+try:
+    import pythoncom
+except ImportError:
+    pythoncom = None
+
 # Add src to Python path if needed
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -105,9 +110,11 @@ class OutlookEmailAdapter(EmailProvider):
         
         try:
             # Get emails from OutlookManager
-            emails = self.outlook_manager.get_emails_from_inbox(
-                days_back=30,  # Default to 30 days
-                count=count
+            # Note: get_recent_emails only supports Inbox and takes days_back/max_emails
+            # We ignore folder_name for now and use max_emails for count
+            emails = self.outlook_manager.get_recent_emails(
+                days_back=365,  # Get emails from past year
+                max_emails=count + offset  # Get enough for offset + count
             )
             
             # Convert to standardized format
@@ -148,18 +155,77 @@ class OutlookEmailAdapter(EmailProvider):
             raise RuntimeError("Not connected to Outlook. Call connect() first.")
         
         try:
+            print(f"\n=== Starting email move operation ===")
+            print(f"Destination folder requested: '{destination_folder}'")
+            
             # Get the email item by EntryID
             email = self.outlook_manager.namespace.GetItemFromID(email_id)
+            email_subject = getattr(email, 'Subject', 'Unknown')
+            print(f"Email subject: {email_subject}")
             
-            # Get or create the destination folder
-            target_folder = self.outlook_manager._get_or_create_folder(destination_folder)
+            # Find the destination folder - check if it's a category key or folder name
+            target_folder = None
             
-            # Move the email
-            email.Move(target_folder)
-            return True
+            # First check if it's in the folders dictionary by category key
+            print(f"Checking OutlookManager.folders dictionary...")
+            print(f"Available folders in dictionary: {list(self.outlook_manager.folders.keys())}")
+            for category_key, folder in self.outlook_manager.folders.items():
+                if folder:
+                    print(f"  - {category_key}: {folder.Name}")
+                    if folder.Name == destination_folder:
+                        target_folder = folder
+                        print(f"[OK] Found folder in dictionary: {category_key} -> {folder.Name}")
+                        break
+            
+            # If not found, try to find or create the folder
+            if not target_folder:
+                print(f"Folder not found in dictionary, searching Outlook folder structure...")
+                # Get mail root (parent of inbox)
+                mail_root = self.outlook_manager.inbox.Parent
+                print(f"Mail root: {mail_root.Name}")
+                
+                # Try inbox subfolders first
+                print(f"Searching inbox subfolders...")
+                for subfolder in self.outlook_manager.inbox.Folders:
+                    print(f"  - Inbox subfolder: {subfolder.Name}")
+                    if subfolder.Name == destination_folder:
+                        target_folder = subfolder
+                        print(f"[OK] Found in inbox subfolders: {subfolder.Name}")
+                        break
+                
+                # Then try mail root folders
+                if not target_folder:
+                    print(f"Searching mail root folders...")
+                    for subfolder in mail_root.Folders:
+                        print(f"  - Root folder: {subfolder.Name}")
+                        if subfolder.Name == destination_folder:
+                            target_folder = subfolder
+                            print(f"[OK] Found in root folders: {subfolder.Name}")
+                            break
+                
+                # Create if still not found
+                if not target_folder:
+                    print(f"Folder not found, creating new folder: {destination_folder}")
+                    target_folder = mail_root.Folders.Add(destination_folder)
+                    print(f"[OK] Created new folder: {target_folder.Name}")
+            
+            if target_folder:
+                # Move the email
+                print(f"Moving email to {target_folder.Name}...")
+                email.Move(target_folder)
+                print(f"[OK] Successfully moved email '{email_subject}' to {destination_folder}")
+                print(f"=== Move operation completed ===\n")
+                return True
+            else:
+                print(f"[FAIL] Could not find or create folder: {destination_folder}")
+                print(f"=== Move operation failed ===\n")
+                return False
             
         except Exception as e:
-            print(f"Error moving email: {e}")
+            print(f"\n[ERROR] Error moving email to {destination_folder}: {e}")
+            import traceback
+            traceback.print_exc()
+            print(f"=== Move operation failed with exception ===\n")
             return False
     
     def get_email_body(self, email_id: str) -> str:
@@ -187,6 +253,31 @@ class OutlookEmailAdapter(EmailProvider):
         except Exception as e:
             print(f"Error retrieving email body: {e}")
             return ""
+
+    def get_email_by_id(self, email_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single email by its EntryID.
+        
+        Args:
+            email_id: EntryID of the email to retrieve
+        
+        Returns:
+            Email dictionary if found, None otherwise
+        """
+        if not self.connected:
+            raise RuntimeError("Not connected to Outlook. Call connect() first.")
+        
+        try:
+            # Get the email item directly by EntryID
+            email = self.outlook_manager.namespace.GetItemFromID(email_id)
+            
+            if email:
+                return self._email_to_dict(email)
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error retrieving email by ID {email_id}: {e}")
+            return None
     
     def get_folders(self) -> List[Dict[str, str]]:
         """List available email folders.
@@ -282,9 +373,14 @@ class OutlookEmailAdapter(EmailProvider):
                 'recipient': '',
                 'body': getattr(email, 'Body', '')[:500],  # Truncate for list view
                 'received_time': self._format_datetime(email.ReceivedTime),
+                'date': self._format_datetime(email.ReceivedTime),  # Add date field for frontend
                 'is_read': not email.UnRead,
+                'has_attachments': email.Attachments.Count > 0 if hasattr(email, 'Attachments') else False,
+                'importance': self._convert_importance(getattr(email, 'Importance', 1)),  # Convert to string
                 'categories': self._get_categories(email),
-                'conversation_id': getattr(email, 'ConversationID', '')
+                'conversation_id': getattr(email, 'ConversationID', ''),
+                'one_line_summary': None,  # Will be populated by AI service
+                'holistic_classification': None  # Will be populated by holistic analyzer
             }
             
             # Extract recipient
@@ -300,6 +396,18 @@ class OutlookEmailAdapter(EmailProvider):
         except Exception as e:
             print(f"Error converting email to dict: {e}")
             raise
+    
+    def _convert_importance(self, importance: int) -> str:
+        """Convert Outlook numeric importance to string.
+        
+        Args:
+            importance: Outlook importance value (0=Low, 1=Normal, 2=High)
+        
+        Returns:
+            String importance level
+        """
+        importance_map = {0: 'Low', 1: 'Normal', 2: 'High'}
+        return importance_map.get(importance, 'Normal')
     
     def _format_datetime(self, dt) -> str:
         """Format Outlook datetime to ISO string.
