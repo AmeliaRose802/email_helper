@@ -2273,22 +2273,22 @@ button:disabled, a:disabled {
   display: flex;
   align-items: flex-start;
   padding: 12px 16px;
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
+  background-color: rgba(26, 10, 62, 0.6);
+  border: 1px solid rgba(122, 44, 247, 0.3);
   border-radius: 6px;
   transition: all 0.3s ease;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 .simple-task-item.completed {
-  background-color: #f0f0f0;
-  border-color: #d0d0d0;
-  opacity: 0.7;
+  background-color: rgba(26, 10, 62, 0.3);
+  border-color: rgba(122, 44, 247, 0.2);
+  opacity: 0.6;
   box-shadow: none;
 }
 
 .simple-task-item.recently-completed {
-  background-color: #d4edda;
+  background-color: rgba(40, 167, 69, 0.2);
   border: 2px solid #28a745;
   box-shadow: 0 0 20px rgba(40, 167, 69, 0.5);
   transform: scale(1.02);
@@ -2330,7 +2330,7 @@ button:disabled, a:disabled {
 }
 
 .simple-task-title.completed {
-  color: #a0a0a0;
+  color: #8e8ea0;
   text-decoration: line-through;
 }
 
@@ -2368,15 +2368,15 @@ button:disabled, a:disabled {
 .simple-task-links {
   margin-top: 8px;
   padding: 8px 12px;
-  background-color: #e7f3ff;
-  border: 1px solid #b3d9ff;
+  background-color: rgba(0, 230, 255, 0.1);
+  border: 1px solid rgba(0, 230, 255, 0.3);
   border-radius: 4px;
 }
 
 .simple-task-links-header {
   font-size: 12px;
   font-weight: bold;
-  color: #0066cc;
+  color: #00e6ff;
   margin-bottom: 4px;
 }
 
@@ -2386,7 +2386,7 @@ button:disabled, a:disabled {
 
 .simple-task-link a {
   font-size: 13px;
-  color: #0066cc;
+  color: #00e6ff;
   text-decoration: underline;
   word-break: break-all;
 }
@@ -2401,9 +2401,9 @@ button:disabled, a:disabled {
 .simple-task-tag {
   font-size: 11px;
   padding: 2px 8px;
-  background-color: #e0e0e0;
+  background-color: rgba(122, 44, 247, 0.3);
   border-radius: 12px;
-  color: #555;
+  color: #d8d8e8;
 }
 
 .simple-task-delete-btn {

@@ -19,6 +19,7 @@ import asyncio
 import os
 import sys
 import json
+import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
@@ -32,6 +33,9 @@ except ImportError as e:
     print(f"Warning: Could not import AI dependencies: {e}")
     AIProcessor = None
     get_azure_config = None
+
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
 
 
 class COMAIService:
@@ -348,27 +352,31 @@ class COMAIService:
                 try:
                     result = json.loads(result)
                 except json.JSONDecodeError:
-                    # Fallback parsing for non-JSON responses
+                    # Fallback parsing for non-JSON responses - mark as error
+                    logger.warning(f"[AI Service] Failed to parse JSON response: {result[:100]}...")
                     result = {
-                        "action_required": result[:200] if result else "Review email content",
+                        "action_required": "Review email content",  # Detected as fallback in emails.py
                         "explanation": "Unable to parse structured response",
                         "due_date": "",
                         "relevance": "",
-                        "links": []
+                        "links": [],
+                        "error": "JSON parse failed"  # Flag as error response
                     }
             
             # Ensure dictionary structure
             if not isinstance(result, dict):
+                logger.warning(f"[AI Service] Non-dict result from prompty: {type(result)}")
                 result = {
-                    "action_required": str(result),
-                    "explanation": "",
+                    "action_required": "Review email content",  # Detected as fallback
+                    "explanation": "AI returned non-structured response",
                     "due_date": "",
                     "relevance": "",
-                    "links": []
+                    "links": [],
+                    "error": "Invalid response format"  # Flag as error
                 }
             
             # Format response with all expected fields
-            return {
+            response = {
                 "action_items": [result] if result.get("action_required") else [],
                 "action_required": result.get("action_required", "No action required"),
                 "due_date": result.get("due_date", ""),
@@ -377,6 +385,15 @@ class COMAIService:
                 "links": result.get("links", []),
                 "confidence": 0.8  # Default confidence for successful extraction
             }
+            
+            # Preserve error flag if present
+            if "error" in result:
+                response["error"] = result["error"]
+                logger.warning(f"[AI Service] Action extraction had error: {result['error']}")
+            else:
+                logger.debug(f"[AI Service] Action extracted: {response['action_required'][:80]}...")
+            
+            return response
             
         except Exception as e:
             raise  # Re-raise to be caught by async wrapper
