@@ -1,10 +1,9 @@
 // Email detail page for viewing individual emails
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { 
   useGetEmailByIdQuery, 
-  useMarkEmailReadMutation, 
-  useDeleteEmailMutation,
+  useMarkEmailReadMutation,
   useGetCategoryMappingsQuery,
   useUpdateEmailClassificationMutation
 } from '@/services/emailApi';
@@ -51,9 +50,7 @@ const formatPlainTextEmail = (text: string): string => {
 
 const EmailDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [markAsRead] = useMarkEmailReadMutation();
-  const [deleteEmail] = useDeleteEmailMutation();
   const [updateClassification, { isLoading: updateClassificationLoading }] = useUpdateEmailClassificationMutation();
   const [showClassificationMenu, setShowClassificationMenu] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -80,29 +77,6 @@ const EmailDetail: React.FC = () => {
     }
   }, [email, markAsRead]);
   
-  const handleDelete = async () => {
-    if (!email) return;
-    
-    if (window.confirm('Are you sure you want to delete this email?')) {
-      try {
-        await deleteEmail(email.id).unwrap();
-        navigate('/emails');
-      } catch (error) {
-        console.error('Failed to delete email:', error);
-      }
-    }
-  };
-  
-  const handleMarkAsUnread = async () => {
-    if (!email) return;
-    
-    try {
-      await markAsRead({ id: email.id, read: false }).unwrap();
-    } catch (error) {
-      console.error('Failed to mark as unread:', error);
-    }
-  };
-
   const handleUpdateClassification = async (newCategory: string) => {
     if (!email) return;
     
@@ -157,7 +131,7 @@ const EmailDetail: React.FC = () => {
   
   return (
     <div className="email-detail-container">
-      {/* Header with navigation and actions */}
+      {/* Header with navigation only */}
       <div className="email-detail-header">
         <Link 
           to="/emails" 
@@ -165,24 +139,6 @@ const EmailDetail: React.FC = () => {
         >
           ← Back to Inbox
         </Link>
-        
-        <div className="email-detail-actions">
-          <button
-            className="email-detail-action-btn email-detail-action-btn--secondary"
-            onClick={handleMarkAsUnread}
-            title="Mark as unread"
-          >
-            Mark as Unread
-          </button>
-          
-          <button
-            className="email-detail-action-btn email-detail-action-btn--danger"
-            onClick={handleDelete}
-            title="Delete email"
-          >
-            Delete
-          </button>
-        </div>
       </div>
       
       {/* Email header */}
@@ -204,13 +160,13 @@ const EmailDetail: React.FC = () => {
         
         <div className="email-detail-meta-row">
           <div className="email-detail-sender">
-            <strong>From:</strong> {email.sender || 'Unknown Sender'}
+            <strong>From:</strong> {email.sender || 'N/A'}
           </div>
         </div>
         
         <div className="email-detail-meta-row">
           <div className="email-detail-recipient">
-            <strong>To:</strong> {email.recipient || 'Unknown Recipient'}
+            <strong>To:</strong> {email.recipient || 'N/A'}
           </div>
         </div>
         
@@ -225,7 +181,7 @@ const EmailDetail: React.FC = () => {
                   hour: 'numeric', 
                   minute: '2-digit' 
                 })
-                : 'Date unavailable'}
+                : 'N/A'}
           </div>
           {email.folder_name && (
             <div><strong>Folder:</strong> {email.folder_name}</div>

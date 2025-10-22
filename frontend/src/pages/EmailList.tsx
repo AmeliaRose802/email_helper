@@ -19,9 +19,27 @@ const EmailList: React.FC = () => {
   const [extractTasksFromEmails] = useExtractTasksFromEmailsMutation();
   const [isApplyingToOutlook, setIsApplyingToOutlook] = useState(false);
   const [isExtractingTasks, setIsExtractingTasks] = useState(false);
-  // Use ref to persist classification state across re-renders and page changes
+  
+  // Initialize refs from sessionStorage to persist across page reloads
   const classifiedEmailsRef = React.useRef<Map<string, Email>>(new Map());
-  const [classifiedEmails, setClassifiedEmails] = useState<Map<string, Email>>(classifiedEmailsRef.current);
+  
+  // Load from sessionStorage on mount
+  React.useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('classifiedEmails');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const map = new Map(Object.entries(parsed)) as Map<string, Email>;
+        classifiedEmailsRef.current = map;
+        setClassifiedEmails(map);
+        console.log('[EmailList] Restored', map.size, 'classified emails from sessionStorage');
+      }
+    } catch (e) {
+      console.warn('Failed to load classified emails from sessionStorage:', e);
+    }
+  }, []); // Run once on mount
+  
+  const [classifiedEmails, setClassifiedEmails] = useState<Map<string, Email>>(new Map());
   const [classifyingIds, setClassifyingIds] = useState<Set<string>>(new Set());
   
   // Progress tracking for classification
@@ -51,10 +69,34 @@ const EmailList: React.FC = () => {
     });
   }, [isLoading, error, emailData]);
 
+  // Persist classification state to sessionStorage
+  useEffect(() => {
+    try {
+      // Convert Map to object for JSON serialization
+      const emailsObj = Object.fromEntries(classifiedEmailsRef.current);
+      sessionStorage.setItem('classifiedEmails', JSON.stringify(emailsObj));
+      
+      // Persist classified pages
+      const pagesArray = Array.from(classifiedPagesRef.current);
+      sessionStorage.setItem('classifiedPages', JSON.stringify(pagesArray));
+    } catch (e) {
+      console.warn('Failed to persist classification state:', e);
+    }
+  }, [classifiedEmails]); // Trigger when classifiedEmails state changes
+
   // Current data
   const currentData = emailData;
   const currentLoading = isLoading;
   const currentError = error;
+
+  // Cleanup on unmount - abort any pending prefetch operations
+  useEffect(() => {
+    return () => {
+      if (prefetchAbortControllerRef.current) {
+        prefetchAbortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // Group emails by conversation (like Python app)
   const conversationGroups = useMemo(() => {
@@ -112,6 +154,131 @@ const EmailList: React.FC = () => {
   // Use a ref to track which pages have been classified to prevent re-classification
   const classifiedPagesRef = React.useRef<Set<number>>(new Set());
   
+  // Load classified pages from sessionStorage on mount
+  React.useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('classifiedPages');
+      if (stored) {
+        classifiedPagesRef.current = new Set(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn('Failed to load classified pages from sessionStorage:', e);
+    }
+  }, []); // Run once on mount
+  
+  const prefetchAbortControllerRef = React.useRef<AbortController | null>(null);
+  const isPrefetchingRef = React.useRef(false);
+  const [isPrefetchingState, setIsPrefetchingState] = useState(false);
+  
+  // Helper function to classify a batch of conversations
+  const classifyConversations = useCallback(async (
+    conversations: typeof currentPageConversations,
+    isPrefetch = false,
+    abortSignal?: AbortSignal
+  ) => {
+    if (conversations.length === 0) return;
+    
+    // Get representative emails from conversations that need classification
+    const conversationsToClassify = conversations.filter(conv => {
+      const repEmail = conv.representativeEmail;
+      // Skip if already classified (check both state and ref) or currently classifying
+      if (classifiedEmailsRef.current.has(repEmail.id) || classifyingIds.has(repEmail.id)) {
+        return false;
+      }
+      // Only classify if no AI category yet
+      return !repEmail.ai_category;
+    });
+
+    if (conversationsToClassify.length === 0) {
+      return;
+    }
+
+    // Only show progress for current page, not prefetch
+    if (!isPrefetch) {
+      setIsClassifying(true);
+      setClassificationProgress({ current: 0, total: conversationsToClassify.length });
+    }
+
+    // Classify one conversation at a time to avoid API limits
+    for (let i = 0; i < conversationsToClassify.length; i++) {
+      // Check for abort signal
+      if (abortSignal?.aborted) {
+        console.log('[Prefetch] Classification aborted');
+        break;
+      }
+
+      const conversation = conversationsToClassify[i];
+      const repEmail = conversation.representativeEmail;
+      
+      // Mark email as classifying
+      setClassifyingIds(prev => new Set(prev).add(repEmail.id));
+
+      try {
+        const result = await classifyEmail({
+          subject: repEmail.subject,
+          sender: repEmail.sender,
+          content: repEmail.body || '',
+        }).unwrap();
+
+        // Apply classification to all emails in the conversation
+        setClassifiedEmails(prev => {
+          const next = new Map(prev);
+          conversation.emails.forEach(email => {
+            const classified = {
+              ...email,
+              ai_category: result.category as any,
+              ai_confidence: result.confidence,
+              ai_reasoning: result.reasoning,
+              one_line_summary: result.one_line_summary, // Store the AI-generated one-line summary
+              classification_status: 'classified' as const,
+            };
+            next.set(email.id, classified);
+            // Also update ref to persist across page changes
+            classifiedEmailsRef.current.set(email.id, classified);
+          });
+          return next;
+        });
+
+        // Update progress only for current page
+        if (!isPrefetch) {
+          setClassificationProgress({ current: i + 1, total: conversationsToClassify.length });
+        }
+      } catch (error) {
+        console.error(`Failed to classify conversation ${repEmail.id}:`, error);
+        // Store as error status for all emails in conversation
+        setClassifiedEmails(prev => {
+          const next = new Map(prev);
+          conversation.emails.forEach(email => {
+            const errored = {
+              ...email,
+              classification_status: 'error' as const,
+            };
+            next.set(email.id, errored);
+            // Also update ref to persist across page changes
+            classifiedEmailsRef.current.set(email.id, errored);
+          });
+          return next;
+        });
+      } finally {
+        // Remove from classifying set
+        setClassifyingIds(prev => {
+          const next = new Set(prev);
+          next.delete(repEmail.id);
+          return next;
+        });
+      }
+
+      // Delay between classifications to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // Classification complete
+    if (!isPrefetch) {
+      setIsClassifying(false);
+    }
+  }, [classifyEmail, classifyingIds]);
+  
+  // Classify current page conversations
   useEffect(() => {
     const classifyCurrentPageConversations = async () => {
       if (currentPageConversations.length === 0) return;
@@ -120,104 +287,103 @@ const EmailList: React.FC = () => {
       if (classifiedPagesRef.current.has(currentConversationPage)) {
         return;
       }
-      
-      // Get representative emails from conversations that need classification
-      const conversationsToClassify = currentPageConversations.filter(conv => {
-        const repEmail = conv.representativeEmail;
-        // Skip if already classified (check both state and ref) or currently classifying
-        if (classifiedEmailsRef.current.has(repEmail.id) || classifyingIds.has(repEmail.id)) {
-          return false;
-        }
-        // Only classify if no AI category yet
-        return !repEmail.ai_category;
-      });
-
-      if (conversationsToClassify.length === 0) {
-        // Mark page as processed even if no conversations to classify
-        classifiedPagesRef.current.add(currentConversationPage);
-        return;
-      }
 
       // Mark this page as being classified
       classifiedPagesRef.current.add(currentConversationPage);
 
-      // Initialize progress tracking
-      setIsClassifying(true);
-      setClassificationProgress({ current: 0, total: conversationsToClassify.length });
-
-      // Classify one conversation at a time to avoid API limits
-      for (let i = 0; i < conversationsToClassify.length; i++) {
-        const conversation = conversationsToClassify[i];
-        const repEmail = conversation.representativeEmail;
-        
-        // Mark email as classifying
-        setClassifyingIds(prev => new Set(prev).add(repEmail.id));
-
-        try {
-          const result = await classifyEmail({
-            subject: repEmail.subject,
-            sender: repEmail.sender,
-            content: repEmail.body || '',
-          }).unwrap();
-
-          // Apply classification to all emails in the conversation
-          setClassifiedEmails(prev => {
-            const next = new Map(prev);
-            conversation.emails.forEach(email => {
-              const classified = {
-                ...email,
-                ai_category: result.category as any,
-                ai_confidence: result.confidence,
-                ai_reasoning: result.reasoning,
-                one_line_summary: result.one_line_summary, // Store the AI-generated one-line summary
-                classification_status: 'classified' as const,
-              };
-              next.set(email.id, classified);
-              // Also update ref to persist across page changes
-              classifiedEmailsRef.current.set(email.id, classified);
-            });
-            return next;
-          });
-
-          // Update progress
-          setClassificationProgress({ current: i + 1, total: conversationsToClassify.length });
-        } catch (error) {
-          console.error(`Failed to classify conversation ${repEmail.id}:`, error);
-          // Store as error status for all emails in conversation
-          setClassifiedEmails(prev => {
-            const next = new Map(prev);
-            conversation.emails.forEach(email => {
-              const errored = {
-                ...email,
-                classification_status: 'error' as const,
-              };
-              next.set(email.id, errored);
-              // Also update ref to persist across page changes
-              classifiedEmailsRef.current.set(email.id, errored);
-            });
-            return next;
-          });
-        } finally {
-          // Remove from classifying set
-          setClassifyingIds(prev => {
-            const next = new Set(prev);
-            next.delete(repEmail.id);
-            return next;
-          });
-        }
-
-        // Delay between classifications to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      // Classification complete
-      setIsClassifying(false);
+      // Classify current page
+      await classifyConversations(currentPageConversations, false);
     };
 
     classifyCurrentPageConversations();
     // Don't include classifiedEmails in dependencies since we're using ref for persistence
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPageConversations, classifyEmail, classifyingIds, currentConversationPage]);
+  }, [currentPageConversations, currentConversationPage, classifyConversations]);
+
+  // PREFETCH: Classify next page in background for instant navigation
+  useEffect(() => {
+    // Abort any existing prefetch operation when page changes
+    if (prefetchAbortControllerRef.current) {
+      prefetchAbortControllerRef.current.abort();
+      prefetchAbortControllerRef.current = null;
+      isPrefetchingRef.current = false;
+    }
+
+    // Wait for current page to finish classifying before prefetching
+    if (isClassifying || isPrefetchingRef.current) {
+      return;
+    }
+
+    const prefetchNextPage = async () => {
+      const nextPage = currentConversationPage + 1;
+      
+      // Check if there is a next page and it hasn't been classified yet
+      if (nextPage >= totalPages || classifiedPagesRef.current.has(nextPage)) {
+        return;
+      }
+
+      // Get next page conversations
+      const nextPageStartIdx = nextPage * CONVERSATIONS_PER_PAGE;
+      const nextPageEndIdx = nextPageStartIdx + CONVERSATIONS_PER_PAGE;
+      const nextPageConversations = conversationGroups.slice(nextPageStartIdx, nextPageEndIdx);
+
+      if (nextPageConversations.length === 0) {
+        return;
+      }
+
+      // Check if any conversations on next page need classification
+      const needsClassification = nextPageConversations.some(conv => {
+        const repEmail = conv.representativeEmail;
+        // Check both ref and current state to ensure we don't re-classify
+        return !classifiedEmailsRef.current.has(repEmail.id) && 
+               !classifiedEmails.has(repEmail.id) && 
+               !repEmail.ai_category;
+      });
+
+      if (!needsClassification) {
+        // Mark as classified even though we didn't do work
+        classifiedPagesRef.current.add(nextPage);
+        return;
+      }
+
+      // Start prefetch after a short delay (user is reading current page)
+      const timer = setTimeout(async () => {
+        console.log(`[Prefetch] Starting background classification for page ${nextPage + 1} (${nextPageConversations.length} conversations)`);
+        isPrefetchingRef.current = true;
+        setIsPrefetchingState(true);
+        
+        // Create abort controller for this prefetch operation
+        const abortController = new AbortController();
+        prefetchAbortControllerRef.current = abortController;
+
+        // Mark page as being classified
+        classifiedPagesRef.current.add(nextPage);
+
+        try {
+          await classifyConversations(nextPageConversations, true, abortController.signal);
+          console.log(`[Prefetch] Completed background classification for page ${nextPage + 1}`);
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            console.log('[Prefetch] Classification was aborted');
+          } else {
+            console.error('[Prefetch] Error during background classification:', error);
+          }
+        } finally {
+          isPrefetchingRef.current = false;
+          setIsPrefetchingState(false);
+          if (prefetchAbortControllerRef.current === abortController) {
+            prefetchAbortControllerRef.current = null;
+          }
+        }
+      }, 2000); // 2 second delay before starting prefetch
+
+      // Cleanup timer on unmount or page change
+      return () => clearTimeout(timer);
+    };
+
+    prefetchNextPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentConversationPage, isClassifying, conversationGroups, totalPages, classifyConversations]);
 
   // Get emails from current page conversations with classification
   const currentPageEmails = useMemo(() => {
@@ -510,19 +676,30 @@ const EmailList: React.FC = () => {
               {selectedEmails.length > 0 && (
                 <span> | {selectedEmails.length} selected</span>
               )}
+              {isPrefetchingState && (
+                <span className="email-list-prefetch-indicator">
+                  ⚡ Pre-loading next page...
+                </span>
+              )}
             </>
           )}
         </div>
         
-        {/* Single Approve Button - Does Both Operations */}
+        {/* Single Approve Button - Does Both Operations (Current Page Only) */}
         <button
           onClick={async () => {
-            if (!currentData?.emails || classifiedEmailsRef.current.size === 0) {
-              alert('No classified emails to process');
+            // Get only classified emails from current page
+            const currentPageEmailIds = currentPageEmails
+              .filter(email => email.ai_category)
+              .map(email => email.id);
+            
+            if (currentPageEmailIds.length === 0) {
+              alert('No classified emails on current page to process');
               return;
             }
 
-            if (!window.confirm(`Process ${classifiedEmailsRef.current.size} classified emails?\n\n✅ Apply classifications to Outlook folders\n✅ Extract tasks and summaries\n\nThis will run in the background.`)) {
+            const emailCount = currentPageEmailIds.length;
+            if (!window.confirm(`Process ${emailCount} classified email${emailCount !== 1 ? 's' : ''} from current page?\n\n✅ Apply classifications to Outlook folders\n✅ Extract tasks and summaries\n\nThis will run in the background.`)) {
               return;
             }
 
@@ -532,25 +709,26 @@ const EmailList: React.FC = () => {
 
             try {
               // 1. Apply to Outlook
-              const classifiedEmailIds = Array.from(classifiedEmailsRef.current.keys());
               const applyResult = await bulkApplyToOutlook({
-                emailIds: classifiedEmailIds,
+                emailIds: currentPageEmailIds,
                 applyToOutlook: true,
               }).unwrap();
 
               console.log('✅ Applied to Outlook:', applyResult);
 
-              // 2. Sync to database
-              const classifiedEmails = Array.from(classifiedEmailsRef.current.values());
+              // 2. Sync to database - only current page emails
+              const currentPageClassifiedEmails = currentPageEmails.filter(email => 
+                currentPageEmailIds.includes(email.id)
+              );
               const syncResult = await syncEmailsToDatabase({
-                emails: classifiedEmails
+                emails: currentPageClassifiedEmails
               }).unwrap();
 
               console.log('✅ Synced to database:', syncResult);
 
               // 3. Extract tasks
               const extractResult = await extractTasksFromEmails({
-                email_ids: classifiedEmailIds
+                email_ids: currentPageEmailIds
               }).unwrap();
 
               console.log('✅ Extracting tasks:', extractResult);
@@ -566,18 +744,23 @@ const EmailList: React.FC = () => {
               setIsExtractingTasks(false);
             }
           }}
-          disabled={isApplyingToOutlook || isExtractingTasks || isClassifying || classifiedEmailsRef.current.size === 0}
+          disabled={
+            isApplyingToOutlook || 
+            isExtractingTasks || 
+            isClassifying || 
+            currentPageEmails.filter(e => e.ai_category).length === 0
+          }
           className="email-approve-button"
           title={
             isClassifying 
               ? 'Please wait for classification to complete'
-              : classifiedEmailsRef.current.size === 0
-              ? 'No classified emails to process'
-              : 'Apply classifications to Outlook AND extract tasks - all in one click!'
+              : currentPageEmails.filter(e => e.ai_category).length === 0
+              ? 'No classified emails on current page'
+              : 'Apply classifications to Outlook AND extract tasks for current page only!'
           }
         >
           <span className="email-list-checkmark">✅</span>
-          {isApplyingToOutlook || isExtractingTasks ? 'Processing...' : 'Approve All (Apply + Extract Tasks)'}
+          {isApplyingToOutlook || isExtractingTasks ? 'Processing...' : `Approve ${currentPageEmails.filter(e => e.ai_category).length} Email${currentPageEmails.filter(e => e.ai_category).length !== 1 ? 's' : ''}`}
         </button>
       </div>
 
@@ -688,11 +871,10 @@ const EmailList: React.FC = () => {
 
           {/* Email Detail - Right Side */}
           {selectedEmailId && (
-            <div className="email-list-panel">
+            <div className="email-list-panel" key={selectedEmailId}>
               <EmailDetailView
                 emailId={selectedEmailId}
                 onClose={() => setSelectedEmailId(null)}
-                showBackButton={true}
               />
             </div>
           )}

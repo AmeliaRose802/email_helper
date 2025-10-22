@@ -1,9 +1,6 @@
-// Complete Task Management with Kanban Board - T8 Implementation
+// Complete Task Management - Simplified List View
 import React, { useState, useMemo } from 'react';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useGetTasksQuery } from '@/services/taskApi';
-import { TaskBoard } from '@/components/Task/TaskBoard';
 import { SimpleTaskList } from '@/components/Task/SimpleTaskList';
 import { TaskFilters } from '@/components/Task/TaskFilters';
 import { ProgressTracker } from '@/components/Task/ProgressTracker';
@@ -15,7 +12,6 @@ const TaskList: React.FC = () => {
   const [filters, setFilters] = useState<TaskFilter>({});
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = useState<'board' | 'list'>('list'); // Default to simple list
 
   const {
     data: taskData,
@@ -44,10 +40,6 @@ const TaskList: React.FC = () => {
     setFilters({});
   };
 
-  const handleEditTask = (task: Task) => {
-    setEditingTask(task);
-  };
-
   const handleCloseForm = () => {
     setShowCreateForm(false);
     setEditingTask(null);
@@ -66,81 +58,57 @@ const TaskList: React.FC = () => {
   }
 
   return (
-    <DndProvider backend={HTML5Backend}>
-      <div className="task-list-container">
-        <div className="task-list-header">
-          <div className="header-title">
-            <h1>Task Board</h1>
-            <div className="task-count">
-              {filteredTasks.length} of {taskData?.total_count || 0} tasks
-            </div>
-          </div>
-          
-          <div className="header-actions">
-            <div className="view-toggle">
-              <button
-                className={viewMode === 'board' ? 'active' : ''}
-                onClick={() => setViewMode('board')}
-              >
-                Board
-              </button>
-              <button
-                className={viewMode === 'list' ? 'active' : ''}
-                onClick={() => setViewMode('list')}
-              >
-                List
-              </button>
-            </div>
-            
-            <button 
-              className="create-task-btn primary"
-              onClick={() => setShowCreateForm(true)}
-            >
-              + New Task
-            </button>
+    <div className="task-list-container">
+      <div className="task-list-header">
+        <div className="header-title">
+          <h1>Task Board</h1>
+          <div className="task-count">
+            {filteredTasks.length} of {taskData?.total_count || 0} tasks
           </div>
         </div>
-
-        <div className="task-progress-section">
-          <ProgressTracker tasks={filteredTasks} />
+        
+        <div className="header-actions">
+          <button 
+            className="create-task-btn primary"
+            onClick={() => setShowCreateForm(true)}
+          >
+            + New Task
+          </button>
         </div>
+      </div>
 
-        <div className="task-filters-section">
-          <TaskFilters 
-            filters={filters}
-            onChange={handleFilterChange}
-            onReset={handleFilterReset}
-          />
-        </div>
+      <div className="task-progress-section">
+        <ProgressTracker tasks={filteredTasks} />
+      </div>
 
-        <div className="task-content-section">
-          {isLoading ? (
-            <div className="task-list-loading">
-              <div className="loading-spinner"></div>
-              <p>Loading tasks...</p>
-            </div>
-          ) : viewMode === 'board' ? (
-            <TaskBoard 
-              tasks={filteredTasks}
-              onEditTask={handleEditTask}
-              isLoading={isLoading}
-              onRefresh={refetch}
-            />
-          ) : (
-            <SimpleTaskList 
-              tasks={filteredTasks}
-              onRefresh={refetch}
-            />
-          )}
-        </div>
-
-        <TaskForm
-          task={editingTask}
-          onClose={handleCloseForm}
-          isOpen={showCreateForm || !!editingTask}
+      <div className="task-filters-section">
+        <TaskFilters 
+          filters={filters}
+          onChange={handleFilterChange}
+          onReset={handleFilterReset}
         />
       </div>
-    </DndProvider>
+
+      <div className="task-content-section">
+        {isLoading ? (
+          <div className="task-list-loading">
+            <div className="loading-spinner"></div>
+            <p>Loading tasks...</p>
+          </div>
+        ) : (
+          <SimpleTaskList 
+            tasks={filteredTasks}
+            onRefresh={refetch}
+          />
+        )}
+      </div>
+
+      <TaskForm
+        task={editingTask}
+        onClose={handleCloseForm}
+        isOpen={showCreateForm || !!editingTask}
+      />
+    </div>
   );
 };
 

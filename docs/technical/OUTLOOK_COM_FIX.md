@@ -104,18 +104,6 @@ Created diagnostic tools:
 
 Both tests pass successfully with Outlook running.
 
-## How to Restart the App
-
-Use the new clean restart script:
-```powershell
-.\restart-app.ps1
-```
-
-This script:
-1. Cleanly stops all Electron and Python processes
-2. Frees port 8000
-3. Starts the app fresh
-
 ## Why This Works
 
 In FastAPI/uvicorn:

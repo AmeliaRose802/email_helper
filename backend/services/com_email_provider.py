@@ -31,7 +31,7 @@ except ImportError:
     PYTHONCOM_AVAILABLE = False
     pythoncom = None
 
-# Add src to Python path for adapter imports
+# Add src to Python path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from backend.services.email_provider import EmailProvider
@@ -355,64 +355,29 @@ class COMEmailProvider(EmailProvider):
         # Reconnect to ensure COM objects are on this thread
         self.adapter.connect()
         
-        # Get full email metadata first
+        # Use the adapter's get_email_by_id method - it already handles all the metadata extraction correctly!
+        # This is the SAME method used by get_emails() which works perfectly
+        email_dict = self.adapter.get_email_by_id(email_id)
+        
+        if not email_dict:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Email with ID '{email_id}' not found"
+            )
+        
+        # Get full body content (adapter truncates it for list view)
         try:
-            mail = self.adapter.outlook.Session.GetItemFromID(email_id)
-            
-            # Parse received time
-            received_time = None
-            try:
-                if hasattr(mail, 'ReceivedTime'):
-                    received_dt = mail.ReceivedTime
-                    if received_dt:
-                        # Convert to Python datetime
-                        from datetime import datetime
-                        if hasattr(received_dt, 'strftime'):
-                            received_time = received_dt.strftime('%Y-%m-%dT%H:%M:%S')
-                        else:
-                            # Try to parse COM date
-                            import pywintypes
-                            try:
-                                py_dt = pywintypes.Time(received_dt)
-                                received_time = py_dt.strftime('%Y-%m-%dT%H:%M:%S')
-                            except:
-                                received_time = str(received_dt)
-            except Exception as e:
-                self.logger.warning(f"Could not parse ReceivedTime: {e}")
-            
-            # Get full body content
-            body = self.adapter.get_email_body(email_id)
-            
-            # Return complete email with metadata
-            return {
-                'id': email_id,
-                'subject': mail.Subject if hasattr(mail, 'Subject') else '',
-                'sender': mail.SenderEmailAddress if hasattr(mail, 'SenderEmailAddress') else '',
-                'recipient': mail.To if hasattr(mail, 'To') else '',
-                'body': body or '',
-                'date': received_time,
-                'received_time': received_time,
-                'is_read': mail.UnRead == 0 if hasattr(mail, 'UnRead') else True,
-                'has_attachments': mail.Attachments.Count > 0 if hasattr(mail, 'Attachments') else False,
-                'importance': self._map_importance(mail.Importance) if hasattr(mail, 'Importance') else 'Normal',
-                'categories': list(mail.Categories.split(',')) if hasattr(mail, 'Categories') and mail.Categories else [],
-                'conversation_id': mail.ConversationID if hasattr(mail, 'ConversationID') else None
-            }
+            full_body = self.adapter.get_email_body(email_id)
+            email_dict['body'] = full_body or email_dict.get('body', '')
         except Exception as e:
-            self.logger.error(f"Error getting email metadata: {e}")
-            # Fallback to just body if metadata fails
-            body = self.adapter.get_email_body(email_id)
-            if body is not None:
-                return {
-                    'id': email_id,
-                    'body': body,
-                    'subject': 'Unknown',
-                    'sender': 'Unknown',
-                    'recipient': '',
-                    'date': None,
-                    'received_time': None
-                }
-            return None
+            self.logger.warning(f"Could not retrieve full body for {email_id}: {e}")
+            # Keep the truncated body from email_dict
+        
+        # Map importance format if needed
+        if 'importance' not in email_dict or not email_dict['importance']:
+            email_dict['importance'] = 'Normal'
+        
+        return email_dict
     
     def get_folders(self) -> List[Dict[str, str]]:
         """List available email folders.

@@ -13,6 +13,7 @@ export interface Email {
   importance: 'Low' | 'Normal' | 'High';
   categories?: string[]; // Outlook categories
   conversation_id?: string;
+  conversation_count?: number; // Number of emails in conversation
   folder_name?: string;
   // AI Classification fields
   ai_category?: 'required_personal_action' | 'team_action' | 'optional_action' | 'job_listing' | 'optional_event' | 'work_relevant' | 'fyi' | 'newsletter' | 'spam_to_delete';

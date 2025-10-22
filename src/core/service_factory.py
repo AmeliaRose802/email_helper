@@ -29,19 +29,8 @@ if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
 # Import modules from src directory
-try:
-    from outlook_manager import OutlookManager
-except ImportError:
-    # Handle import error for non-Windows environments (CI/CD)
-    OutlookManager = None
-    
 from ai_processor import AIProcessor
-from email_analyzer import EmailAnalyzer
-from summary_generator import SummaryGenerator
-from email_processor import EmailProcessor
 from task_persistence import TaskPersistence
-from accuracy_tracker import AccuracyTracker
-from database.migrations import DatabaseMigrations
 from .interfaces import EmailProvider, AIProvider, StorageProvider
 
 
@@ -60,58 +49,13 @@ class ServiceFactory:
             self._instances[service_name] = factory_func()
         return self._instances[service_name]
         
-    def get_outlook_manager(self) -> EmailProvider:
-        """Get OutlookManager instance."""
-        if OutlookManager is None:
-            raise ImportError("OutlookManager requires Windows and pywin32 package")
-        return self._get_or_create('outlook_manager', lambda: OutlookManager())
-        
-    def get_email_analyzer(self) -> 'EmailAnalyzer':
-        """Get EmailAnalyzer instance."""
-        return self._get_or_create('email_analyzer', lambda: EmailAnalyzer())
-        
     def get_ai_processor(self) -> AIProvider:
-        """Get AIProcessor instance with dependencies."""
-        def create_ai_processor():
-            email_analyzer = self.get_email_analyzer()
-            ai_processor = AIProcessor(email_analyzer)
-            # Set circular dependency
-            email_analyzer.ai_processor = ai_processor
-            return ai_processor
-            
-        return self._get_or_create('ai_processor', create_ai_processor)
-        
-    def get_summary_generator(self) -> 'SummaryGenerator':
-        """Get SummaryGenerator instance."""
-        return self._get_or_create('summary_generator', lambda: SummaryGenerator())
-        
-    def get_email_processor(self) -> 'EmailProcessor':
-        """Get EmailProcessor instance with all dependencies."""
-        def create_email_processor():
-            return EmailProcessor(
-                self.get_outlook_manager(),
-                self.get_ai_processor(),
-                self.get_email_analyzer(),
-                self.get_summary_generator()
-            )
-            
-        return self._get_or_create('email_processor', create_email_processor)
+        """Get AIProcessor instance."""
+        return self._get_or_create('ai_processor', lambda: AIProcessor())
         
     def get_task_persistence(self) -> StorageProvider:
         """Get TaskPersistence instance."""
         return self._get_or_create('task_persistence', lambda: TaskPersistence())
-        
-    def get_accuracy_tracker(self) -> 'AccuracyTracker':
-        """Get AccuracyTracker instance."""
-        from .config import config
-        runtime_data_dir = config.get('storage.base_dir')
-        return self._get_or_create('accuracy_tracker', lambda: AccuracyTracker(runtime_data_dir))
-    
-    def get_database_migrations(self) -> 'DatabaseMigrations':
-        """Get DatabaseMigrations instance."""
-        from .config import config
-        db_path = config.get_storage_path('database/email_helper.db')
-        return self._get_or_create('database_migrations', lambda: DatabaseMigrations(db_path))
         
     def reset(self):
         """Reset all instances (useful for testing)."""

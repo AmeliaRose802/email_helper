@@ -198,10 +198,10 @@ export const EmailItem: React.FC<EmailItemProps> = ({
             </span>
           )}
           
-          {/* Conversation indicator */}
-          {email.conversation_id && (
-            <span title="Part of conversation" className="email-item__icon--conversation">
-              💬
+          {/* Conversation indicator with count */}
+          {email.conversation_id && email.conversation_count && email.conversation_count > 1 && (
+            <span title={`Part of conversation (${email.conversation_count} emails)`} className="email-item__icon--conversation">
+              💬 {email.conversation_count}
             </span>
           )}
           

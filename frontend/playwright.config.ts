@@ -28,8 +28,8 @@ export default defineConfig({
   
   // Shared settings for all projects
   use: {
-    // Base URL for navigation
-    baseURL: 'http://localhost:3000',
+    // Base URL for navigation - Vite dev server runs on port 5173
+    baseURL: 'http://localhost:5173',
     
     // Collect trace on failure for debugging
     trace: 'on-first-retry',
@@ -74,15 +74,15 @@ export default defineConfig({
     // },
   ],
 
-  // Web server configuration - start dev server before tests
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000, // 2 minutes to start
-    stdout: 'ignore',
-    stderr: 'pipe',
-  },
+  // Web server configuration - DISABLED since dev server is already running
+  // webServer: {
+  //   command: 'npm run dev',
+  //   url: 'http://localhost:5173',
+  //   reuseExistingServer: !process.env.CI,
+  //   timeout: 120 * 1000, // 2 minutes to start
+  //   stdout: 'ignore',
+  //   stderr: 'pipe',
+  // },
 
   // Global setup/teardown
   // globalSetup: require.resolve('./tests/e2e/global-setup.ts'),

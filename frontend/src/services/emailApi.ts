@@ -45,6 +45,8 @@ export const emailApi = apiSlice.injectEndpoints({
     getEmailById: builder.query<Email, string>({
       query: (id) => `/api/emails/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Email', id }],
+      // Cache email details for 5 minutes to prevent redundant fetches
+      keepUnusedDataFor: 300,
     }),
 
     // Get email statistics

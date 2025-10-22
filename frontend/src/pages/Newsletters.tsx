@@ -14,10 +14,16 @@ const Newsletters: React.FC = () => {
     refetch,
   } = useGetTasksQuery({ page: 1, per_page: 1000 });
 
-  // Filter for newsletter tasks - hide completed ones
+  // Filter for newsletter tasks - hide completed ones and irrelevant ones
   const newsletterTasks = useMemo(() => {
     if (!taskData?.tasks) return [];
-    return taskData.tasks.filter(task => task.category === 'newsletter' && task.status !== 'done');
+    return taskData.tasks.filter(task => {
+      if (task.category !== 'newsletter') return false;
+      if (task.status === 'done') return false;
+      // Hide newsletters marked as irrelevant
+      if (task.description?.includes('No content relevant to your interests')) return false;
+      return true;
+    });
   }, [taskData?.tasks]);
 
   const handleToggleRead = async (task: Task) => {
@@ -75,6 +81,28 @@ const Newsletters: React.FC = () => {
     );
   }
 
+  const handleDismissAll = async () => {
+    if (!window.confirm(`Dismiss all ${newsletterTasks.length} newsletters?`)) {
+      return;
+    }
+    
+    try {
+      // Mark all newsletters as done
+      await Promise.all(
+        newsletterTasks.map(task => 
+          updateTask({
+            id: task.id,
+            data: { status: 'done' as any }
+          }).unwrap()
+        )
+      );
+      refetch();
+    } catch (error) {
+      console.error('Failed to dismiss all newsletters:', error);
+      alert('Failed to dismiss all newsletters');
+    }
+  };
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -82,6 +110,14 @@ const Newsletters: React.FC = () => {
         <div className="page-stats">
           {newsletterTasks.length} newsletter{newsletterTasks.length !== 1 ? 's' : ''}
         </div>
+        {newsletterTasks.length > 0 && (
+          <button
+            onClick={handleDismissAll}
+            className="synthwave-button-secondary dismiss-all-btn"
+          >
+            Dismiss All
+          </button>
+        )}
       </div>
 
       <div className="page-content">

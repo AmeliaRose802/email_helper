@@ -17,7 +17,6 @@ interface AccuracyStat {
 const AccuracyDashboard: React.FC = () => {
   const [stats, setStats] = useState<AccuracyStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [overallAccuracy, setOverallAccuracy] = useState(0);
 
   useEffect(() => {
     // Fetch real accuracy stats from backend
@@ -45,7 +44,6 @@ const AccuracyDashboard: React.FC = () => {
         }));
         
         setStats(transformedStats);
-        setOverallAccuracy(data.overall_accuracy);
         setIsLoading(false);
       } catch (error) {
         console.error('Error fetching accuracy stats:', error);
@@ -68,10 +66,6 @@ const AccuracyDashboard: React.FC = () => {
     ];
     
     setStats(mockStats);
-    
-    const totalEmails = mockStats.reduce((sum, stat) => sum + stat.total, 0);
-    const totalCorrect = mockStats.reduce((sum, stat) => sum + stat.correct, 0);
-    setOverallAccuracy(totalEmails > 0 ? (totalCorrect / totalEmails) * 100 : 0);
     
     setIsLoading(false);
     };
@@ -108,21 +102,7 @@ const AccuracyDashboard: React.FC = () => {
         </p>
       </div>
 
-      {/* Overall Accuracy */}
-      <div className="accuracy-overall-card">
-        <div className="accuracy-overall-card__icon">🎯</div>
-        <h2 className="accuracy-overall-card__percentage">
-          {overallAccuracy.toFixed(1)}%
-        </h2>
-        <p className="accuracy-overall-card__label">
-          Overall Classification Accuracy
-        </p>
-        <p className="accuracy-overall-card__count">
-          Based on {stats.reduce((sum, stat) => sum + stat.total, 0)} classified emails
-        </p>
-      </div>
-
-      {/* Category Stats Grid */}
+      {/* Category Stats Grid - Focus on per-category accuracy */}
       <div className="accuracy-stats-grid">
         {stats.map((stat) => {
           const level = getAccuracyLevel(stat.accuracy);

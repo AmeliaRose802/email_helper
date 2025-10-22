@@ -16,12 +16,21 @@ export const formatEmailDate = (dateString: string): string => {
       return 'Invalid date';
     }
     
-    if (isToday(date)) {
-      return format(date, 'HH:mm');
-    } else if (isYesterday(date)) {
+    // Convert to PST (Pacific Standard Time)
+    const pstDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    
+    if (isToday(pstDate)) {
+      // Show time with AM/PM for today's emails
+      return pstDate.toLocaleString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true,
+        timeZone: 'America/Los_Angeles'
+      });
+    } else if (isYesterday(pstDate)) {
       return 'Yesterday';
     } else {
-      return format(date, 'MMM d');
+      return format(pstDate, 'MMM d');
     }
   } catch (error) {
     console.error('Error formatting date:', dateString, error);

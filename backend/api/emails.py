@@ -169,6 +169,21 @@ async def get_emails(
                 offset=offset
             )
             
+            # Calculate conversation counts by grouping emails
+            conversation_counts = {}
+            for email in emails:
+                conv_id = email.get('conversation_id')
+                if conv_id:
+                    conversation_counts[conv_id] = conversation_counts.get(conv_id, 0) + 1
+            
+            # Add conversation_count to each email
+            for email in emails:
+                conv_id = email.get('conversation_id')
+                if conv_id and conv_id in conversation_counts:
+                    email['conversation_count'] = conversation_counts[conv_id]
+                else:
+                    email['conversation_count'] = 1  # Single email, not part of thread
+            
             # Calculate if there are more emails
             has_more = len(emails) == limit
             
@@ -481,8 +496,15 @@ async def get_email(
     Returns:
         Full email data including body content
     """
+    import time
+    start_time = time.time()
+    
     try:
         email = await provider.get_email_content(email_id)
+        
+        elapsed = time.time() - start_time
+        if elapsed > 1.0:  # Log if slower than 1 second
+            print(f"⚠️ Slow email fetch: {email_id} took {elapsed:.2f}s")
         
         if not email:
             raise HTTPException(
@@ -1121,8 +1143,19 @@ async def extract_tasks_from_emails(
                         email_text = f"Subject: {email.get('subject', '')}\nFrom: {email.get('sender', '')}\n\n{email.get('body', '')}"
                         action_result = await ai_service.extract_action_items(email_text)
                         
-                        if action_result and action_result.get('action_required'):
+                        # Filter out fallback/error responses that shouldn't create tasks
+                        # IMPORTANT: Only check for explicit error phrases, not partial matches
+                        action_text = action_result.get('action_required', '') if action_result else ''
+                        is_fallback = any(phrase in action_text.lower() for phrase in [
+                            'review email manually', 'unable to extract action',
+                            'ai processing unavailable', 'ai parsing failed', 'content filter blocked'
+                        ])
+                        
+                        if action_result and action_text and not is_fallback:
+                            logger.info(f"[Task Extraction] ✅ Successfully extracted action: '{action_text[:80]}...' from {email_id[:30]}")
+                            
                             # Determine priority
+                            priority = 'high' if 'urgent' in email.get('subject', '').lower() else 'medium'
                             priority = 'high' if 'urgent' in email.get('subject', '').lower() else 'medium'
                             if ai_category == 'required_personal_action':
                                 priority = 'high'
@@ -1163,6 +1196,11 @@ async def extract_tasks_from_emails(
                             created_task = await task_service_instance.create_task(task_data, user_id=1)
                             tasks_created += 1
                             logger.info(f"[Task Extraction] Created task #{created_task.id} for email {email_id[:20]}...")
+                        else:
+                            if is_fallback:
+                                logger.info(f"[Task Extraction] ⏭️ Skipped: Fallback response detected for {email_id[:30]} - '{action_text[:60]}'")
+                            elif not action_text:
+                                logger.info(f"[Task Extraction] ⏭️ Skipped: No action required for {email_id[:30]}")
                             
                     except Exception as task_error:
                         error_type = type(task_error).__name__
@@ -1186,6 +1224,17 @@ async def extract_tasks_from_emails(
                         
                         email_text = f"Subject: {email.get('subject', '')}\nFrom: {email.get('sender', '')}\n\n{email.get('body', '')}"
                         action_result = await ai_service.extract_action_items(email_text)
+                        
+                        # Filter out fallback responses for job listings too
+                        action_text = action_result.get('action_required', '') if action_result else ''
+                        is_fallback = any(phrase in action_text.lower() for phrase in [
+                            'review email manually', 'unable to extract action',
+                            'ai processing unavailable'
+                        ])
+                        
+                        if is_fallback:
+                            logger.info(f"[Task Extraction] Skipping job listing due to fallback response: {email_id[:30]}")
+                            continue
                         
                         description_parts = [f"Job Listing: {email.get('subject', '')}"]
                         if action_result.get('explanation'):
@@ -1240,6 +1289,17 @@ async def extract_tasks_from_emails(
                         
                         email_text = f"Subject: {email.get('subject', '')}\nFrom: {email.get('sender', '')}\n\n{email.get('body', '')}"
                         action_result = await ai_service.extract_action_items(email_text)
+                        
+                        # Filter out fallback responses for events too
+                        action_text = action_result.get('action_required', '') if action_result else ''
+                        is_fallback = any(phrase in action_text.lower() for phrase in [
+                            'review email manually', 'unable to extract action',
+                            'ai processing unavailable'
+                        ])
+                        
+                        if is_fallback:
+                            logger.info(f"[Task Extraction] Skipping event due to fallback response: {email_id[:30]}")
+                            continue
                         
                         description_parts = [f"Optional Event: {email.get('subject', '')}"]
                         if action_result.get('relevance'):

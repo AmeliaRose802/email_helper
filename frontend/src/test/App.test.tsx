@@ -17,23 +17,21 @@ beforeEach(() => {
 describe('App Component', () => {
   it('renders without crashing', async () => {
     render(<App />);
-    // App may show loading state initially, then login form
+    // App should render the router and main navigation
     await waitFor(() => {
-      // Should show either loading state or login form
-      const hasLoadingState = screen.queryByText('Checking authentication...');
-      const hasLoginForm = screen.queryByText('Email Helper');
-      expect(hasLoadingState || hasLoginForm).toBeTruthy();
+      // The app renders with navigation elements
+      const hasNav = document.querySelector('.synthwave-nav');
+      expect(hasNav).toBeTruthy();
     });
   });
 
-  it('shows login form when not authenticated', async () => {
+  it('shows email list by default', async () => {
     render(<App />);
-    // Wait for auth initialization to complete and show login form
+    // Wait for router to render and show inbox
     await waitFor(() => {
-      expect(screen.getByText('Email Helper')).toBeInTheDocument();
+      // Should show inbox/email list as default route
+      const hasEmailContent = screen.queryByText('Inbox') || screen.queryByText('Loading Emails');
+      expect(hasEmailContent).toBeTruthy();
     });
-    expect(screen.getByRole('heading', { name: 'Sign In' })).toBeInTheDocument();
-    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
   });
 });

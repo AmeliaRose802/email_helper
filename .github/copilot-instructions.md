@@ -8,23 +8,37 @@ This is an intelligent email management system that helps users process, categor
 
 ### Core Modules
 
-- `email_manager_main.py` - Main entry point and orchestration
-- `src/outlook_manager.py` - Outlook integration and email retrieval
-- `src/ai_processor.py` - AI analysis and processing logic
-- `src/email_analyzer.py` - Email content analysis and categorization
-- `src/summary_generator.py` - Summary generation and formatting
-- `src/unified_gui.py` - User interface components
-- `src/task_persistence.py` - Task management and persistence
+- `backend/main.py` - FastAPI backend entry point
+- `frontend/` - React frontend application
+- `electron/` - Electron desktop wrapper
+- `src/ai_processor.py` - AI analysis and processing logic (used by backend)
+- `src/task_persistence.py` - Task management and persistence (used by backend)
+- `src/azure_config.py` - Azure OpenAI configuration
 
 ### Data Flow
 
-1. Connect to Outlook and retrieve emails
-2. Analyze and categorize emails using AI
-3. Extract action items and generate summaries
-4. Store results in database for persistence
-5. Present results through GUI interface
+1. Electron app loads React frontend and starts FastAPI backend
+2. Backend connects to Outlook via COM interface
+3. Backend analyzes and categorizes emails using AI (src/ai_processor.py)
+4. Backend stores results in SQLite database
+5. Frontend presents results through React UI
+6. Tasks persisted via src/task_persistence.py
 
 ## Coding Standards
+
+### CRITICAL: Mock Usage Policy
+
+**MOCKS ARE NEVER ACCEPTABLE IN PRODUCTION CODE**
+
+- ❌ **NEVER** use MockEmailProvider, MockAIProvider, or any mock classes outside of test files
+- ❌ **NEVER** create fallback logic that uses mocks when real implementations fail
+- ❌ **NEVER** temporarily enable mocks "just for testing" in production code
+- ✅ **ALWAYS** throw explicit errors when required services are unavailable
+- ✅ **ALWAYS** document setup requirements in README/troubleshooting docs
+- ✅ Mocks belong **ONLY** in `test/` or `**/tests/` directories
+- ✅ If a service is unavailable, **FAIL FAST** with a clear error message
+
+**Why:** Mocks hide real problems, make debugging impossible, and create false confidence that features work when they don't. Production code must fail visibly when dependencies are missing.
 
 ### Python Style
 
@@ -33,6 +47,7 @@ This is an intelligent email management system that helps users process, categor
 - Include comprehensive docstrings for all functions and classes
 - Use descriptive variable and function names
 - Prefer composition over inheritance
+- **NEVER use mock implementations** outside of test code - fail fast with clear errors instead
 
 ### Frontend Style (React/TypeScript)
 
@@ -178,9 +193,6 @@ This is an intelligent email management system that helps users process, categor
 - Diagnostic scripts (convert to proper troubleshooting docs)
 - Fix scripts (apply fix, commit, delete script)
 
-**Root-level scripts are ONLY for:**
-- Application entry points (`email_manager_main.py`, `run_backend.py`)
-- App launchers (`launch-desktop.ps1`, `restart-app.ps1`)
 ### Test Organization
 
 **Proper test locations:**

@@ -8,7 +8,6 @@ import { apiSlice } from '../services/api';
 import authReducer from '../store/authSlice';
 import EmailList from '../pages/EmailList';
 import TaskList from '../pages/TaskList';
-import Login from '../pages/Login';
 import Settings from '../pages/Settings';
 
 // Mock store for testing
@@ -54,11 +53,6 @@ describe('Route Components', () => {
     renderWithProviders(<TaskList />);
     // Should show loading initially due to API call
     expect(screen.getByText('Loading tasks...')).toBeInTheDocument();
-  });
-
-  it('renders Login component', () => {
-    renderWithProviders(<Login />);
-    expect(screen.getByRole('heading', { name: 'Sign In' })).toBeInTheDocument();
   });
 
   it('renders Settings component', () => {

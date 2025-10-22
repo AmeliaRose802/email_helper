@@ -211,7 +211,7 @@ if __name__ == "__main__":
     print(f"🌐 Server: {settings.host}:{settings.port}")
     
     uvicorn.run(
-        "main:app",
+        "backend.main:app",
         host=settings.host,
         port=settings.port,
         reload=settings.debug,

@@ -297,13 +297,45 @@ class COMAIService:
             Action items result dictionary
         """
         try:
-            # Use prompty file for action item extraction
-            inputs = {
-                "email_content": email_content
-            }
+            # Parse email content into structured format expected by prompty
+            lines = email_content.split('\n')
+            subject = "No subject"
+            sender = "Unknown sender"
+            date = "Recent"
+            body = email_content
             
-            if context:
-                inputs["context"] = context
+            # Extract subject, sender, and body from email text
+            for i, line in enumerate(lines[:10]):  # Check first 10 lines
+                if line.startswith('Subject:'):
+                    subject = line.replace('Subject:', '').strip()
+                elif line.startswith('From:'):
+                    sender = line.replace('From:', '').strip()
+                elif line.startswith('Date:'):
+                    date = line.replace('Date:', '').strip()
+                elif line.strip() == '' and i > 0:
+                    # Empty line typically separates headers from body
+                    body = '\n'.join(lines[i+1:])
+                    break
+            
+            # If no empty line found, use full content as body
+            if body == email_content:
+                # Try to extract body after the first few header lines
+                body_start = 0
+                for i, line in enumerate(lines[:5]):
+                    if line.startswith('Subject:') or line.startswith('From:') or line.startswith('Date:'):
+                        body_start = i + 1
+                if body_start > 0:
+                    body = '\n'.join(lines[body_start:])
+            
+            # Create inputs matching the prompty schema
+            inputs = {
+                "context": context or "Email analysis for action item extraction",
+                "username": self.ai_processor.get_username() if hasattr(self.ai_processor, 'get_username') else "User",
+                "subject": subject,
+                "sender": sender,
+                "date": date,
+                "body": body[:8000]  # Limit body length
+            }
             
             # Execute the summerize_action_item prompty
             result = self.ai_processor.execute_prompty(

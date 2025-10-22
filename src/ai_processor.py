@@ -30,13 +30,41 @@ import os
 import json
 from datetime import datetime
 from azure_config import get_azure_config
-from accuracy_tracker import AccuracyTracker
-from data_recorder import DataRecorder
 from utils import (
     clean_json_response, parse_json_with_fallback, parse_date_string,
     clean_ai_response, clean_markdown_formatting, truncate_with_ellipsis,
-    add_bullet_if_needed, SessionTracker, load_csv_or_empty, format_date_for_display
+    add_bullet_if_needed, load_csv_or_empty, format_date_for_display
 )
+
+# Minimal stubs for removed analytics - no-op implementations
+class DataRecorder:
+    """Stub for data recording - analytics collection disabled."""
+    def __init__(self, runtime_data_dir):
+        pass
+    def record_learning_feedback(self, feedback_entries):
+        pass
+    def record_batch_processing(self, success_count, error_count, categories_used):
+        pass
+    def record_suggestion_modification(self, email_data, old_category, new_category, user_explanation):
+        pass
+    def record_accepted_suggestions(self, email_suggestions):
+        pass
+
+class AccuracyTracker:
+    """Stub for accuracy tracking - disabled."""
+    def __init__(self, runtime_data_dir):
+        pass
+
+class SessionTracker:
+    """Stub for session tracking - disabled."""
+    def __init__(self, accuracy_tracker):
+        self.accuracy_tracker = accuracy_tracker
+    def start_accuracy_session(self, total_emails):
+        pass
+    def add_modification(self, old_category, new_category):
+        pass
+    def finalize_session(self, success_count=None, error_count=None, categories_used=None):
+        pass
 
 
 class AIProcessor:

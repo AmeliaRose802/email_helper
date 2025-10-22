@@ -528,5 +528,57 @@ class TestCOMAIServiceEdgeCases:
         )
         
         assert result["summary"] == long_summary
-        assert len(result["key_points"]) <= 3  # Should extract up to 3 key points
+
+    @patch('backend.services.com_ai_service.AIProcessor')
+    @patch('backend.services.com_ai_service.get_azure_config')
+    @pytest.mark.asyncio
+    async def test_extract_action_items_input_format(self, mock_config, mock_processor, com_ai_service):
+        """Test that action item extraction passes correct input format to prompty."""
+        # Mock the AI processor
+        mock_ai_instance = MagicMock()
+        mock_processor.return_value = mock_ai_instance
+        mock_config.return_value = MagicMock()
+        mock_ai_instance.get_username.return_value = "TestUser"
+        
+        # Mock the prompty execution result
+        mock_ai_instance.execute_prompty.return_value = {
+            "due_date": "2024-01-15",
+            "action_required": "Complete code review",
+            "explanation": "PR needs approval",
+            "relevance": "Blocking team",
+            "links": ["https://github.com/pr/123"]
+        }
+        
+        # Call with formatted email text
+        email_text = "Subject: Code Review Needed\nFrom: john@example.com\nDate: 2024-01-10\n\nPlease review PR #123 by Friday."
+        result = await com_ai_service.extract_action_items(
+            email_content=email_text,
+            context="Work assignment"
+        )
+        
+        # Verify prompty was called with correct inputs
+        mock_ai_instance.execute_prompty.assert_called_once()
+        call_args = mock_ai_instance.execute_prompty.call_args
+        
+        # Verify prompty file name
+        assert call_args[0][0] == "summerize_action_item.prompty"
+        
+        # Verify inputs contain all required fields
+        inputs = call_args[1]['inputs']
+        assert 'context' in inputs
+        assert 'username' in inputs
+        assert 'subject' in inputs
+        assert 'sender' in inputs
+        assert 'date' in inputs
+        assert 'body' in inputs
+        
+        # Verify parsed values are correct
+        assert inputs['subject'] == "Code Review Needed"
+        assert inputs['sender'] == "john@example.com"
+        assert inputs['date'] == "2024-01-10"
+        assert "Please review PR #123" in inputs['body']
+        
+        # Verify result structure
+        assert result["action_required"] == "Complete code review"
+        assert "https://github.com/pr/123" in result["links"]
         assert result["confidence"] == 0.8

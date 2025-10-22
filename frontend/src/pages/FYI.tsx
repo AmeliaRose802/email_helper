@@ -75,6 +75,28 @@ const FYI: React.FC = () => {
     );
   }
 
+  const handleDismissAll = async () => {
+    if (!window.confirm(`Dismiss all ${fyiTasks.length} FYI items?`)) {
+      return;
+    }
+    
+    try {
+      // Mark all FYI items as done
+      await Promise.all(
+        fyiTasks.map(task => 
+          updateTask({
+            id: task.id,
+            data: { status: 'done' as any }
+          }).unwrap()
+        )
+      );
+      refetch();
+    } catch (error) {
+      console.error('Failed to dismiss all FYI items:', error);
+      alert('Failed to dismiss all FYI items');
+    }
+  };
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -82,6 +104,14 @@ const FYI: React.FC = () => {
         <div className="page-stats">
           {fyiTasks.length} FYI item{fyiTasks.length !== 1 ? 's' : ''}
         </div>
+        {fyiTasks.length > 0 && (
+          <button
+            onClick={handleDismissAll}
+            className="synthwave-button-secondary dismiss-all-btn"
+          >
+            Dismiss All
+          </button>
+        )}
       </div>
 
       <div className="page-content">

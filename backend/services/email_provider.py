@@ -211,7 +211,7 @@ def get_email_provider_instance() -> EmailProvider:
                 redirect_uri=settings.graph_redirect_uri
             )
         
-        # Require properly configured email provider - no mock fallback
+        # Require properly configured email provider - NO MOCKS IN PRODUCTION
         if _email_provider is None:
             raise RuntimeError(
                 "No email provider configured. Please configure either:\n"

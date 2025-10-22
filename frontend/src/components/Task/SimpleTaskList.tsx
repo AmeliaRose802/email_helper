@@ -27,8 +27,11 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
   const [showCelebration, setShowCelebration] = useState(false);
   const [recentlyCompleted, setRecentlyCompleted] = useState<Set<string>>(new Set());
 
-  // Calculate completion stats for motivation
-  const completedCount = tasks.filter(t => t.status === 'done').length;
+  // Separate completed and active tasks
+  const [showCompleted, setShowCompleted] = useState(false);
+  const completedTasks = tasks.filter(t => t.status === 'done');
+  const activeTasks = tasks.filter(t => t.status !== 'done');
+  const completedCount = completedTasks.length;
   const totalCount = tasks.length;
   const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
@@ -177,12 +180,12 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
   };
 
   const groupedTasks = {
-    'Required Personal Actions': tasks.filter(t => t.category?.includes('required') && !t.category?.includes('team') && t.category !== 'newsletter' && t.category !== 'fyi'),
-    'Team Actions': tasks.filter(t => t.category?.includes('team') && t.category !== 'newsletter' && t.category !== 'fyi'),
-    'Optional Actions': tasks.filter(t => t.category?.includes('optional') && !t.category?.includes('event') && !t.category?.includes('job') && t.category !== 'newsletter' && t.category !== 'fyi'),
-    'Job Listings': tasks.filter(t => t.category?.includes('job') && t.category !== 'newsletter' && t.category !== 'fyi'),
-    'Events': tasks.filter(t => t.category?.includes('event') && t.category !== 'newsletter' && t.category !== 'fyi'),
-    'Other': tasks.filter(t => !t.category || (!t.category.includes('required') && !t.category.includes('team') && !t.category.includes('optional') && !t.category.includes('job') && !t.category.includes('event') && t.category !== 'newsletter' && t.category !== 'fyi'))
+    'Required Personal Actions': activeTasks.filter(t => t.category?.includes('required') && !t.category?.includes('team') && t.category !== 'newsletter' && t.category !== 'fyi'),
+    'Team Actions': activeTasks.filter(t => t.category?.includes('team') && t.category !== 'newsletter' && t.category !== 'fyi'),
+    'Optional Actions': activeTasks.filter(t => t.category?.includes('optional') && !t.category?.includes('event') && !t.category?.includes('job') && t.category !== 'newsletter' && t.category !== 'fyi'),
+    'Job Listings': activeTasks.filter(t => t.category?.includes('job') && t.category !== 'newsletter' && t.category !== 'fyi'),
+    'Events': activeTasks.filter(t => t.category?.includes('event') && t.category !== 'newsletter' && t.category !== 'fyi'),
+    'Other': activeTasks.filter(t => !t.category || (!t.category.includes('required') && !t.category.includes('team') && !t.category.includes('optional') && !t.category.includes('job') && !t.category.includes('event') && t.category !== 'newsletter' && t.category !== 'fyi'))
   };
 
   const renderTaskGroup = (groupName: string, groupTasks: Task[]) => {
@@ -344,6 +347,49 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
 
       {Object.entries(groupedTasks).map(([groupName, groupTasks]) => 
         renderTaskGroup(groupName, groupTasks)
+      )}
+      
+      {/* Completed Tasks - Collapsed Section */}
+      {completedTasks.length > 0 && (
+        <div className="completed-tasks-section">
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className="completed-tasks-toggle"
+          >
+            {showCompleted ? '▼' : '▶'} Completed Tasks ({completedTasks.length})
+          </button>
+          {showCompleted && (
+            <div className="completed-tasks-list">
+              {completedTasks.map(task => {
+                return (
+                  <div key={task.id} className="simple-task-item completed">
+                    <input
+                      type="checkbox"
+                      checked={true}
+                      onChange={() => handleToggleComplete(task)}
+                      className="simple-task-checkbox"
+                    />
+                    <div className="simple-task-content">
+                      <div className="simple-task-title-row">
+                        <span className="simple-task-icon">{getCategoryIcon(task.category)}</span>
+                        <span className="simple-task-title completed">
+                          {task.title}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDelete(task.id)}
+                      className="simple-task-delete-btn"
+                      title="Delete task"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
       
       {tasks.length === 0 && (

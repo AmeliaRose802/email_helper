@@ -9,8 +9,6 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ tasks }) => {
   const stats = React.useMemo(() => {
     const total = tasks.length;
     const todoCount = tasks.filter(t => t.status === 'todo').length;
-    const inProgressCount = tasks.filter(t => t.status === 'in-progress').length;
-    const reviewCount = tasks.filter(t => t.status === 'review').length;
     const doneCount = tasks.filter(t => t.status === 'done').length;
     
     const overdue = tasks.filter(t => 
@@ -24,8 +22,6 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ tasks }) => {
     return {
       total,
       todoCount,
-      inProgressCount,
-      reviewCount,
       doneCount,
       overdue,
       highPriority,
@@ -84,36 +80,6 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ tasks }) => {
               <div className="stat-info">
                 <span className="stat-label">To Do</span>
                 <span className="stat-count">{stats.todoCount}</span>
-              </div>
-            </div>
-
-            <div className="stat-item in-progress">
-              <div className="stat-bar">
-                <div 
-                  className="stat-fill"
-                  style={{ 
-                    width: stats.total > 0 ? `${(stats.inProgressCount / stats.total) * 100}%` : '0%' 
-                  }}
-                />
-              </div>
-              <div className="stat-info">
-                <span className="stat-label">In Progress</span>
-                <span className="stat-count">{stats.inProgressCount}</span>
-              </div>
-            </div>
-
-            <div className="stat-item review">
-              <div className="stat-bar">
-                <div 
-                  className="stat-fill"
-                  style={{ 
-                    width: stats.total > 0 ? `${(stats.reviewCount / stats.total) * 100}%` : '0%' 
-                  }}
-                />
-              </div>
-              <div className="stat-info">
-                <span className="stat-label">Review</span>
-                <span className="stat-count">{stats.reviewCount}</span>
               </div>
             </div>
 
