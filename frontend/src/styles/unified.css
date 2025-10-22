@@ -3701,8 +3701,8 @@ button:disabled, a:disabled {
 
 /* Email Content */
 .email-detail-content {
-  line-height: 1.8;
-  font-size: 16px;
+  line-height: 1.7;
+  font-size: 15px;
   color: #212529 !important;
   background: #ffffff !important;
   padding: 24px;
@@ -3717,14 +3717,22 @@ button:disabled, a:disabled {
 }
 
 .email-detail-content p {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   margin-top: 0;
   color: #212529 !important;
-  line-height: 1.8;
+  line-height: 1.7;
 }
 
+/* Add spacing after line breaks for better readability */
 .email-detail-content br {
-  line-height: 2.0;
+  display: block;
+  content: "";
+  margin: 6px 0;
+}
+
+/* Ensure double line breaks create proper paragraph spacing */
+.email-detail-content br + br {
+  margin: 12px 0;
 }
 
 .email-detail-content a {

@@ -221,9 +221,18 @@ const EmailList: React.FC = () => {
         }).unwrap();
 
         // Apply classification to all emails in the conversation
+        // BUT: Don't overwrite manually classified emails
         setClassifiedEmails(prev => {
           const next = new Map(prev);
           conversation.emails.forEach(email => {
+            // Check if email was already manually classified
+            const existingClassification = classifiedEmailsRef.current.get(email.id);
+            if (existingClassification && existingClassification.ai_category) {
+              // Email was already classified manually - keep it
+              console.log(`[Classification] Skipping email ${email.id.substring(0, 20)}... - already classified as ${existingClassification.ai_category}`);
+              return;
+            }
+            
             const classified = {
               ...email,
               ai_category: result.category as any,
@@ -389,13 +398,25 @@ const EmailList: React.FC = () => {
   const currentPageEmails = useMemo(() => {
     const emails = currentPageConversations.flatMap(conv => conv.emails);
     
+    // Deduplicate emails by ID (some emails may appear in multiple conversations)
+    const seenIds = new Set<string>();
+    const uniqueEmails = emails.filter(email => {
+      if (seenIds.has(email.id)) {
+        return false;
+      }
+      seenIds.add(email.id);
+      return true;
+    });
+    
     console.log('[EmailList Debug] currentPageEmails calculation:', {
       conversationsOnPage: currentPageConversations.length,
       totalEmailsFromConversations: emails.length,
+      uniqueEmailsAfterDedup: uniqueEmails.length,
+      duplicatesRemoved: emails.length - uniqueEmails.length,
       sampleConversation: currentPageConversations[0]
     });
     
-    return emails.map(email => {
+    return uniqueEmails.map(email => {
       // Check ref first for persisted classifications
       const classified = classifiedEmailsRef.current.get(email.id);
       if (classified) {

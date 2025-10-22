@@ -160,8 +160,8 @@ export const EmailDetailView: React.FC<EmailDetailViewProps> = ({
         style={{
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
-          lineHeight: '1.6',
-          fontSize: '14px'
+          lineHeight: '1.65',
+          fontSize: '15px'
         }}
         dangerouslySetInnerHTML={{ __html: prepareEmailHTML(email.body || '') }}
       />
