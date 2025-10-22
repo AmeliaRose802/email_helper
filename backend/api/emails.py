@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import json
 import asyncio
+import logging
 from datetime import datetime
 import time
 
@@ -16,6 +17,7 @@ from backend.models.user import UserInDB
 from backend.models.email import Email, EmailBatch, EmailBatchResult
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class EmailListResponse(BaseModel):
@@ -906,17 +908,21 @@ async def bulk_apply_to_outlook(
 @router.post("/emails/batch-process", response_model=EmailBatchResult)
 async def batch_process_emails(
     batch_request: EmailBatch,
-    provider: EmailProvider = Depends(get_email_provider)
+    provider: EmailProvider = Depends(get_email_provider),
+    ai_service = Depends(get_ai_service)
 ):
     """Batch process multiple emails for classification and analysis.
     
+    Uses AI service to classify each email and extract action items in batch.
+    Optimized for processing multiple emails efficiently.
+    
     Args:
         batch_request: Batch of emails to process
-        current_user: Authenticated user
         provider: Email provider instance
+        ai_service: AI service for classification
     
     Returns:
-        Batch processing results
+        Batch processing results with AI classifications
     """
     try:
         # Get email content for each email ID in the batch
@@ -938,17 +944,51 @@ async def batch_process_emails(
             except Exception as e:
                 errors.append(f"Failed to process email: {str(e)}")
         
-        # TODO: Integrate with AI processing for classification
-        # For now, return basic results
+        # 🤖 AI INTEGRATION: Classify and extract action items from each email
         results = []
         for email in processed_emails:
-            results.append({
-                "category": "unclassified",
-                "confidence": 0.5,
-                "reasoning": "Basic classification - AI integration pending",
-                "action_items": [],
-                "priority": "normal"
-            })
+            try:
+                # Format email content for AI processing
+                email_text = f"Subject: {email.get('subject', 'No subject')}\n"
+                email_text += f"From: {email.get('sender', 'Unknown')}\n\n"
+                email_text += email.get('body', email.get('content', ''))
+                
+                # Classify email
+                classification = await ai_service.classify_email(email_text)
+                
+                # Extract action items if actionable
+                action_items = []
+                if classification.get('category') in ['required_personal_action', 'actionable']:
+                    action_result = await ai_service.extract_action_items(email_text)
+                    if action_result.get('action_items'):
+                        action_items = action_result['action_items']
+                
+                # Determine priority based on classification
+                priority = "high" if classification.get('category') == 'required_personal_action' else "normal"
+                if classification.get('category') in ['spam_to_delete', 'fyi']:
+                    priority = "low"
+                
+                results.append({
+                    "email_id": email.get('id'),
+                    "category": classification.get('category', 'unclassified'),
+                    "confidence": classification.get('confidence', 0.5),
+                    "reasoning": classification.get('reasoning', ''),
+                    "action_items": action_items,
+                    "priority": priority
+                })
+                
+            except Exception as e:
+                logger.error(f"AI processing failed for email: {e}")
+                # Return fallback result for this email
+                results.append({
+                    "email_id": email.get('id'),
+                    "category": "unclassified",
+                    "confidence": 0.0,
+                    "reasoning": f"AI processing error: {str(e)}",
+                    "action_items": [],
+                    "priority": "normal",
+                    "error": str(e)
+                })
         
         return EmailBatchResult(
             processed_count=len(batch_request.emails),
