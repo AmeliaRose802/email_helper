@@ -28,7 +28,11 @@ may be unavailable or return malformed responses.
 
 import os
 import json
+import logging
 from datetime import datetime
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 from azure_config import get_azure_config
 from utils import (
     clean_json_response, parse_json_with_fallback, parse_date_string,
@@ -300,27 +304,49 @@ class AIProcessor:
             return None
     
     def execute_prompty(self, prompty_file, inputs=None):
+        """Execute a prompty template with given inputs and return the AI response.
+        
+        Handles multiple prompty library import paths and enforces JSON format
+        for structured responses. Includes comprehensive error handling for
+        content filter violations and execution failures.
+        
+        Args:
+            prompty_file: Name of the .prompty file to execute
+            inputs: Dictionary of input variables for the template
+            
+        Returns:
+            AI response - type depends on prompty template (dict, str, etc.)
+        """
         if inputs is None:
             inputs = {}
         
         prompty_path = os.path.join(self.prompts_dir, prompty_file)
         azure_config = get_azure_config()
         
+        logger.debug(f"[AI Processor] Executing {prompty_file} with inputs: {list(inputs.keys())}")
+        
         try:
             from promptflow.core import Prompty
+            logger.info(f"[AI Processor] Using promptflow.core for {prompty_file}")
             model_config = azure_config.get_promptflow_config()
             prompty_instance = Prompty.load(prompty_path, model={'configuration': model_config})
-            return prompty_instance(**inputs)
+            result = prompty_instance(**inputs)
+            logger.info(f"[AI Processor] ✅ {prompty_file} completed successfully")
+            return result
             
         except ImportError:
             try:
                 import prompty
                 import prompty.azure
                 
+                logger.info(f"[AI Processor] Using prompty library for {prompty_file}")
+                
                 p = prompty.load(prompty_path)
                 p.model.configuration["azure_endpoint"] = azure_config.endpoint
                 p.model.configuration["azure_deployment"] = azure_config.deployment  
                 p.model.configuration["api_version"] = azure_config.api_version
+                
+                logger.debug(f"[AI Processor] Model config: endpoint={azure_config.endpoint[:30]}..., deployment={azure_config.deployment}")
                 
                 # 🔧 CRITICAL FIX: Enforce JSON response format for prompts that require structured output
                 # This prevents Azure OpenAI from returning plain text instead of JSON
@@ -333,7 +359,7 @@ class AIProcessor:
                     if not hasattr(p.model, 'parameters'):
                         p.model.parameters = {}
                     p.model.parameters["response_format"] = {"type": "json_object"}
-                    print(f"[AI Processor] Enforcing JSON format for {prompty_file}")
+                    logger.info(f"[AI Processor] 📋 Enforcing JSON format for {prompty_file}")
                 
                 if azure_config.use_azure_credential():
                     from azure.identity import DefaultAzureCredential, get_bearer_token_provider
@@ -354,17 +380,18 @@ class AIProcessor:
                     # Check if it's actually JSON
                     try:
                         json.loads(result)
-                        print(f"[AI Processor] ✅ {prompty_file} returned JSON string (good)")
+                        logger.info(f"[AI Processor] ✅ {prompty_file} returned JSON string")
                     except:
-                        print(f"[AI Processor] ⚠️ {prompty_file} returned plain text despite JSON format request: {result[:100]}...")
+                        logger.warning(f"[AI Processor] ⚠️ {prompty_file} returned plain text: {result[:100]}...")
                 elif isinstance(result, dict):
-                    print(f"[AI Processor] ✅ {prompty_file} returned dict (perfect)")
+                    logger.info(f"[AI Processor] ✅ {prompty_file} returned dict")
                 else:
-                    print(f"[AI Processor] ⚠️ {prompty_file} returned unexpected type: {type(result)}")
+                    logger.warning(f"[AI Processor] ⚠️ {prompty_file} returned unexpected type: {type(result)}")
                 
                 return result
                 
             except ImportError as e:
+                logger.error(f"[AI Processor] 🚨 PROMPTY LIBRARY NOT AVAILABLE: {e}")
                 print(f"\n🚨 PROMPTY LIBRARY NOT AVAILABLE")
                 print(f"ImportError: {e}")
                 print(f"Prompty file: {prompty_file}")
@@ -383,12 +410,14 @@ class AIProcessor:
             is_wrapped_openai_error = 'wrappedopenaierror' in error_type
             
             if is_content_filter or is_wrapped_openai_error:
+                logger.warning(f"[AI Processor] 🚫 Content filter blocked {prompty_file}: {str(e)[:200]}")
                 print(f"\n⚠️  CONTENT FILTER BLOCKED: {prompty_file}")
                 print(f"Reason: Azure OpenAI content policy violation")
                 print(f"Error details: {str(e)[:200]}...")
                 # Return a safe fallback response instead of crashing
                 return self._get_content_filter_fallback(prompty_file, inputs)
             else:
+                logger.error(f"[AI Processor] 🚨 Prompty execution failed for {prompty_file}: {str(e)[:200]}")
                 print(f"\n🚨 PROMPTY EXECUTION FAILED")
                 print(f"Error: {e}")
                 print(f"Prompty file: {prompty_file}")
