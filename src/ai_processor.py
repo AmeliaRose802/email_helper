@@ -322,6 +322,19 @@ class AIProcessor:
                 p.model.configuration["azure_deployment"] = azure_config.deployment  
                 p.model.configuration["api_version"] = azure_config.api_version
                 
+                # 🔧 CRITICAL FIX: Enforce JSON response format for prompts that require structured output
+                # This prevents Azure OpenAI from returning plain text instead of JSON
+                json_required_prompts = [
+                    'summerize_action_item', 'email_classifier', 'holistic_inbox_analyzer',
+                    'action_item_deduplication', 'content_deduplication', 'email_duplicate_detection',
+                    'event_relevance_assessment'
+                ]
+                if any(prompt_name in prompty_file for prompt_name in json_required_prompts):
+                    if not hasattr(p.model, 'parameters'):
+                        p.model.parameters = {}
+                    p.model.parameters["response_format"] = {"type": "json_object"}
+                    print(f"[AI Processor] Enforcing JSON format for {prompty_file}")
+                
                 if azure_config.use_azure_credential():
                     from azure.identity import DefaultAzureCredential, get_bearer_token_provider
                     token_provider = get_bearer_token_provider(
@@ -334,7 +347,22 @@ class AIProcessor:
                 else:
                     p.model.configuration["api_key"] = azure_config.get_api_key()
                 
-                return prompty.run(p, inputs=inputs)
+                result = prompty.run(p, inputs=inputs)
+                
+                # 📊 Log response type for diagnostics
+                if isinstance(result, str):
+                    # Check if it's actually JSON
+                    try:
+                        json.loads(result)
+                        print(f"[AI Processor] ✅ {prompty_file} returned JSON string (good)")
+                    except:
+                        print(f"[AI Processor] ⚠️ {prompty_file} returned plain text despite JSON format request: {result[:100]}...")
+                elif isinstance(result, dict):
+                    print(f"[AI Processor] ✅ {prompty_file} returned dict (perfect)")
+                else:
+                    print(f"[AI Processor] ⚠️ {prompty_file} returned unexpected type: {type(result)}")
+                
+                return result
                 
             except ImportError as e:
                 print(f"\n🚨 PROMPTY LIBRARY NOT AVAILABLE")
