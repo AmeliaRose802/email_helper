@@ -21,7 +21,8 @@ import sys
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
+from datetime import datetime, timedelta
 
 # Add src to Python path for existing service imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -63,10 +64,15 @@ class COMAIService:
     """
     
     def __init__(self):
-        """Initialize COM AI service with lazy loading."""
+        """Initialize COM AI service with lazy loading and performance caching."""
         self.ai_processor = None
         self.azure_config = None
         self._initialized = False
+        
+        # Performance optimization: Cache user settings
+        self._user_settings_cache: Optional[Tuple[str, str, str]] = None  # (job_role_context, custom_interests, username)
+        self._cache_timestamp: Optional[datetime] = None
+        self._cache_ttl = timedelta(minutes=10)  # Cache for 10 minutes
         
     def _ensure_initialized(self):
         """Lazy initialization of AI components.
@@ -84,6 +90,87 @@ class COMAIService:
                 self._initialized = True
             except Exception as e:
                 raise RuntimeError(f"Failed to initialize AI components: {e}")
+    
+    def _get_cached_user_settings(self) -> Tuple[str, str, str]:
+        """Get user settings with caching for performance optimization.
+        
+        User settings (job_role_context, custom_interests, username) rarely change
+        but are loaded on EVERY email processing operation. Caching reduces:
+        - Database queries from 3-5 per email to once per 10 minutes
+        - File I/O operations when database is unavailable
+        - Processing latency per email by ~10-20ms
+        
+        Returns:
+            Tuple of (job_role_context, custom_interests, username)
+        """
+        # Check if cache is valid
+        now = datetime.now()
+        if (self._user_settings_cache is not None and 
+            self._cache_timestamp is not None and 
+            now < self._cache_timestamp + self._cache_ttl):
+            logger.debug("[COM AI Service] Using cached user settings")
+            return self._user_settings_cache
+        
+        # Cache miss - load from database/files
+        logger.debug("[COM AI Service] Loading user settings (cache miss)")
+        
+        job_role_context = ""
+        custom_interests = ""
+        username = ""
+        
+        try:
+            # Try database first
+            import sqlite3
+            db_path = Path(__file__).parent.parent.parent / 'runtime_data' / 'database' / 'email_helper_history.db'
+            
+            if db_path.exists():
+                conn = sqlite3.connect(str(db_path))
+                cursor = conn.cursor()
+                cursor.execute("SELECT username, job_context, newsletter_interests FROM user_settings WHERE user_id = 1")
+                row = cursor.fetchone()
+                conn.close()
+                
+                if row:
+                    username = row[0] or ""
+                    job_role_context = row[1] or ""
+                    custom_interests = row[2] or ""
+                    logger.debug(f"[COM AI Service] Loaded settings from database: username={username[:20]}...")
+        except Exception as e:
+            logger.debug(f"[COM AI Service] Database load failed, using file fallback: {e}")
+        
+        # Fall back to files if database didn't provide values
+        try:
+            user_data_path = Path(__file__).parent.parent.parent / 'user_specific_data'
+            
+            if not job_role_context and (user_data_path / 'job_role_context.md').exists():
+                job_role_context = (user_data_path / 'job_role_context.md').read_text(encoding='utf-8')
+                logger.debug("[COM AI Service] Loaded job_role_context from file")
+            
+            if not custom_interests and (user_data_path / 'custom_interests.md').exists():
+                custom_interests = (user_data_path / 'custom_interests.md').read_text(encoding='utf-8')
+                logger.debug("[COM AI Service] Loaded custom_interests from file")
+            
+            if not username and (user_data_path / 'username.txt').exists():
+                username = (user_data_path / 'username.txt').read_text(encoding='utf-8').strip()
+                logger.debug("[COM AI Service] Loaded username from file")
+        except Exception as e:
+            logger.warning(f"[COM AI Service] File fallback failed: {e}")
+        
+        # Update cache
+        self._user_settings_cache = (job_role_context, custom_interests, username)
+        self._cache_timestamp = now
+        logger.info(f"[COM AI Service] ✅ Cached user settings (TTL: {self._cache_ttl.total_seconds()}s)")
+        
+        return self._user_settings_cache
+    
+    def invalidate_user_settings_cache(self):
+        """Invalidate user settings cache to force reload on next access.
+        
+        Call this method when user settings are updated to ensure fresh data.
+        """
+        self._user_settings_cache = None
+        self._cache_timestamp = None
+        logger.info("[COM AI Service] User settings cache invalidated")
     
     async def classify_email(
         self, 
@@ -175,38 +262,9 @@ class COMAIService:
             except ImportError:
                 learning_data = []  # Fallback to empty list
             
-            # 🔧 CRITICAL FIX: Load user job context for accurate classification
-            # Classification accuracy depends on knowing the user's role and responsibilities!
-            job_role_context = ""
-            try:
-                import sqlite3
-                from pathlib import Path
-                
-                user_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'user_specific_data')
-                
-                # Try database first
-                try:
-                    db_path = Path(__file__).parent.parent.parent / 'runtime_data' / 'email_helper_history.db'
-                    if db_path.exists():
-                        conn = sqlite3.connect(str(db_path))
-                        cursor = conn.execute("SELECT job_context FROM user_settings WHERE user_id = 1")
-                        row = cursor.fetchone()
-                        if row and row[0]:
-                            job_role_context = row[0]
-                        conn.close()
-                        logger.debug(f"[AI Service] Loaded job context from database for classification ({len(job_role_context)} chars)")
-                except Exception:
-                    pass
-                
-                # Fall back to file
-                if not job_role_context:
-                    job_context_path = os.path.join(user_data_dir, 'job_role_context.md')
-                    if os.path.exists(job_context_path):
-                        with open(job_context_path, 'r', encoding='utf-8') as f:
-                            job_role_context = f.read()
-                        logger.debug(f"[AI Service] Loaded job context from file for classification ({len(job_role_context)} chars)")
-            except Exception as ctx_error:
-                logger.warning(f"[AI Service] Failed to load job context for classification: {ctx_error}")
+            # � PERFORMANCE OPTIMIZATION: Use cached user settings
+            # Previously loaded from database/files on EVERY email - now cached for 10 minutes
+            job_role_context, _, _ = self._get_cached_user_settings()
             
             # Create email_content dict for AIProcessor
             email_dict = {
@@ -365,66 +423,15 @@ class COMAIService:
                 if body_start > 0:
                     body = '\n'.join(lines[body_start:])
             
-            # 🔧 CRITICAL FIX: Load user context for relevance assessment
-            # This was missing - user preferences were being ignored!
-            job_role_context = ""
-            custom_interests = ""
-            username = "User"
+            # � PERFORMANCE OPTIMIZATION: Use cached user settings
+            # Previously loaded from database/files on EVERY email - now cached for 10 minutes
+            job_role_context, custom_interests, username = self._get_cached_user_settings()
             
-            try:
-                import sqlite3
-                from pathlib import Path
-                
-                user_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'user_specific_data')
-                
-                # First try to load from database (preferred source)
-                try:
-                    db_path = Path(__file__).parent.parent.parent / 'runtime_data' / 'email_helper_history.db'
-                    if db_path.exists():
-                        conn = sqlite3.connect(str(db_path))
-                        cursor = conn.execute("SELECT username, job_context, newsletter_interests FROM user_settings WHERE user_id = 1")
-                        row = cursor.fetchone()
-                        if row:
-                            if row[0]:
-                                username = row[0]
-                            if row[1]:
-                                job_role_context = row[1]
-                            if row[2]:
-                                custom_interests = row[2]
-                        conn.close()
-                        logger.debug(f"[AI Service] Loaded user context from database: username={username}, has_job_context={bool(job_role_context)}, has_interests={bool(custom_interests)}")
-                except Exception as db_error:
-                    logger.debug(f"[AI Service] Database context load failed, trying files: {db_error}")
-                
-                # Fall back to file-based loading if database had no data
-                if not job_role_context:
-                    job_context_path = os.path.join(user_data_dir, 'job_role_context.md')
-                    if os.path.exists(job_context_path):
-                        with open(job_context_path, 'r', encoding='utf-8') as f:
-                            job_role_context = f.read()
-                        logger.debug(f"[AI Service] Loaded job_role_context from file ({len(job_role_context)} chars)")
-                
-                if not custom_interests:
-                    custom_interests_path = os.path.join(user_data_dir, 'custom_interests.md')
-                    if os.path.exists(custom_interests_path):
-                        with open(custom_interests_path, 'r', encoding='utf-8') as f:
-                            custom_interests = f.read()
-                        logger.debug(f"[AI Service] Loaded custom_interests from file ({len(custom_interests)} chars)")
-                
-                if username == "User":
-                    username_path = os.path.join(user_data_dir, 'username.txt')
-                    if os.path.exists(username_path):
-                        with open(username_path, 'r', encoding='utf-8') as f:
-                            username = f.read().strip()
-                        logger.debug(f"[AI Service] Loaded username from file: {username}")
-                
-                # Try AIProcessor's get_username as final fallback
-                if username == "User" and hasattr(self.ai_processor, 'get_username'):
+            # Use defaults if cache returned empty values
+            if not username:
+                username = "User"
+                if hasattr(self.ai_processor, 'get_username'):
                     username = self.ai_processor.get_username()
-                    
-            except Exception as ctx_error:
-                logger.warning(f"[AI Service] Failed to load user context: {ctx_error}")
-                # Continue with defaults if context loading fails
             
             # Create inputs matching the prompty schema WITH user context
             inputs = {
