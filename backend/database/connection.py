@@ -98,8 +98,32 @@ class DatabaseManager:
                 )
             ''')
             
+            # 🚀 PERFORMANCE OPTIMIZATION: Add indexes for common query patterns
+            # These indexes significantly speed up filtering, sorting, and joins
+            
+            # Email indexes - speeds up category filtering and date sorting
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_emails_category ON emails(category)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_emails_received_date ON emails(received_date DESC)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_emails_user_id ON emails(user_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_emails_sender ON emails(sender)')
+            
+            # Task indexes - speeds up status filtering, priority sorting, and due date queries
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_tasks_email_id ON tasks(email_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at DESC)')
+            
+            # Composite index for common task queries (status + user_id)
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks(user_id, status)')
+            
+            # User index - speeds up username lookups during authentication
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
+            
             conn.commit()
-            print("[DB] Basic database structure verified", flush=True)
+            print("[DB] Basic database structure verified with performance indexes", flush=True)
     
     @contextmanager
     def get_connection(self) -> Generator[sqlite3.Connection, None, None]:
