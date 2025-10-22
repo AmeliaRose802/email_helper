@@ -175,6 +175,39 @@ class COMAIService:
             except ImportError:
                 learning_data = []  # Fallback to empty list
             
+            # 🔧 CRITICAL FIX: Load user job context for accurate classification
+            # Classification accuracy depends on knowing the user's role and responsibilities!
+            job_role_context = ""
+            try:
+                import sqlite3
+                from pathlib import Path
+                
+                user_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'user_specific_data')
+                
+                # Try database first
+                try:
+                    db_path = Path(__file__).parent.parent.parent / 'runtime_data' / 'email_helper_history.db'
+                    if db_path.exists():
+                        conn = sqlite3.connect(str(db_path))
+                        cursor = conn.execute("SELECT job_context FROM user_settings WHERE user_id = 1")
+                        row = cursor.fetchone()
+                        if row and row[0]:
+                            job_role_context = row[0]
+                        conn.close()
+                        logger.debug(f"[AI Service] Loaded job context from database for classification ({len(job_role_context)} chars)")
+                except Exception:
+                    pass
+                
+                # Fall back to file
+                if not job_role_context:
+                    job_context_path = os.path.join(user_data_dir, 'job_role_context.md')
+                    if os.path.exists(job_context_path):
+                        with open(job_context_path, 'r', encoding='utf-8') as f:
+                            job_role_context = f.read()
+                        logger.debug(f"[AI Service] Loaded job context from file for classification ({len(job_role_context)} chars)")
+            except Exception as ctx_error:
+                logger.warning(f"[AI Service] Failed to load job context for classification: {ctx_error}")
+            
             # Create email_content dict for AIProcessor
             email_dict = {
                 'subject': subject,
@@ -182,10 +215,11 @@ class COMAIService:
                 'body': body
             }
             
-            # Use the enhanced classification method with explanation
+            # Use the enhanced classification method with explanation AND job context
             result = self.ai_processor.classify_email_with_explanation(
                 email_content=email_dict,
-                learning_data=learning_data
+                learning_data=learning_data,
+                job_role_context=job_role_context  # ✅ Pass user context for better accuracy!
             )
             
             # Ensure result is in expected format
@@ -331,15 +365,81 @@ class COMAIService:
                 if body_start > 0:
                     body = '\n'.join(lines[body_start:])
             
-            # Create inputs matching the prompty schema
+            # 🔧 CRITICAL FIX: Load user context for relevance assessment
+            # This was missing - user preferences were being ignored!
+            job_role_context = ""
+            custom_interests = ""
+            username = "User"
+            
+            try:
+                import sqlite3
+                from pathlib import Path
+                
+                user_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'user_specific_data')
+                
+                # First try to load from database (preferred source)
+                try:
+                    db_path = Path(__file__).parent.parent.parent / 'runtime_data' / 'email_helper_history.db'
+                    if db_path.exists():
+                        conn = sqlite3.connect(str(db_path))
+                        cursor = conn.execute("SELECT username, job_context, newsletter_interests FROM user_settings WHERE user_id = 1")
+                        row = cursor.fetchone()
+                        if row:
+                            if row[0]:
+                                username = row[0]
+                            if row[1]:
+                                job_role_context = row[1]
+                            if row[2]:
+                                custom_interests = row[2]
+                        conn.close()
+                        logger.debug(f"[AI Service] Loaded user context from database: username={username}, has_job_context={bool(job_role_context)}, has_interests={bool(custom_interests)}")
+                except Exception as db_error:
+                    logger.debug(f"[AI Service] Database context load failed, trying files: {db_error}")
+                
+                # Fall back to file-based loading if database had no data
+                if not job_role_context:
+                    job_context_path = os.path.join(user_data_dir, 'job_role_context.md')
+                    if os.path.exists(job_context_path):
+                        with open(job_context_path, 'r', encoding='utf-8') as f:
+                            job_role_context = f.read()
+                        logger.debug(f"[AI Service] Loaded job_role_context from file ({len(job_role_context)} chars)")
+                
+                if not custom_interests:
+                    custom_interests_path = os.path.join(user_data_dir, 'custom_interests.md')
+                    if os.path.exists(custom_interests_path):
+                        with open(custom_interests_path, 'r', encoding='utf-8') as f:
+                            custom_interests = f.read()
+                        logger.debug(f"[AI Service] Loaded custom_interests from file ({len(custom_interests)} chars)")
+                
+                if username == "User":
+                    username_path = os.path.join(user_data_dir, 'username.txt')
+                    if os.path.exists(username_path):
+                        with open(username_path, 'r', encoding='utf-8') as f:
+                            username = f.read().strip()
+                        logger.debug(f"[AI Service] Loaded username from file: {username}")
+                
+                # Try AIProcessor's get_username as final fallback
+                if username == "User" and hasattr(self.ai_processor, 'get_username'):
+                    username = self.ai_processor.get_username()
+                    
+            except Exception as ctx_error:
+                logger.warning(f"[AI Service] Failed to load user context: {ctx_error}")
+                # Continue with defaults if context loading fails
+            
+            # Create inputs matching the prompty schema WITH user context
             inputs = {
-                "context": context or "Email analysis for action item extraction",
-                "username": self.ai_processor.get_username() if hasattr(self.ai_processor, 'get_username') else "User",
+                "context": job_role_context or context or "Email analysis for action item extraction",
+                "username": username,
                 "subject": subject,
                 "sender": sender,
                 "date": date,
                 "body": body[:8000]  # Limit body length
             }
+            
+            # Add custom_interests if available (used by some prompts for relevance filtering)
+            if custom_interests:
+                inputs["custom_interests"] = custom_interests
+                logger.debug(f"[AI Service] Including custom_interests in action extraction")
             
             # Execute the summerize_action_item prompty
             result = self.ai_processor.execute_prompty(
