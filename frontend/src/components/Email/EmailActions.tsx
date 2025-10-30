@@ -75,162 +75,57 @@ export const EmailActions: React.FC<EmailActionsProps> = ({
     }
   };
   
-  const containerStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '12px 16px',
-    backgroundColor: '#e3f2fd',
-    border: '1px solid #90caf9',
-    borderRadius: '8px',
-    margin: '16px 0',
-  };
-  
-  const countStyle = {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#1976d2',
-  };
-  
-  const buttonBaseStyle = {
-    padding: '8px 16px',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    disabled: isProcessing,
-  };
-  
-  const primaryButtonStyle = {
-    ...buttonBaseStyle,
-    backgroundColor: '#007acc',
-    color: 'white',
-  };
-  
-  const secondaryButtonStyle = {
-    ...buttonBaseStyle,
-    backgroundColor: '#6c757d',
-    color: 'white',
-  };
-  
-  const dangerButtonStyle = {
-    ...buttonBaseStyle,
-    backgroundColor: '#dc3545',
-    color: 'white',
-  };
-  
-  const clearButtonStyle = {
-    ...buttonBaseStyle,
-    backgroundColor: 'transparent',
-    color: '#6c757d',
-    border: '1px solid #6c757d',
-  };
-  
-  const disabledStyle = {
-    opacity: 0.6,
-    cursor: 'not-allowed',
-  };
-  
   if (selectedEmails.length === 0) {
     return null;
   }
   
   return (
-    <div className={`email-actions ${className}`} style={containerStyle}>
-      <style>
-        {`
-          .email-actions button:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-          }
-          
-          .primary-action:hover:not(:disabled) {
-            background-color: #0056b3 !important;
-          }
-          
-          .secondary-action:hover:not(:disabled) {
-            background-color: #5a6268 !important;
-          }
-          
-          .danger-action:hover:not(:disabled) {
-            background-color: #c82333 !important;
-          }
-          
-          .clear-action:hover:not(:disabled) {
-            background-color: #6c757d !important;
-            color: white !important;
-          }
-        `}
-      </style>
-      
-      <div style={countStyle}>
+    <div className={`email-actions ${className}`}>
+      <div className="email-actions__count">
         {selectedEmails.length} email{selectedEmails.length !== 1 ? 's' : ''} selected
       </div>
       
       <button
-        className="primary-action"
+        className="email-actions__button--primary"
         onClick={handleMarkAsRead}
         disabled={isProcessing}
-        style={{
-          ...primaryButtonStyle,
-          ...(isProcessing ? disabledStyle : {}),
-        }}
         title="Mark selected emails as read"
       >
         {isProcessing ? '⟳ ' : ''}Mark as Read
       </button>
       
       <button
-        className="secondary-action"
+        className="email-actions__button--secondary"
         onClick={handleMarkAsUnread}
         disabled={isProcessing}
-        style={{
-          ...secondaryButtonStyle,
-          ...(isProcessing ? disabledStyle : {}),
-        }}
         title="Mark selected emails as unread"
       >
         {isProcessing ? '⟳ ' : ''}Mark as Unread
       </button>
       
       <button
-        className="primary-action"
+        className="email-actions__button--success"
         onClick={handleApplyToOutlook}
         disabled={isProcessing}
-        style={{
-          ...primaryButtonStyle,
-          backgroundColor: '#28a745',
-          ...(isProcessing ? disabledStyle : {}),
-        }}
         title="Apply AI classifications and move to Outlook folders"
       >
         {isProcessing ? '⟳ Processing...' : '📁 Apply to Outlook'}
       </button>
       
       <button
-        className="danger-action"
+        className="email-actions__button--danger"
         onClick={handleDelete}
         disabled={isProcessing}
-        style={{
-          ...dangerButtonStyle,
-          ...(isProcessing ? disabledStyle : {}),
-        }}
         title="Delete selected emails"
       >
         {isProcessing ? '⟳ ' : ''}Delete
       </button>
       
-      <div style={{ marginLeft: 'auto' }}>
+      <div className="email-actions__spacer">
         <button
-          className="clear-action"
+          className="email-actions__button--clear"
           onClick={onClear}
           disabled={isProcessing}
-          style={{
-            ...clearButtonStyle,
-            ...(isProcessing ? disabledStyle : {}),
-          }}
           title="Clear selection"
         >
           Clear Selection
