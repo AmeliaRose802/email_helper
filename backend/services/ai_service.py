@@ -6,44 +6,75 @@ for use with FastAPI endpoints, following T1's dependency injection patterns.
 
 import asyncio
 import os
-import sys
 import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-# Add src to Python path for existing service imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
-try:
-    from ai_processor import AIProcessor
-    from azure_config import get_azure_config
-except ImportError as e:
-    print(f"Warning: Could not import AI dependencies: {e}")
-    AIProcessor = None
-    get_azure_config = None
+from backend.core.business.ai_orchestrator import AIOrchestrator
+from backend.core.infrastructure.azure_config import get_azure_config
 
 
 class AIService:
-    """Async AI service wrapper for FastAPI integration."""
+    """Async AI service wrapper for FastAPI integration.
+    
+    Wraps AIOrchestrator (pure business logic) with async operations
+    for FastAPI endpoint integration.
+    """
     
     def __init__(self):
-        """Initialize AI service with existing processors."""
-        self.ai_processor = None
+        """Initialize AI service with AIOrchestrator."""
+        self.ai_orchestrator = None
         self.azure_config = None
         self._initialized = False
         
     def _ensure_initialized(self):
         """Lazy initialization of AI components."""
         if not self._initialized:
-            if AIProcessor is None or get_azure_config is None:
+            if AIOrchestrator is None or get_azure_config is None:
                 raise RuntimeError("AI dependencies not available")
             
             try:
-                self.ai_processor = AIProcessor()
                 self.azure_config = get_azure_config()
+                self.ai_orchestrator = AIOrchestrator(self.azure_config)
                 self._initialized = True
             except Exception as e:
                 raise RuntimeError(f"Failed to initialize AI components: {e}")
+    
+    async def classify_email(
+        self, 
+        email_content: str, 
+        context: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Async wrapper for email classification using full email content.
+        
+        Args:
+            email_content: Full email text (may include Subject:, From: headers)
+            context: Additional context for classification
+            
+        Returns:
+            Dict containing classification results with category, confidence, and reasoning
+        """
+        self._ensure_initialized()
+        
+        # Run CPU-bound AI processing in thread pool to avoid blocking event loop
+        loop = asyncio.get_event_loop()
+        
+        try:
+            result = await loop.run_in_executor(
+                None,
+                self._classify_email_sync,
+                email_content,
+                context or ""
+            )
+            return result
+        except Exception as e:
+            return {
+                "category": "work_relevant",
+                "confidence": 0.5,
+                "reasoning": f"Classification failed: {str(e)}",
+                "alternatives": [],
+                "error": str(e)
+            }
     
     async def classify_email_async(
         self, 
@@ -92,7 +123,7 @@ class AIService:
         """Synchronous email classification for thread pool execution."""
         try:
             # Use the enhanced classification method with explanation
-            result = self.ai_processor.classify_email_with_explanation(
+            result = self.ai_orchestrator.classify_email_with_explanation(
                 email_content, 
                 learning_data=[]  # Empty learning data for now
             )
@@ -185,7 +216,7 @@ class AIService:
                 'body': body
             }
             
-            result = self.ai_processor.execute_prompty('summerize_action_item.prompty', inputs)
+            result = self.ai_orchestrator.execute_prompty('summerize_action_item.prompty', inputs)
             
             # Parse JSON result
             if isinstance(result, str):
@@ -282,7 +313,7 @@ class AIService:
                 'body': body
             }
             
-            result = self.ai_processor.execute_prompty('email_one_line_summary.prompty', inputs)
+            result = self.ai_orchestrator.execute_prompty('email_one_line_summary.prompty', inputs)
             
             # Process result
             summary_text = str(result).strip() if result else "Unable to generate summary"
@@ -352,8 +383,8 @@ class AIService:
                 }
                 email_data_list.append(email_data)
             
-            # Use AIProcessor's holistic analysis
-            analysis, notes = self.ai_processor.analyze_inbox_holistically(email_data_list)
+            # Use AIOrchestrator's holistic analysis
+            analysis, notes = self.ai_orchestrator.analyze_inbox_holistically(email_data_list)
             
             if not analysis:
                 return {

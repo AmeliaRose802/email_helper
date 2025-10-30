@@ -5,12 +5,26 @@ import App from '../App';
 
 // Mock fetch to prevent real API calls in tests
 beforeEach(() => {
+  // Create a proper mock Response with clone() method
+  const createMockResponse = (data: any, status = 401, ok = false) => {
+    const response = {
+      ok,
+      status,
+      json: () => Promise.resolve(data),
+      text: () => Promise.resolve(JSON.stringify(data)),
+      headers: new Headers(),
+      redirected: false,
+      statusText: ok ? 'OK' : 'Unauthorized',
+      type: 'basic' as ResponseType,
+      url: '',
+      // CRITICAL: Add clone() method that fetch API requires
+      clone: function() { return { ...this }; },
+    };
+    return response as Response;
+  };
+
   global.fetch = vi.fn(() =>
-    Promise.resolve({
-      ok: false,
-      status: 401,
-      json: () => Promise.resolve({ detail: 'Not authenticated' }),
-    } as Response)
+    Promise.resolve(createMockResponse({ detail: 'Not authenticated' }))
   );
 });
 
@@ -30,7 +44,11 @@ describe('App Component', () => {
     // Wait for router to render and show inbox
     await waitFor(() => {
       // Should show inbox/email list as default route
-      const hasEmailContent = screen.queryByText('Inbox') || screen.queryByText('Loading Emails');
+      // The component will show either the inbox, loading state, or error state
+      const hasEmailContent = 
+        screen.queryByText('Inbox') || 
+        screen.queryByText('Loading Emails') ||
+        screen.queryByText('Error Loading Emails');
       expect(hasEmailContent).toBeTruthy();
     });
   });

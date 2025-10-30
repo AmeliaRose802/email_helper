@@ -16,7 +16,6 @@ Thread Safety:
     proper synchronization for concurrent access.
 """
 
-import sys
 import logging
 import asyncio
 from pathlib import Path
@@ -32,7 +31,6 @@ except ImportError:
     pythoncom = None
 
 # Add src to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from backend.services.email_provider import EmailProvider
 

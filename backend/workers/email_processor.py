@@ -10,11 +10,9 @@ import logging
 import json
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-import sys
 from pathlib import Path
 
 # Add src to Python path for existing service imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from backend.services.job_queue import job_queue, JobStatus, JobType, JobProgress
 from backend.services.websocket_manager import websocket_manager
@@ -289,5 +287,28 @@ class EmailProcessorWorker:
         }
 
 
-# Global worker instance
-email_processor_worker = EmailProcessorWorker()
+# Lazy-initialized global worker instance
+_email_processor_worker: Optional[EmailProcessorWorker] = None
+
+
+def get_email_processor_worker() -> EmailProcessorWorker:
+    """Get or create the global email processor worker instance.
+    
+    This lazy initialization pattern ensures the worker is only created when
+    actually needed, not at module import time. This prevents test collection
+    failures when COM/email services aren't configured.
+    """
+    global _email_processor_worker
+    if _email_processor_worker is None:
+        _email_processor_worker = EmailProcessorWorker()
+    return _email_processor_worker
+
+
+# Backward compatibility: property that acts like the old global instance
+class _WorkerProxy:
+    """Proxy object that provides backward compatibility for direct access."""
+    def __getattr__(self, name):
+        return getattr(get_email_processor_worker(), name)
+
+
+email_processor_worker = _WorkerProxy()

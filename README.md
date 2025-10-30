@@ -231,13 +231,36 @@ cat frontend/.env.local | grep VITE_API_BASE_URL
 
 > **📖 More Help:** See the [Troubleshooting Guide](docs/TROUBLESHOOTING.md) for comprehensive troubleshooting steps.
 
-## 🤝 Contributing
+## � Testing
+
+Run all tests with a single command:
+
+```bash
+npm test
+# OR
+.\run-all-tests.ps1
+```
+
+Run specific test suites:
+
+```bash
+npm run test:backend     # Backend Python tests
+npm run test:src         # Src Python tests  
+npm run test:frontend    # Frontend unit tests
+npm run test:e2e         # Frontend E2E tests
+npm run test:coverage    # All tests with coverage
+```
+
+For detailed testing documentation, see [`TEST_RUNNER_README.md`](TEST_RUNNER_README.md).
+
+## � Contributing
 
 This is a personal productivity tool, but improvements are welcome! Please ensure:
+
 - No personal data in commits
 - Security best practices maintained  
 - Documentation updated for changes
-- Tests written and passing (see `test/TEST_ORGANIZATION.md`)
+- **Tests written and passing** - Run `npm test` before committing
 - Follow guidelines in `.github/copilot-instructions.md`
 
 ## ⚠️ Important Notes

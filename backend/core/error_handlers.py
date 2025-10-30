@@ -5,20 +5,15 @@ This module provides centralized error handling for the FastAPI backend,
 ensuring consistent error responses and proper logging.
 """
 
-import sys
 import logging
 from typing import Union, Dict, Any
-from pathlib import Path
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
-from core.exceptions import (
+from backend.core.infrastructure.exceptions import (
     EmailHelperError,
     ValidationError,
     AuthenticationError,
@@ -32,7 +27,7 @@ from core.exceptions import (
     TaskNotFoundError,
     ResourceNotAvailableError
 )
-from utils.error_utils import standardized_error_handler
+from backend.core.infrastructure.error_utils import standardized_error_handler
 
 logger = logging.getLogger(__name__)
 

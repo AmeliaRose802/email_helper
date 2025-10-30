@@ -20,6 +20,33 @@ from backend.core.config import settings
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Import provider classes at module level for test mocking
+# These imports are optional and will fail gracefully if not available
+COMEmailProvider = None
+COMAIService = None
+AIService = None
+get_email_provider_instance = None
+
+try:
+    from backend.services.com_email_provider import COMEmailProvider
+except ImportError:
+    logger.debug("COMEmailProvider not available")
+
+try:
+    from backend.services.com_ai_service import COMAIService
+except ImportError:
+    logger.debug("COMAIService not available")
+
+try:
+    from backend.services.ai_service import AIService
+except ImportError:
+    logger.debug("AIService not available")
+
+try:
+    from backend.services.email_provider import get_email_provider_instance
+except ImportError:
+    logger.debug("get_email_provider_instance not available")
+
 # Global singleton instances
 _com_email_provider: Optional[object] = None
 _com_ai_service: Optional[object] = None
@@ -52,10 +79,14 @@ def get_com_email_provider():
     
     if _com_email_provider is None:
         try:
-            from backend.services.com_email_provider import COMEmailProvider
+            # Use module-level COMEmailProvider if available, otherwise try import
+            provider_class = COMEmailProvider
+            if provider_class is None:
+                from backend.services.com_email_provider import COMEmailProvider as ImportedProvider
+                provider_class = ImportedProvider
             
             logger.info("Initializing COM email provider")
-            _com_email_provider = COMEmailProvider()
+            _com_email_provider = provider_class()
             
             # Authenticate/connect to Outlook with retries
             max_retries = 3
@@ -96,14 +127,13 @@ def get_com_email_provider():
 def get_com_ai_service():
     """FastAPI dependency for COM AI service.
     
-    Returns singleton instance of COMAIService that wraps AIProcessor
-    for COM-based AI operations using Azure OpenAI.
+    Returns singleton instance of AIService for AI operations using Azure OpenAI.
     
     The service is lazily initialized on first use. Subsequent calls
     return the same instance.
     
     Returns:
-        COMAIService: COM AI service instance
+        AIService: AI service instance
         
     Raises:
         HTTPException: If AI service cannot be initialized
@@ -118,27 +148,31 @@ def get_com_ai_service():
     
     if _com_ai_service is None:
         try:
-            from backend.services.com_ai_service import COMAIService
+            # Use module-level AIService if available, otherwise try import
+            service_class = AIService
+            if service_class is None:
+                from backend.services.ai_service import AIService as ImportedAIService
+                service_class = ImportedAIService
             
-            logger.info("Initializing COM AI service")
-            _com_ai_service = COMAIService()
+            logger.info("Initializing AI service")
+            _com_ai_service = service_class()
             
             # Test initialization by ensuring AI components are available
             _com_ai_service._ensure_initialized()
             
-            logger.info("COM AI service initialized successfully")
+            logger.info("AI service initialized successfully")
             
         except ImportError as e:
-            logger.error(f"COM AI service not available: {e}")
+            logger.error(f"AI service not available: {e}")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="COM AI service not available. Check AI dependencies."
+                detail="AI service not available. Check AI dependencies."
             )
         except Exception as e:
-            logger.error(f"Failed to initialize COM AI service: {e}")
+            logger.error(f"Failed to initialize AI service: {e}")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"COM AI service initialization failed: {str(e)}"
+                detail=f"AI service initialization failed: {str(e)}"
             )
     
     return _com_ai_service
@@ -186,9 +220,13 @@ def get_email_provider():
         
         # Fall back to existing provider selection logic
         try:
-            from backend.services.email_provider import get_email_provider_instance
+            # Use module-level function if available, otherwise try import
+            provider_factory = get_email_provider_instance
+            if provider_factory is None:
+                from backend.services.email_provider import get_email_provider_instance as ImportedFactory
+                provider_factory = ImportedFactory
             logger.info("Using standard email provider selection")
-            _email_provider = get_email_provider_instance()
+            _email_provider = provider_factory()
         except Exception as e:
             logger.error(f"Failed to initialize email provider: {e}")
             raise HTTPException(
@@ -200,52 +238,17 @@ def get_email_provider():
 
 
 def get_ai_service():
-    """FastAPI dependency for AI service with configuration-based selection.
+    """FastAPI dependency for AI service.
     
-    Selects AI service based on configuration settings:
-    1. COM AI service if use_com_backend is True
-    2. Standard AI service for general use
-    
-    This function provides backward compatibility while enabling COM
-    AI service selection through configuration.
+    Returns singleton instance of AIService for AI operations.
     
     Returns:
-        AIService or COMAIService: Selected AI service instance
+        AIService: AI service instance
         
     Raises:
         HTTPException: If no service can be initialized
-        
-    Example:
-        >>> from fastapi import Depends
-        >>> @router.post("/classify")
-        >>> async def classify(service = Depends(get_ai_service)):
-        >>>     return await service.classify_email(email_text)
     """
-    global _ai_service
-    
-    if _ai_service is None:
-        # Check for COM AI service preference
-        if getattr(settings, 'use_com_backend', False):
-            try:
-                logger.info("Using COM AI service (configured)")
-                _ai_service = get_com_ai_service()
-                return _ai_service
-            except HTTPException as e:
-                logger.warning(f"COM AI service unavailable, falling back: {e.detail}")
-        
-        # Fall back to standard AI service
-        try:
-            from backend.services.ai_service import AIService
-            logger.info("Using standard AI service")
-            _ai_service = AIService()
-        except Exception as e:
-            logger.error(f"Failed to initialize AI service: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="AI service initialization failed"
-            )
-    
-    return _ai_service
+    return get_com_ai_service()
 
 
 def get_task_service():

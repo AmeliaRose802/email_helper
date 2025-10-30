@@ -3,10 +3,6 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch, MagicMock
-import sys
-
-# Ensure backend modules can be imported
-sys.path.insert(0, '/home/runner/work/email_helper/email_helper')
 
 from backend.main import app
 from backend.core.dependencies import reset_dependencies

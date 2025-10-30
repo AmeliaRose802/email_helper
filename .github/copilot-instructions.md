@@ -73,12 +73,47 @@ This is an intelligent email management system that helps users process, categor
 - Follow existing test patterns and naming conventions
 - Include both positive and negative test cases
 - Mock external dependencies (Outlook, AI services)
-- **Run the test suite before submitting code** - Use `python -m pytest test/` or existing test runners
+- **Run the test suite before submitting code** - Use `npm test` to run all tests
 - **Verify edge cases and error conditions** - Test failure scenarios, invalid inputs, and boundary conditions
 - **Test with real data when possible** - Use sample emails and realistic data scenarios
 - **Integration testing is critical** - Test how components work together, not just in isolation
 - **Performance testing for email processing** - Verify the system handles large email volumes efficiently
 - **Track test failures with Beads** - Use `bd create` to file issues for failing tests as you discover them
+
+### Running Tests
+
+**Run all tests with a single command:**
+```bash
+npm test
+# OR
+.\run-all-tests.ps1
+```
+
+**Test suites available:**
+- `npm run test:backend` - Backend Python tests (pytest backend/tests/)
+- `npm run test:src` - Src Python tests (pytest test/)
+- `npm run test:frontend` - Frontend unit tests (vitest)
+- `npm run test:e2e` - Frontend E2E tests (Playwright)
+- `npm run test:coverage` - All tests with coverage reports
+
+**Advanced test runner options:**
+```powershell
+# Run with coverage
+.\run-all-tests.ps1 -Coverage
+
+# Skip specific suites for faster development
+.\run-all-tests.ps1 -SkipE2E
+.\run-all-tests.ps1 -SkipBackend -SkipE2E
+
+# Verbose output for debugging
+.\run-all-tests.ps1 -Verbose
+```
+
+**Before committing code:**
+1. Run `npm test` to execute all test suites
+2. Fix any failing tests immediately
+3. If you discover bugs during testing, file them with: `bd create "Bug: <description>" -t bug -p 1`
+4. Verify the exit code is 0 (all tests passed)
 
 ## Dependencies & Integration
 

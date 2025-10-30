@@ -13,10 +13,6 @@ from typing import Dict, Any, List
 import json
 
 # Import the FastAPI app
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from backend.main import app
 from backend.models.task import TaskStatus
 

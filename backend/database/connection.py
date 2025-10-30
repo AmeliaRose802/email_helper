@@ -5,25 +5,11 @@ patterns while integrating with FastAPI's dependency injection system.
 """
 
 import sqlite3
-import sys
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-# Add src to Python path to import existing database utilities
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
 from backend.core.config import get_database_path
-
-try:
-    from database.migrations import DatabaseMigrations
-except ImportError:
-    # Mock if can't import
-    class DatabaseMigrations:
-        def __init__(self, db_path):
-            self.db_path = db_path
-        def apply_migrations(self):
-            return True
 
 
 class DatabaseManager:
@@ -38,14 +24,7 @@ class DatabaseManager:
         db_dir = Path(self.db_path).parent
         db_dir.mkdir(parents=True, exist_ok=True)
         
-        # Apply migrations if available
-        try:
-            migrations = DatabaseMigrations(self.db_path)
-            migrations.apply_migrations()
-        except Exception as e:
-            print(f"[WARNING] Could not apply migrations: {e}", flush=True)
-        
-        # Always ensure our API tables exist
+        # Create basic database structure
         self._create_basic_structure()
     
     def _create_basic_structure(self):

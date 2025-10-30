@@ -6,14 +6,12 @@ maintaining compatibility with the existing EmailProvider interface
 from src/core/interfaces.py.
 """
 
-import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Union
 from fastapi import Depends, HTTPException
 
 # Add src to Python path for existing service imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from backend.core.config import settings
 

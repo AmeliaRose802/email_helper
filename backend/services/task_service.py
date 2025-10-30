@@ -12,7 +12,7 @@ from typing import List, Optional, Dict, Any
 
 from backend.database.connection import db_manager
 from backend.models.task import Task, TaskCreate, TaskUpdate, TaskInDB, TaskStatus, TaskPriority
-from src.task_persistence import TaskPersistence
+from backend.core.domain.task_persistence import TaskPersistence
 
 
 class TaskListResponse:

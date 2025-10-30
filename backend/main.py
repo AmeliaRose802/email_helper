@@ -4,17 +4,12 @@ This module creates the main FastAPI application with all necessary middleware,
 routers, and configuration for the Email Helper mobile backend.
 """
 
-import sys
-from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-# Add src to Python path for existing service imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from backend.core.config import settings
 from backend.database.connection import db_manager

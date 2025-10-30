@@ -9,11 +9,9 @@ import asyncio
 import logging
 from typing import Optional, Set
 from datetime import datetime, timedelta
-import sys
 from pathlib import Path
 
 # Add src to Python path for existing service imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from backend.services.job_queue import job_queue
 from backend.workers.email_processor import email_processor_worker

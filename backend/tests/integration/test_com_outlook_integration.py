@@ -9,9 +9,6 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch, call
 from fastapi import HTTPException
 
-import sys
-sys.path.insert(0, '/home/runner/work/email_helper/email_helper')
-
 
 @pytest.fixture
 def mock_outlook_adapter():

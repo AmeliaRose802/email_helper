@@ -9,9 +9,6 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch, AsyncMock
 import json
 
-import sys
-sys.path.insert(0, '/home/runner/work/email_helper/email_helper')
-
 
 @pytest.fixture
 def mock_complete_email_provider():
@@ -120,8 +117,8 @@ class TestCompleteEmailProcessingWorkflow:
     ):
         """Test full workflow: retrieve emails → classify each."""
         # Setup AI service
-        with patch('backend.services.com_ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.com_ai_service.get_azure_config'):
+        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
+            with patch('backend.services.ai_service.get_azure_config'):
                 mock_ai = MagicMock()
                 
                 # Return different classifications for different emails
@@ -148,8 +145,8 @@ class TestCompleteEmailProcessingWorkflow:
                 mock_ai.execute_prompty.side_effect = classifications
                 mock_ai_class.return_value = mock_ai
                 
-                from backend.services.com_ai_service import COMAIService
-                ai_service = COMAIService()
+                from backend.services.ai_service import AIService
+                ai_service = AIService()
                 ai_service._ensure_initialized()
                 
                 # Authenticate and retrieve emails
@@ -188,8 +185,8 @@ class TestCompleteEmailProcessingWorkflow:
     ):
         """Test workflow: retrieve emails → extract action items."""
         # Setup AI service
-        with patch('backend.services.com_ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.com_ai_service.get_azure_config'):
+        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
+            with patch('backend.services.ai_service.get_azure_config'):
                 mock_ai = MagicMock()
                 
                 # Return action items for emails
@@ -228,8 +225,8 @@ class TestCompleteEmailProcessingWorkflow:
                 mock_ai.execute_prompty.side_effect = action_results
                 mock_ai_class.return_value = mock_ai
                 
-                from backend.services.com_ai_service import COMAIService
-                ai_service = COMAIService()
+                from backend.services.ai_service import AIService
+                ai_service = AIService()
                 ai_service._ensure_initialized()
                 
                 # Get emails
@@ -269,8 +266,8 @@ class TestCompleteEmailProcessingWorkflow:
     ):
         """Test workflow: retrieve emails → generate summaries."""
         # Setup AI service
-        with patch('backend.services.com_ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.com_ai_service.get_azure_config'):
+        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
+            with patch('backend.services.ai_service.get_azure_config'):
                 mock_ai = MagicMock()
                 
                 # Return summaries
@@ -282,8 +279,8 @@ class TestCompleteEmailProcessingWorkflow:
                 mock_ai.execute_prompty.side_effect = summaries
                 mock_ai_class.return_value = mock_ai
                 
-                from backend.services.com_ai_service import COMAIService
-                ai_service = COMAIService()
+                from backend.services.ai_service import AIService
+                ai_service = AIService()
                 ai_service._ensure_initialized()
                 
                 # Get emails
@@ -315,8 +312,8 @@ class TestCompleteEmailProcessingWorkflow:
     ):
         """Test full pipeline: retrieve → classify → extract actions → summarize."""
         # Setup AI service
-        with patch('backend.services.com_ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.com_ai_service.get_azure_config'):
+        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
+            with patch('backend.services.ai_service.get_azure_config'):
                 mock_ai = MagicMock()
                 
                 # Mock responses for complete pipeline
@@ -343,8 +340,8 @@ class TestCompleteEmailProcessingWorkflow:
                 mock_ai.execute_prompty.side_effect = responses
                 mock_ai_class.return_value = mock_ai
                 
-                from backend.services.com_ai_service import COMAIService
-                ai_service = COMAIService()
+                from backend.services.ai_service import AIService
+                ai_service = AIService()
                 ai_service._ensure_initialized()
                 
                 # Get first email
@@ -408,15 +405,15 @@ class TestWorkflowErrorHandling:
     @pytest.mark.asyncio
     async def test_ai_classification_failure_handling(self):
         """Test handling of AI classification failures."""
-        with patch('backend.services.com_ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.com_ai_service.get_azure_config'):
+        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
+            with patch('backend.services.ai_service.get_azure_config'):
                 mock_ai = MagicMock()
                 mock_ai.execute_prompty.side_effect = Exception("AI service unavailable")
                 mock_ai_class.return_value = mock_ai
                 
-                from backend.services.com_ai_service import COMAIService
+                from backend.services.ai_service import AIService
                 
-                ai_service = COMAIService()
+                ai_service = AIService()
                 ai_service._ensure_initialized()
                 
                 # Should return fallback classification
@@ -431,8 +428,8 @@ class TestWorkflowErrorHandling:
         self, mock_complete_email_provider
     ):
         """Test recovery from partial workflow failures."""
-        with patch('backend.services.com_ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.com_ai_service.get_azure_config'):
+        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
+            with patch('backend.services.ai_service.get_azure_config'):
                 mock_ai = MagicMock()
                 
                 # First call succeeds, second fails, third succeeds
@@ -448,9 +445,9 @@ class TestWorkflowErrorHandling:
                 ]
                 mock_ai_class.return_value = mock_ai
                 
-                from backend.services.com_ai_service import COMAIService
+                from backend.services.ai_service import AIService
                 
-                ai_service = COMAIService()
+                ai_service = AIService()
                 ai_service._ensure_initialized()
                 
                 # Get email
@@ -481,8 +478,8 @@ class TestWorkflowPerformance:
     ):
         """Test processing multiple emails efficiently."""
         # Setup for batch processing
-        with patch('backend.services.com_ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.com_ai_service.get_azure_config'):
+        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
+            with patch('backend.services.ai_service.get_azure_config'):
                 mock_ai = MagicMock()
                 
                 # Return quick results for batch
@@ -494,9 +491,9 @@ class TestWorkflowPerformance:
                 })
                 mock_ai_class.return_value = mock_ai
                 
-                from backend.services.com_ai_service import COMAIService
+                from backend.services.ai_service import AIService
                 
-                ai_service = COMAIService()
+                ai_service = AIService()
                 ai_service._ensure_initialized()
                 
                 # Process multiple emails
@@ -561,8 +558,8 @@ class TestWorkflowDataPersistence:
         self, mock_complete_email_provider
     ):
         """Test persisting email categories after classification."""
-        with patch('backend.services.com_ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.com_ai_service.get_azure_config'):
+        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
+            with patch('backend.services.ai_service.get_azure_config'):
                 mock_ai = MagicMock()
                 mock_ai.execute_prompty.return_value = json.dumps({
                     "category": "required_personal_action",
@@ -572,9 +569,9 @@ class TestWorkflowDataPersistence:
                 })
                 mock_ai_class.return_value = mock_ai
                 
-                from backend.services.com_ai_service import COMAIService
+                from backend.services.ai_service import AIService
                 
-                ai_service = COMAIService()
+                ai_service = AIService()
                 ai_service._ensure_initialized()
                 
                 # Process and categorize

@@ -1,5 +1,6 @@
 """Tests for AI processing API endpoints."""
 
+import asyncio
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 from fastapi.testclient import TestClient
@@ -24,7 +25,7 @@ def reset_deps():
 class TestAIClassification:
     """Tests for email classification endpoint."""
     
-    @patch('backend.services.ai_service.AIService.classify_email_async')
+    @patch('backend.services.ai_service.AIService.classify_email', new_callable=AsyncMock)
     def test_classify_email_success(self, mock_classify):
         """Test successful email classification."""
         # Mock AI service response
@@ -55,7 +56,7 @@ class TestAIClassification:
         assert "processing_time" in data
         assert isinstance(data["alternative_categories"], list)
     
-    @patch('backend.services.ai_service.AIService.classify_email_async')
+    @patch('backend.services.ai_service.AIService.classify_email', new_callable=AsyncMock)
     def test_classify_email_with_error(self, mock_classify):
         """Test email classification with AI service error."""
         # Mock AI service error

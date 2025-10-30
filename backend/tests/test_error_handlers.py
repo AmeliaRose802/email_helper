@@ -7,12 +7,10 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from fastapi.responses import JSONResponse
 from unittest.mock import Mock
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from core.exceptions import (
+from backend.core.infrastructure.exceptions import (
     EmailHelperError,
     AIServiceUnavailableError,
     EmailNotFoundError,

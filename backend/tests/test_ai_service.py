@@ -13,7 +13,7 @@ class TestAIService:
         """Create AI service instance for testing."""
         return AIService()
     
-    @patch('backend.services.ai_service.AIProcessor')
+    @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
     def test_ai_service_initialization(self, mock_config, mock_processor, ai_service):
         """Test AI service initialization."""
@@ -27,17 +27,17 @@ class TestAIService:
         ai_service._ensure_initialized()
         
         assert ai_service._initialized is True
-        assert ai_service.ai_processor is not None
+        assert ai_service.ai_orchestrator is not None
         assert ai_service.azure_config is not None
     
     def test_ai_service_initialization_failure(self, ai_service):
         """Test AI service initialization with missing dependencies."""
         # Test with unavailable dependencies
-        with patch('backend.services.ai_service.AIProcessor', None):
+        with patch('backend.services.ai_service.AIOrchestrator', None):
             with pytest.raises(RuntimeError, match="AI dependencies not available"):
                 ai_service._ensure_initialized()
     
-    @patch('backend.services.ai_service.AIProcessor')
+    @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
     @pytest.mark.asyncio
     async def test_classify_email_async_success(self, mock_config, mock_processor, ai_service):
@@ -67,7 +67,7 @@ class TestAIService:
         assert "reasoning" in result
         assert "alternatives" in result
     
-    @patch('backend.services.ai_service.AIProcessor')
+    @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
     @pytest.mark.asyncio
     async def test_classify_email_async_failure(self, mock_config, mock_processor, ai_service):
@@ -91,7 +91,7 @@ class TestAIService:
         assert "error" in result
         assert "Classification failed" in result["reasoning"]
     
-    @patch('backend.services.ai_service.AIProcessor')
+    @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
     @pytest.mark.asyncio
     async def test_extract_action_items_success(self, mock_config, mock_processor, ai_service):
@@ -121,7 +121,7 @@ class TestAIService:
         assert result["confidence"] == 0.8
         assert len(result["links"]) == 1
     
-    @patch('backend.services.ai_service.AIProcessor')
+    @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
     @pytest.mark.asyncio
     async def test_extract_action_items_failure(self, mock_config, mock_processor, ai_service):
@@ -143,7 +143,7 @@ class TestAIService:
         assert "error" in result
         assert "Unable to extract action items" in result["action_required"]
     
-    @patch('backend.services.ai_service.AIProcessor')
+    @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
     @pytest.mark.asyncio
     async def test_generate_summary_success(self, mock_config, mock_processor, ai_service):
@@ -165,7 +165,7 @@ class TestAIService:
         assert result["confidence"] == 0.8
         assert len(result["key_points"]) > 0
     
-    @patch('backend.services.ai_service.AIProcessor')
+    @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
     @pytest.mark.asyncio
     async def test_generate_summary_failure(self, mock_config, mock_processor, ai_service):
@@ -246,7 +246,7 @@ class TestAIServiceEdgeCases:
         """Create AI service instance for testing."""
         return AIService()
     
-    @patch('backend.services.ai_service.AIProcessor')
+    @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
     @pytest.mark.asyncio
     async def test_classify_email_with_string_result(self, mock_config, mock_processor, ai_service):
@@ -269,7 +269,7 @@ class TestAIServiceEdgeCases:
         assert result["confidence"] == 0.8
         assert "Email classified successfully" in result["reasoning"]
     
-    @patch('backend.services.ai_service.AIProcessor')
+    @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
     @pytest.mark.asyncio
     async def test_extract_action_items_with_json_string(self, mock_config, mock_processor, ai_service):
@@ -291,7 +291,7 @@ class TestAIServiceEdgeCases:
         assert result["due_date"] == "2024-01-15"
         assert result["confidence"] == 0.8
     
-    @patch('backend.services.ai_service.AIProcessor')
+    @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
     @pytest.mark.asyncio
     async def test_extract_action_items_with_invalid_json(self, mock_config, mock_processor, ai_service):
@@ -313,7 +313,7 @@ class TestAIServiceEdgeCases:
         assert result["explanation"] == "Unable to parse structured response"
         assert result["confidence"] == 0.8
     
-    @patch('backend.services.ai_service.AIProcessor')
+    @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
     @pytest.mark.asyncio
     async def test_generate_summary_empty_result(self, mock_config, mock_processor, ai_service):
