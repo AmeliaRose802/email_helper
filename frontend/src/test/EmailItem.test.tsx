@@ -1,6 +1,6 @@
 // Email item component tests
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
@@ -19,6 +19,20 @@ vi.mock('react-router-dom', async (importOriginal) => {
   };
 });
 
+// Mock the API hooks
+vi.mock('@/services/emailApi', () => ({
+  useMarkEmailReadMutation: () => [vi.fn().mockResolvedValue({}), { isLoading: false }],
+  useGetCategoryMappingsQuery: () => ({
+    data: [
+      { category: 'required_action', outlook_folder: 'Action Required' },
+      { category: 'fyi', outlook_folder: 'FYI' },
+      { category: 'waiting', outlook_folder: 'Waiting' },
+    ],
+    isLoading: false,
+  }),
+  useUpdateEmailClassificationMutation: () => [vi.fn().mockResolvedValue({}), { isLoading: false }],
+}));
+
 // Mock email data
 const mockEmail: Email = {
   id: '1',
@@ -33,6 +47,7 @@ const mockEmail: Email = {
   has_attachments: true,
   categories: ['required_action'],
   conversation_id: 'conv-123',
+  conversation_count: 3,
   folder_name: 'Inbox',
 };
 
@@ -129,7 +144,7 @@ describe('EmailItem Component', () => {
     );
 
     // Check for unread styling (the component has conditional styling)
-    const emailItem = screen.getByText('Test Email Subject').closest('.email-item');
+    const emailItem = screen.getByText('Test Email Subject').closest('.email-item__container');
     expect(emailItem).toHaveClass('unread');
   });
 
@@ -144,7 +159,7 @@ describe('EmailItem Component', () => {
       </TestWrapper>
     );
 
-    const emailItem = screen.getByText('Read Email Subject').closest('.email-item');
+    const emailItem = screen.getByText('Read Email Subject').closest('.email-item__container');
     expect(emailItem).not.toHaveClass('unread');
   });
 
@@ -176,7 +191,7 @@ describe('EmailItem Component', () => {
     expect(screen.queryByTitle('Has attachments')).not.toBeInTheDocument();
   });
 
-  it('shows category badge when showCategory is true', () => {
+  it('shows category badge when showCategory is true', async () => {
     render(
       <TestWrapper>
         <EmailItem
@@ -187,7 +202,12 @@ describe('EmailItem Component', () => {
       </TestWrapper>
     );
 
-    expect(screen.getByText('Action Required')).toBeInTheDocument();
+    // Category is now shown in a dropdown, not as a text badge
+    // Wait for the dropdown to appear after loading
+    await waitFor(() => {
+      const dropdown = screen.getByTitle(/Change classification/);
+      expect(dropdown).toBeInTheDocument();
+    });
   });
 
   it('hides category badge when showCategory is false', () => {
@@ -256,7 +276,7 @@ describe('EmailItem Component', () => {
     expect(checkbox.checked).toBe(true);
   });
 
-  it('navigates to email detail when clicked', () => {
+  it('navigates to email detail when clicked', async () => {
     render(
       <TestWrapper>
         <EmailItem
@@ -267,10 +287,13 @@ describe('EmailItem Component', () => {
       </TestWrapper>
     );
 
-    const emailItem = screen.getByText('Test Email Subject').closest('.email-item');
+    const emailItem = screen.getByText('Test Email Subject').closest('.email-item__container');
     fireEvent.click(emailItem!);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/emails/1');
+    // Wait for async click handler to complete
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/emails/1');
+    });
   });
 
   it('does not trigger navigation when checkbox is clicked', () => {
@@ -320,6 +343,7 @@ describe('EmailItem Component', () => {
       </TestWrapper>
     );
 
-    expect(screen.getByTitle('Part of conversation')).toBeInTheDocument();
+    // Updated to match actual title format which includes count
+    expect(screen.getByTitle('Part of conversation (3 emails)')).toBeInTheDocument();
   });
 });
