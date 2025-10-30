@@ -68,3 +68,57 @@ class StorageProvider(ABC):
     def save_metrics(self, metrics: Dict[str, Any]) -> bool:
         """Save accuracy metrics to storage."""
         pass
+
+
+class OutlookManagerInterface(ABC):
+    """Abstract interface for Outlook email management."""
+    
+    @abstractmethod
+    def connect_to_outlook(self) -> None:
+        """Connect to Outlook application."""
+        pass
+    
+    @abstractmethod
+    def get_recent_emails(self, days_back: Optional[int] = None, max_emails: int = 10000) -> List[Any]:
+        """Retrieve recent emails from Outlook."""
+        pass
+    
+    @abstractmethod
+    def move_email_to_category(self, email: Any, category: str) -> bool:
+        """Move an email to a category folder."""
+        pass
+
+
+class TaskPersistenceInterface(ABC):
+    """Abstract interface for task persistence operations."""
+    
+    @abstractmethod
+    def save_outstanding_tasks(self, summary_sections: Dict[str, List[Dict]], 
+                              batch_timestamp: Optional[str] = None) -> None:
+        """Save outstanding tasks to persistent storage."""
+        pass
+    
+    @abstractmethod
+    def load_outstanding_tasks(self, auto_clean_expired: bool = True) -> Dict[str, List[Dict]]:
+        """Load outstanding tasks from persistent storage."""
+        pass
+    
+    @abstractmethod
+    def mark_tasks_completed(self, completed_task_ids: List[str], 
+                            completion_timestamp: Optional[str] = None) -> None:
+        """Mark tasks as completed."""
+        pass
+
+
+class DatabaseManagerInterface(ABC):
+    """Abstract interface for database management."""
+    
+    @abstractmethod
+    def get_connection(self):
+        """Get database connection context manager."""
+        pass
+    
+    @abstractmethod
+    def get_connection_sync(self):
+        """Get synchronous database connection."""
+        pass

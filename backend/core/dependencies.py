@@ -248,6 +248,43 @@ def get_ai_service():
     return _ai_service
 
 
+def get_task_service():
+    """FastAPI dependency for task service.
+    
+    Returns:
+        TaskService: Task service instance
+    """
+    from backend.services.task_service import TaskService
+    return TaskService()
+
+
+def get_email_processing_service():
+    """FastAPI dependency for email processing service.
+    
+    Returns EmailProcessingService that coordinates between:
+    - EmailSyncService: Database operations
+    - EmailClassificationService: AI classification
+    - EmailTaskExtractionService: Task extraction
+    - EmailAccuracyService: Accuracy tracking
+    
+    Returns:
+        EmailProcessingService: Email processing coordinator
+        
+    Example:
+        >>> from fastapi import Depends
+        >>> @router.post("/emails/sync")
+        >>> async def sync_emails(service = Depends(get_email_processing_service)):
+        >>>     return await service.sync_emails_to_database(emails)
+    """
+    from backend.services.email_processing_service import EmailProcessingService
+    
+    ai_service = get_ai_service()
+    email_provider = get_email_provider()
+    task_service = get_task_service()
+    
+    return EmailProcessingService(ai_service, email_provider, task_service)
+
+
 def reset_dependencies():
     """Reset all singleton instances for testing purposes.
     

@@ -78,6 +78,7 @@ This is an intelligent email management system that helps users process, categor
 - **Test with real data when possible** - Use sample emails and realistic data scenarios
 - **Integration testing is critical** - Test how components work together, not just in isolation
 - **Performance testing for email processing** - Verify the system handles large email volumes efficiently
+- **Track test failures with Beads** - Use `bd create` to file issues for failing tests as you discover them
 
 ## Dependencies & Integration
 
@@ -283,16 +284,13 @@ def call_ai_service(prompt, data):
 1. Create feature branches for new functionality
 2. Write tests before implementing features (TDD when appropriate)
 3. **RUN AND VERIFY ALL TESTS PASS** - Execute the test suite frequently during development
-4. **IF TESTS FAIL** - Create a Beads issue to track the problem:
-   - Add entry to `.beads/issues.jsonl` in JSONL format
-   - Include: test names, error messages, impact assessment, proposed solution
-   - Set appropriate priority (1=high, 2=medium, 3=low)
-   - Label with "testing", "bug", or relevant categories
-5. Update documentation **in the appropriate docs/ subfolder** for new features
-6. Test integration with existing components
-7. **Run full test suite before commits** - Ensure nothing is broken
-8. Submit pull requests with clear descriptions
-9. **Include test results in PR descriptions** - Show that tests pass and cover new functionality
+4. **IF TESTS FAIL** - Use the `bd` CLI tool to track the problem:
+   - Run `bd create "Test failure: <test_name>" -t bug -p 1 -d "Error: <error_message>"`
+   - Add relevant labels: `-l testing,backend` or `-l testing,frontend`
+   - Link to parent work if applicable: `bd dep add <new-issue-id> <parent-id> --type discovered-from`
+   - Check ready work with: `bd ready --json`
+5. Test integration with existing components
+6. **Run full test suite before commits** - Ensure nothing is broken
 
 ### Documentation Guidelines During Development
 
@@ -319,6 +317,114 @@ def call_ai_service(prompt, data):
 - Test with various email types and content
 - Verify AI service responses and error handling
 - Use the test framework for isolated component testing
+
+## Beads Task Tracking
+
+This project uses [Beads](https://github.com/steveyegge/beads) (`bd` CLI tool) for issue tracking and task management. AI agents should use Beads instead of markdown TODO lists for all task tracking.
+
+### Core Beads Workflow for Agents
+
+**Finding Work:**
+```bash
+# Check what's ready to work on (no blockers)
+bd ready --json
+
+# View specific issue details
+bd show <issue-id> --json
+
+# List all open issues
+bd list --status open --json
+```
+
+**Creating Issues:**
+```bash
+# File a new bug you discovered
+bd create "Bug: <description>" -t bug -p 1 -d "<detailed description>" --json
+
+# Create a feature request
+bd create "Feature: <description>" -t feature -p 2 -d "<details>" --json
+
+# Create a task with labels
+bd create "Task: <description>" -t task -p 2 -l backend,testing --json
+```
+
+**Tracking Dependencies:**
+```bash
+# Link discovered work back to parent issue
+bd dep add <new-issue-id> <parent-issue-id> --type discovered-from
+
+# Mark an issue as blocking another
+bd dep add <blocked-issue> <blocking-issue> --type blocks
+
+# Show dependency tree
+bd dep tree <issue-id> --json
+```
+
+**Updating Status:**
+```bash
+# Mark issue as in-progress when starting work
+bd update <issue-id> --status in_progress --json
+
+# Close issue when complete
+bd close <issue-id> --reason "Implemented feature X" --json
+
+# Add notes to an issue
+bd update <issue-id> --notes "Additional context..." --json
+```
+
+**Filtering and Searching:**
+```bash
+# Find high-priority work
+bd ready --priority 1 --json
+
+# Find backend-related issues
+bd list --label backend --json
+
+# Find bugs
+bd list --type bug --status open --json
+```
+
+### Beads Best Practices for Agents
+
+1. **File issues automatically** - When you discover bugs, missing features, or technical debt during work, immediately file them with `bd create`
+2. **Link related work** - Always link new issues back to the parent issue you were working on using `--type discovered-from`
+3. **Update status immediately** - Mark issues `in_progress` when starting, `closed` when done
+4. **Use proper issue types** - `bug`, `feature`, `task`, `epic`, `chore`
+5. **Set accurate priorities** - P0 (critical), P1 (high), P2 (medium), P3 (low), P4 (backlog)
+6. **Add meaningful labels** - Use labels like `backend`, `frontend`, `testing`, `documentation`, `performance`
+7. **Check ready work first** - Always run `bd ready` to see what's unblocked before starting new work
+8. **Avoid markdown TODOs** - Use Beads instead of creating TODO lists in markdown files
+
+### Why Beads?
+
+- **Long-term memory** - Track work across multiple sessions without forgetting
+- **Dependency tracking** - Understand what's blocked and what's ready
+- **Automatic sync** - Issues are stored in git and sync across machines
+- **Agent-friendly** - JSON output for programmatic integration
+- **No context loss** - Never lose track of discovered work due to context limits
+
+### Beads vs Manual Tracking
+
+❌ **Don't do this:**
+```markdown
+## TODO
+- [ ] Fix bug in email processor
+- [ ] Add tests for AI service
+- [ ] Update documentation
+```
+
+✅ **Do this instead:**
+```bash
+bd create "Fix bug in email processor" -t bug -p 1 -l backend
+bd create "Add tests for AI service" -t task -p 2 -l testing
+bd create "Update documentation" -t chore -p 3 -l documentation
+```
+
+### Beads Integration
+
+The Beads database is located in `.beads/` directory (gitignored). The source of truth is `.beads/issues.jsonl` (committed to git). Beads automatically syncs between the SQLite cache and JSONL file.
+
+**Never manually edit `.beads/issues.jsonl`** - Always use the `bd` CLI tool.
 
 ## PowerShell and Process Management
 

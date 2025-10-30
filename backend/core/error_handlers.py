@@ -32,7 +32,7 @@ from core.exceptions import (
     TaskNotFoundError,
     ResourceNotAvailableError
 )
-from utils.error_utils import standardized_error_handler, format_error_for_api
+from utils.error_utils import standardized_error_handler
 
 logger = logging.getLogger(__name__)
 

@@ -197,14 +197,8 @@ class COMEmailProvider(EmailProvider):
             - conversation_id: Thread identifier
         
         Raises:
-            HTTPException: If not authenticated or retrieval fails
+            HTTPException: If adapter not connected or retrieval fails
         """
-        if not self.authenticated:
-            raise HTTPException(
-                status_code=401,
-                detail="Not authenticated. Call authenticate() first."
-            )
-        
         try:
             # Initialize COM on this thread (required for multi-threaded servers)
             if PYTHONCOM_AVAILABLE:
@@ -257,14 +251,8 @@ class COMEmailProvider(EmailProvider):
             Email dictionary if found, None otherwise
         
         Raises:
-            HTTPException: If not authenticated or retrieval fails
+            HTTPException: If adapter not connected or retrieval fails
         """
-        if not self.authenticated:
-            raise HTTPException(
-                status_code=401,
-                detail="Not authenticated. Call authenticate() first."
-            )
-        
         try:
             # Initialize COM on this thread
             if PYTHONCOM_AVAILABLE:
@@ -317,14 +305,8 @@ class COMEmailProvider(EmailProvider):
             Email dictionary with full content, or None if not found
         
         Raises:
-            HTTPException: If not authenticated or retrieval fails
+            HTTPException: If adapter not connected or retrieval fails
         """
-        if not self.authenticated:
-            raise HTTPException(
-                status_code=401,
-                detail="Not authenticated. Call authenticate() first."
-            )
-        
         try:
             # Run sync COM operations in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
@@ -386,14 +368,8 @@ class COMEmailProvider(EmailProvider):
             List of folder dictionaries with id, name, and type
         
         Raises:
-            HTTPException: If not authenticated or listing fails
+            HTTPException: If adapter not connected or listing fails
         """
-        if not self.authenticated:
-            raise HTTPException(
-                status_code=401,
-                detail="Not authenticated. Call authenticate() first."
-            )
-        
         try:
             # Initialize COM on this thread
             if PYTHONCOM_AVAILABLE:
@@ -433,14 +409,8 @@ class COMEmailProvider(EmailProvider):
             True if successful, False otherwise
         
         Raises:
-            HTTPException: If not authenticated or operation fails
+            HTTPException: If adapter not connected or operation fails
         """
-        if not self.authenticated:
-            raise HTTPException(
-                status_code=401,
-                detail="Not authenticated. Call authenticate() first."
-            )
-        
         try:
             # Initialize COM on this thread
             if PYTHONCOM_AVAILABLE:
@@ -485,14 +455,8 @@ class COMEmailProvider(EmailProvider):
             True if move successful, False otherwise
         
         Raises:
-            HTTPException: If not authenticated or operation fails
+            HTTPException: If adapter not connected or operation fails
         """
-        if not self.authenticated:
-            raise HTTPException(
-                status_code=401,
-                detail="Not authenticated. Call authenticate() first."
-            )
-        
         try:
             # Initialize COM on this thread
             if PYTHONCOM_AVAILABLE:
@@ -537,14 +501,8 @@ class COMEmailProvider(EmailProvider):
             List of email dictionaries in the conversation
         
         Raises:
-            HTTPException: If not authenticated or retrieval fails
+            HTTPException: If adapter not connected or retrieval fails
         """
-        if not self.authenticated:
-            raise HTTPException(
-                status_code=401,
-                detail="Not authenticated. Call authenticate() first."
-            )
-        
         try:
             # Initialize COM on this thread
             if PYTHONCOM_AVAILABLE:

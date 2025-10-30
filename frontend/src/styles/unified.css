@@ -1048,6 +1048,57 @@ button:disabled, a:disabled {
   opacity: 0.9;
 }
 
+/* Category-specific colors (matching AI classification categories) */
+.category-badge--required-personal-action {
+  background-color: #dc3545; /* Red - urgent personal action */
+  color: white;
+}
+
+.category-badge--team-action {
+  background-color: #fd7e14; /* Orange - team coordination */
+  color: white;
+}
+
+.category-badge--optional-action {
+  background-color: #ffc107; /* Yellow - optional tasks */
+  color: black;
+}
+
+.category-badge--job-listing {
+  background-color: #6f42c1; /* Purple - job opportunities */
+  color: white;
+}
+
+.category-badge--optional-event {
+  background-color: #20c997; /* Teal - events/meetings */
+  color: white;
+}
+
+.category-badge--work-relevant {
+  background-color: #0d6efd; /* Blue - work-related info */
+  color: white;
+}
+
+.category-badge--fyi {
+  background-color: #6c757d; /* Gray - informational */
+  color: white;
+}
+
+.category-badge--newsletter {
+  background-color: #0dcaf0; /* Light blue - newsletters */
+  color: black;
+}
+
+.category-badge--spam-to-delete {
+  background-color: #dc3545; /* Red - spam */
+  color: white;
+}
+
+.category-badge--required-action {
+  background-color: #dc3545; /* Red - alias for required_personal_action */
+  color: white;
+}
+
 /* Email Actions Styles */
 .email-actions {
   display: flex;

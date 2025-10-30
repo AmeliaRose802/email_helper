@@ -14,8 +14,6 @@ from pydantic import BaseModel, Field
 from backend.services.job_queue import job_queue, ProcessingPipeline, ProcessingJob
 from backend.services.websocket_manager import websocket_manager
 from backend.workers.email_processor import email_processor_worker
-from backend.api.auth import get_current_user
-from backend.models.user import UserInDB
 
 logger = logging.getLogger(__name__)
 
@@ -58,15 +56,12 @@ class JobStatusResponse(BaseModel):
 
 @router.post("/processing/start", response_model=Dict[str, Any])
 async def start_processing(
-    request: StartProcessingRequest,
-    current_user: UserInDB = Depends(get_current_user)
+    request: StartProcessingRequest
 ):
     """Start email processing pipeline for multiple emails."""
     try:
-        # Get user_id from UserInDB object
-        user_id = getattr(current_user, 'id', 'anonymous')
-        if isinstance(user_id, int):
-            user_id = str(user_id)
+        # Use default user since auth is disabled
+        user_id = "default_user"
         
         if not request.email_ids:
             raise HTTPException(status_code=400, detail="No email IDs provided")
@@ -97,8 +92,7 @@ async def start_processing(
 
 @router.get("/processing/{pipeline_id}/status", response_model=ProcessingStatusResponse)
 async def get_processing_status(
-    pipeline_id: str,
-    current_user: UserInDB = Depends(get_current_user)
+    pipeline_id: str
 ):
     """Get processing pipeline status."""
     try:
@@ -106,11 +100,6 @@ async def get_processing_status(
         
         if not pipeline:
             raise HTTPException(status_code=404, detail="Pipeline not found")
-        
-        # Check user access (basic check)
-        user_id = str(getattr(current_user, 'id', 'anonymous'))
-        if pipeline.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
         
         # Count job statuses
         jobs_completed = sum(1 for job in pipeline.jobs if job.status.value == "completed")
@@ -137,8 +126,7 @@ async def get_processing_status(
 
 @router.get("/processing/{pipeline_id}/jobs", response_model=List[JobStatusResponse])
 async def get_pipeline_jobs(
-    pipeline_id: str,
-    current_user: UserInDB = Depends(get_current_user)
+    pipeline_id: str
 ):
     """Get all jobs in a processing pipeline."""
     try:
@@ -178,8 +166,7 @@ async def get_pipeline_jobs(
 
 @router.post("/processing/{pipeline_id}/cancel")
 async def cancel_processing(
-    pipeline_id: str,
-    current_user: UserInDB = Depends(get_current_user)
+    pipeline_id: str
 ):
     """Cancel processing pipeline."""
     try:
@@ -187,11 +174,6 @@ async def cancel_processing(
         
         if not pipeline:
             raise HTTPException(status_code=404, detail="Pipeline not found")
-        
-        # Check user access
-        user_id = str(getattr(current_user, 'id', 'anonymous'))
-        if pipeline.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
         
         success = await job_queue.cancel_pipeline(pipeline_id)
         
@@ -214,17 +196,14 @@ async def cancel_processing(
 
 
 @router.get("/processing/stats")
-async def get_processing_stats(
-    current_user: UserInDB = Depends(get_current_user)
-):
+async def get_processing_stats():
     """Get processing system statistics."""
     try:
         # Get WebSocket stats
         websocket_stats = await websocket_manager.get_stats()
         
         # Get basic queue stats (would be more detailed with Redis/Celery)
-        user_id = str(getattr(current_user, 'id', 'anonymous'))
-        user_pipelines = [p for p in job_queue._pipelines.values() if p.user_id == user_id]
+        user_pipelines = job_queue._pipelines.values()
         
         total_pipelines = len(user_pipelines)
         active_pipelines = len([p for p in user_pipelines if p.status == "running"])

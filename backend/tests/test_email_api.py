@@ -54,7 +54,7 @@ class TestEmailAPI:
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.get("/api/emails", headers=auth_headers)
+            response = client.get("/api/emails")
             
             assert response.status_code == 200
             data = response.json()
@@ -76,7 +76,7 @@ class TestEmailAPI:
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.get("/api/emails?limit=1&offset=0", headers=auth_headers)
+            response = client.get("/api/emails?limit=1&offset=0")
             
             assert response.status_code == 200
             data = response.json()
@@ -91,7 +91,7 @@ class TestEmailAPI:
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.get("/api/emails?folder=Sent", headers=auth_headers)
+            response = client.get("/api/emails?folder=Sent")
             
             assert response.status_code == 200
             data = response.json()
@@ -99,17 +99,13 @@ class TestEmailAPI:
             # Mock provider returns empty list for non-Inbox folders
             assert len(data["emails"]) == 0
     
-    def test_get_emails_unauthorized(self):
-        """Test email retrieval without authentication."""
-        response = client.get("/api/emails")
-        assert response.status_code == 403  # FastAPI security returns 403 for missing auth
-    
+
     def test_get_email_by_id_success(self, auth_headers, mock_provider):
         """Test successful email retrieval by ID."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.get("/api/emails/mock-email-1", headers=auth_headers)
+            response = client.get("/api/emails/mock-email-1")
             
             assert response.status_code == 200
             data = response.json()
@@ -124,7 +120,7 @@ class TestEmailAPI:
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.get("/api/emails/non-existing", headers=auth_headers)
+            response = client.get("/api/emails/non-existing")
             
             assert response.status_code == 404
             data = response.json()
@@ -135,7 +131,7 @@ class TestEmailAPI:
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.post("/api/emails/mock-email-1/mark-read", headers=auth_headers)
+            response = client.post("/api/emails/mock-email-1/mark-read")
             
             assert response.status_code == 200
             data = response.json()
@@ -149,7 +145,7 @@ class TestEmailAPI:
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.post("/api/emails/non-existing/mark-read", headers=auth_headers)
+            response = client.post("/api/emails/non-existing/mark-read")
             
             assert response.status_code == 200
             data = response.json()
@@ -162,7 +158,7 @@ class TestEmailAPI:
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.post("/api/emails/mock-email-1/move?destination_folder=Sent", headers=auth_headers)
+            response = client.post("/api/emails/mock-email-1/move?destination_folder=Sent")
             
             assert response.status_code == 200
             data = response.json()
@@ -176,7 +172,7 @@ class TestEmailAPI:
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.post("/api/emails/non-existing/move?destination_folder=Sent", headers=auth_headers)
+            response = client.post("/api/emails/non-existing/move?destination_folder=Sent")
             
             assert response.status_code == 200
             data = response.json()
@@ -189,7 +185,7 @@ class TestEmailAPI:
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.get("/api/folders", headers=auth_headers)
+            response = client.get("/api/folders")
             
             assert response.status_code == 200
             data = response.json()
@@ -211,7 +207,7 @@ class TestEmailAPI:
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.get("/api/conversations/conv-1", headers=auth_headers)
+            response = client.get("/api/conversations/conv-1")
             
             assert response.status_code == 200
             data = response.json()
@@ -229,7 +225,7 @@ class TestEmailAPI:
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
             
-            response = client.get("/api/conversations/non-existing", headers=auth_headers)
+            response = client.get("/api/conversations/non-existing")
             
             assert response.status_code == 200
             data = response.json()
@@ -251,7 +247,7 @@ class TestEmailAPI:
                 "context": "test batch processing"
             }
             
-            response = client.post("/api/emails/batch-process", json=batch_request, headers=auth_headers)
+            response = client.post("/api/emails/batch-process", json=batch_request)
             
             assert response.status_code == 200
             data = response.json()
@@ -283,7 +279,7 @@ class TestEmailAPI:
                 ]
             }
             
-            response = client.post("/api/emails/batch-process", json=batch_request, headers=auth_headers)
+            response = client.post("/api/emails/batch-process", json=batch_request)
             
             assert response.status_code == 200
             data = response.json()
@@ -294,20 +290,20 @@ class TestEmailAPI:
             assert len(data["results"]) == 1
             assert len(data["errors"]) > 0
     
-    def test_api_parameter_validation(self, auth_headers):
+    def test_api_parameter_validation(self):
         """Test API parameter validation."""
         # Test invalid limit values
-        response = client.get("/api/emails?limit=0", headers=auth_headers)
+        response = client.get("/api/emails?limit=0")
         assert response.status_code == 422  # Validation error
         
-        response = client.get("/api/emails?limit=101", headers=auth_headers)
+        response = client.get("/api/emails?limit=101")
         assert response.status_code == 422  # Validation error
         
         # Test invalid offset
-        response = client.get("/api/emails?offset=-1", headers=auth_headers)
+        response = client.get("/api/emails?offset=-1")
         assert response.status_code == 422  # Validation error
     
-    def test_api_error_handling(self, auth_headers):
+    def test_api_error_handling(self):
         """Test API error handling for provider errors."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             # Mock provider that raises an exception
@@ -315,7 +311,7 @@ class TestEmailAPI:
             mock_provider.get_emails.side_effect = Exception("Test error")
             mock_get_provider.return_value = mock_provider
             
-            response = client.get("/api/emails", headers=auth_headers)
+            response = client.get("/api/emails")
             
             assert response.status_code == 500
             data = response.json()

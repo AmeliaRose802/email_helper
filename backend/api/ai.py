@@ -18,8 +18,6 @@ from backend.models.ai_models import (
     AIErrorResponse, AvailableTemplatesResponse
 )
 from backend.core.dependencies import get_ai_service
-from backend.api.auth import get_current_user
-from backend.models.user import User
 
 # Create router with prefix and tags
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -33,7 +31,6 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 )
 async def classify_email(
     request: EmailClassificationRequest,
-    current_user: User = Depends(get_current_user),
     ai_service = Depends(get_ai_service)
 ):
     """Classify email content using AI.
@@ -96,7 +93,6 @@ async def classify_email(
 )
 async def extract_action_items(
     request: ActionItemRequest,
-    current_user: User = Depends(get_current_user),
     ai_service = Depends(get_ai_service)
 ):
     """Extract action items from email content.
@@ -146,7 +142,6 @@ async def extract_action_items(
 )
 async def summarize_email(
     request: SummaryRequest,
-    current_user: User = Depends(get_current_user),
     ai_service = Depends(get_ai_service)
 ):
     """Generate email summary.
@@ -194,7 +189,6 @@ async def summarize_email(
     description="Retrieve list of available AI prompt templates and their descriptions"
 )
 async def get_available_templates(
-    current_user: User = Depends(get_current_user),
     ai_service = Depends(get_ai_service)
 ):
     """Get available prompt templates.
@@ -224,7 +218,6 @@ async def get_available_templates(
     description="Check if AI processing services are available and configured"
 )
 async def ai_health_check(
-    current_user: User = Depends(get_current_user),
     ai_service = Depends(get_ai_service)
 ):
     """Check AI service health.
@@ -266,7 +259,6 @@ async def ai_health_check(
 )
 async def classify_batch_stream(
     email_ids: List[str],
-    current_user: User = Depends(get_current_user),
     ai_service = Depends(get_ai_service)
 ):
     """Stream classification progress for batch email processing.

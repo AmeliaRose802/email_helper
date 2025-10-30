@@ -44,23 +44,6 @@ def test_user():
     }
 
 
-@pytest.fixture
-def auth_headers(test_user):
-    """Get authentication headers for test user."""
-    # Register user
-    response = client.post("/auth/register", json=test_user)
-    assert response.status_code == 201, f"Registration failed: {response.json()}"
-    
-    # Login user
-    login_response = client.post("/auth/login", json={
-        "username": test_user["username"],
-        "password": test_user["password"]
-    })
-    assert login_response.status_code == 200, f"Login failed: {login_response.json()}"
-    
-    token = login_response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
-
 
 @pytest.fixture
 def mock_com_email_provider():
@@ -152,7 +135,7 @@ class TestEmailEndpointsWithCOM:
         """Test GET /api/emails - List emails."""
         with patch('backend.core.dependencies.get_com_email_provider', return_value=mock_com_email_provider):
             with patch('backend.core.dependencies.settings.use_com_backend', True):
-                response = client.get("/api/emails?folder=Inbox&limit=50", headers=auth_headers)
+                response = client.get("/api/emails?folder=Inbox&limit=50")
                 
                 assert response.status_code == 200
                 data = response.json()
@@ -172,7 +155,7 @@ class TestEmailEndpointsWithCOM:
         """Test GET /api/emails/{id} - Get email by ID."""
         with patch('backend.core.dependencies.get_com_email_provider', return_value=mock_com_email_provider):
             with patch('backend.core.dependencies.settings.use_com_backend', True):
-                response = client.get("/api/emails/email-1", headers=auth_headers)
+                response = client.get("/api/emails/email-1")
                 
                 assert response.status_code == 200
                 data = response.json()
@@ -189,7 +172,7 @@ class TestEmailEndpointsWithCOM:
         """Test POST /api/emails/{id}/mark-read - Mark as read."""
         with patch('backend.core.dependencies.get_com_email_provider', return_value=mock_com_email_provider):
             with patch('backend.core.dependencies.settings.use_com_backend', True):
-                response = client.post("/api/emails/email-1/mark-read", headers=auth_headers)
+                response = client.post("/api/emails/email-1/mark-read")
                 
                 assert response.status_code == 200
                 data = response.json()
@@ -205,8 +188,7 @@ class TestEmailEndpointsWithCOM:
         with patch('backend.core.dependencies.get_email_provider', return_value=mock_com_email_provider):
             with patch('backend.core.dependencies.settings.use_com_backend', True):
                 response = client.post(
-                    "/api/emails/email-1/move?destination_folder=Archive",
-                    headers=auth_headers
+                    "/api/emails/email-1/move?destination_folder=Archive"
                 )
                 
                 assert response.status_code == 200
@@ -235,7 +217,7 @@ class TestAIEndpointsWithCOM:
                     "context": "Work email"
                 }
                 
-                response = client.post("/api/ai/classify", json=request_data, headers=auth_headers)
+                response = client.post("/api/ai/classify", json=request_data)
                 
                 assert response.status_code == 200
                 data = response.json()
@@ -257,7 +239,7 @@ class TestAIEndpointsWithCOM:
                     "context": "Project review"
                 }
                 
-                response = client.post("/api/ai/action-items", json=request_data, headers=auth_headers)
+                response = client.post("/api/ai/action-items", json=request_data)
                 
                 assert response.status_code == 200
                 data = response.json()
@@ -278,7 +260,7 @@ class TestAIEndpointsWithCOM:
                     "summary_type": "brief"
                 }
                 
-                response = client.post("/api/ai/summarize", json=request_data, headers=auth_headers)
+                response = client.post("/api/ai/summarize", json=request_data)
                 
                 assert response.status_code == 200
                 data = response.json()
@@ -294,9 +276,9 @@ class TestAIEndpointsWithCOM:
 class TestTaskEndpointsWithCOM:
     """Test task API endpoints with COM backend."""
     
-    def test_get_tasks_list(self, auth_headers):
+    def test_get_tasks_list(self):
         """Test GET /api/tasks - List tasks."""
-        response = client.get("/api/tasks?page=1&limit=20", headers=auth_headers)
+        response = client.get("/api/tasks?page=1&limit=20")
         
         assert response.status_code == 200
         data = response.json()
@@ -308,7 +290,7 @@ class TestTaskEndpointsWithCOM:
         # The actual response might have "total_count" or "has_next" instead of "has_more"
         assert isinstance(data["tasks"], list)
     
-    def test_create_task(self, auth_headers):
+    def test_create_task(self):
         """Test POST /api/tasks - Create task."""
         task_data = {
             "title": "COM Integration Test Task",
@@ -317,7 +299,7 @@ class TestTaskEndpointsWithCOM:
             "status": "pending"
         }
         
-        response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+        response = client.post("/api/tasks", json=task_data)
         
         assert response.status_code == 201
         data = response.json()
@@ -331,13 +313,13 @@ class TestTaskEndpointsWithCOM:
         # Store task ID for other tests
         return data["id"]
     
-    def test_get_task_by_id(self, auth_headers):
+    def test_get_task_by_id(self):
         """Test GET /api/tasks/{id} - Get task by ID."""
         # First create a task
         task_id = self.test_create_task(auth_headers)
         
         # Now get the task
-        response = client.get(f"/api/tasks/{task_id}", headers=auth_headers)
+        response = client.get(f"/api/tasks/{task_id}")
         
         assert response.status_code == 200
         data = response.json()
@@ -347,7 +329,7 @@ class TestTaskEndpointsWithCOM:
         assert "title" in data
         assert "status" in data
     
-    def test_update_task(self, auth_headers):
+    def test_update_task(self):
         """Test PUT /api/tasks/{id} - Update task."""
         # First create a task
         task_id = self.test_create_task(auth_headers)
@@ -358,7 +340,7 @@ class TestTaskEndpointsWithCOM:
             "status": "in_progress"
         }
         
-        response = client.put(f"/api/tasks/{task_id}", json=update_data, headers=auth_headers)
+        response = client.put(f"/api/tasks/{task_id}", json=update_data)
         
         assert response.status_code == 200
         data = response.json()
@@ -367,18 +349,18 @@ class TestTaskEndpointsWithCOM:
         assert data["title"] == "Updated COM Test Task"
         assert data["status"] == "in_progress"
     
-    def test_delete_task(self, auth_headers):
+    def test_delete_task(self):
         """Test DELETE /api/tasks/{id} - Delete task."""
         # First create a task
         task_id = self.test_create_task(auth_headers)
         
         # Delete the task
-        response = client.delete(f"/api/tasks/{task_id}", headers=auth_headers)
+        response = client.delete(f"/api/tasks/{task_id}")
         
         assert response.status_code == 200 or response.status_code == 204
         
         # Verify deletion
-        get_response = client.get(f"/api/tasks/{task_id}", headers=auth_headers)
+        get_response = client.get(f"/api/tasks/{task_id}")
         assert get_response.status_code == 404
 
 
@@ -390,7 +372,7 @@ class TestFeatureParityWithTkinter:
         """Verify email retrieval matches Tkinter functionality."""
         with patch('backend.core.dependencies.get_com_email_provider', return_value=mock_com_email_provider):
             with patch('backend.core.dependencies.settings.use_com_backend', True):
-                response = client.get("/api/emails", headers=auth_headers)
+                response = client.get("/api/emails")
                 
                 assert response.status_code == 200
                 data = response.json()
@@ -416,7 +398,7 @@ class TestFeatureParityWithTkinter:
                     "sender": "test@example.com"
                 }
                 
-                response = client.post("/api/ai/classify", json=request_data, headers=auth_headers)
+                response = client.post("/api/ai/classify", json=request_data)
                 
                 assert response.status_code == 200
                 data = response.json()
@@ -426,7 +408,7 @@ class TestFeatureParityWithTkinter:
                 assert "confidence" in data
                 assert "reasoning" in data
     
-    def test_task_management_parity(self, auth_headers):
+    def test_task_management_parity(self):
         """Verify task management matches Tkinter functionality."""
         # Test full task lifecycle
         
@@ -435,25 +417,24 @@ class TestFeatureParityWithTkinter:
             "title": "Parity Test Task",
             "priority": "medium"
         }
-        create_response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+        create_response = client.post("/api/tasks", json=task_data)
         assert create_response.status_code == 201
         task_id = create_response.json()["id"]
         
         # 2. List tasks (Tkinter equivalent: task list view)
-        list_response = client.get("/api/tasks", headers=auth_headers)
+        list_response = client.get("/api/tasks")
         assert list_response.status_code == 200
         assert "tasks" in list_response.json()
         
         # 3. Update task (Tkinter equivalent: task update)
         update_response = client.put(
             f"/api/tasks/{task_id}",
-            json={"status": "completed"},
-            headers=auth_headers
+            json={"status": "completed"}
         )
         assert update_response.status_code == 200
         
         # 4. Delete task (Tkinter equivalent: task deletion)
-        delete_response = client.delete(f"/api/tasks/{task_id}", headers=auth_headers)
+        delete_response = client.delete(f"/api/tasks/{task_id}")
         assert delete_response.status_code in [200, 204]
 
 
@@ -461,37 +442,21 @@ class TestFeatureParityWithTkinter:
 class TestErrorHandling:
     """Test error handling for all endpoints."""
     
-    def test_unauthorized_access(self):
-        """Test that endpoints require authentication."""
-        # Test without auth headers
-        endpoints = [
-            ("/api/emails", "get"),
-            ("/api/emails/test-id", "get"),
-            ("/api/tasks", "get"),
-        ]
-        
-        for endpoint, method in endpoints:
-            if method == "get":
-                response = client.get(endpoint)
-            elif method == "post":
-                response = client.post(endpoint)
-            
-            assert response.status_code in [401, 403], f"Endpoint {endpoint} should require auth"
-    
+
     def test_invalid_email_id(self, auth_headers, mock_com_email_provider):
         """Test handling of invalid email ID."""
         mock_com_email_provider.get_email_content = Mock(return_value=None)
         
         with patch('backend.core.dependencies.get_com_email_provider', return_value=mock_com_email_provider):
             with patch('backend.core.dependencies.settings.use_com_backend', True):
-                response = client.get("/api/emails/invalid-id", headers=auth_headers)
+                response = client.get("/api/emails/invalid-id")
                 
                 # Should return 404 or handle gracefully
                 assert response.status_code in [404, 500]
     
-    def test_invalid_task_id(self, auth_headers):
+    def test_invalid_task_id(self):
         """Test handling of invalid task ID."""
-        response = client.get("/api/tasks/99999", headers=auth_headers)
+        response = client.get("/api/tasks/99999")
         
         # Should return 404
         assert response.status_code == 404
@@ -506,7 +471,7 @@ class TestPerformance:
         with patch('backend.core.dependencies.get_com_email_provider', return_value=mock_com_email_provider):
             with patch('backend.core.dependencies.settings.use_com_backend', True):
                 start_time = time.time()
-                response = client.get("/api/emails", headers=auth_headers)
+                response = client.get("/api/emails")
                 end_time = time.time()
                 
                 assert response.status_code == 200
@@ -515,10 +480,10 @@ class TestPerformance:
                 # Should respond within 2 seconds
                 assert response_time < 2.0, f"Response time {response_time}s exceeds threshold"
     
-    def test_task_operations_response_time(self, auth_headers):
+    def test_task_operations_response_time(self):
         """Test task operations response time."""
         start_time = time.time()
-        response = client.get("/api/tasks", headers=auth_headers)
+        response = client.get("/api/tasks")
         end_time = time.time()
         
         assert response.status_code == 200

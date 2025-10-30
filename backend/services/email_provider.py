@@ -198,25 +198,12 @@ def get_email_provider_instance() -> EmailProvider:
                 import logging
                 logging.warning(f"COM provider not available: {e}. Falling back to alternative provider.")
         
-        # Check if Graph API credentials are configured
-        if _email_provider is None and (settings.graph_client_id and 
-            settings.graph_client_secret and 
-            settings.graph_tenant_id):
-            # Use Graph API provider in production
-            from backend.services.graph_email_provider import GraphEmailProvider
-            _email_provider = GraphEmailProvider(
-                client_id=settings.graph_client_id,
-                client_secret=settings.graph_client_secret,
-                tenant_id=settings.graph_tenant_id,
-                redirect_uri=settings.graph_redirect_uri
-            )
-        
         # Require properly configured email provider - NO MOCKS IN PRODUCTION
         if _email_provider is None:
             raise RuntimeError(
-                "No email provider configured. Please configure either:\n"
-                "1. COM Adapter: Set use_com_backend=True in settings, or\n"
-                "2. Graph API: Set graph_client_id, graph_client_secret, and graph_tenant_id in settings"
+                "No email provider configured. Please configure COM Adapter:\n"
+                "Set use_com_backend=True in settings\n"
+                "Graph API is no longer supported."
             )
     
     return _email_provider

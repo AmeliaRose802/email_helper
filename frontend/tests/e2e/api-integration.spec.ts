@@ -52,7 +52,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
       });
       
       // Navigate to emails page
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(2000);
       
       // Verify API was called
@@ -82,7 +82,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails?page=2&limit=20');
+      await page.goto('/emails?page=2&limit=20');
       await page.waitForTimeout(2000);
       
       // Verify API was called with URL parameters
@@ -107,7 +107,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(1000);
       
       // Click source filter if available
@@ -166,7 +166,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(2000);
       
       // Click first email to view details
@@ -230,7 +230,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(2000);
       
       // Trigger classification
@@ -283,7 +283,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         }
       });
       
-      await page.goto('http://localhost:3001/tasks');
+      await page.goto('/tasks');
       await page.waitForTimeout(2000);
       
       // Try to create a task
@@ -362,7 +362,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(2000);
       
       // Look for bulk action buttons
@@ -391,7 +391,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails/nonexistent-id');
+      await page.goto('/emails/nonexistent-id');
       await page.waitForTimeout(2000);
       
       // Verify app doesn't crash - page loads without console errors
@@ -416,7 +416,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(3000);
       
       // Verify app doesn't crash - page loads
@@ -432,7 +432,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         await route.abort('timedout');
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(5000);
       
       // Verify loading state or error message
@@ -450,7 +450,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(2000);
       
       // Should show auth error or redirect to login
@@ -481,7 +481,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         }
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(5000);
       
       // If retry logic exists, we should see multiple requests
@@ -514,7 +514,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(2000);
       
       // Verify data is displayed correctly
@@ -531,7 +531,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(2000);
       
       // Should show error, not crash
@@ -548,7 +548,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(2000);
       
       // Should show empty state, not crash
@@ -562,7 +562,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
       let contentType = '';
       
       await page.route('**/api/ai/classify*', async (route: Route) => {
-        contentType = route.request().headerValue('content-type') || '';
+        contentType = (await route.request().headerValue('content-type')) || '';
         
         await route.fulfill({
           status: 200,
@@ -579,7 +579,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(2000);
       
       const classifyButton = page.locator('button:has-text("Classify"), button:has-text("Process")').first();
@@ -597,7 +597,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
       let authHeader = '';
       
       await page.route('**/api/emails*', async (route: Route) => {
-        authHeader = route.request().headerValue('authorization') || '';
+        authHeader = (await route.request().headerValue('authorization')) || '';
         
         await route.fulfill({
           status: 200,
@@ -606,7 +606,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
         });
       });
       
-      await page.goto('http://localhost:3001/emails');
+      await page.goto('/emails');
       await page.waitForTimeout(2000);
       
       // If auth is implemented, verify header is present

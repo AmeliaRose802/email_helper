@@ -12,8 +12,6 @@ import time
 
 from backend.services.email_provider import EmailProvider
 from backend.core.dependencies import get_email_provider, get_ai_service
-from backend.api.auth import get_current_user
-from backend.models.user import UserInDB
 from backend.models.email import Email, EmailBatch, EmailBatchResult
 
 router = APIRouter()

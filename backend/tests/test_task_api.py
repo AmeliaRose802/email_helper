@@ -20,28 +20,11 @@ def test_user():
     }
 
 
-@pytest.fixture
-def auth_headers(test_user):
-    """Get authentication headers for test user."""
-    # Register user
-    response = client.post("/auth/register", json=test_user)
-    assert response.status_code == 201
-    
-    # Login user
-    login_response = client.post("/auth/login", json={
-        "username": test_user["username"],
-        "password": test_user["password"]
-    })
-    assert login_response.status_code == 200
-    
-    token = login_response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
-
 
 class TestTaskAPI:
     """Test suite for Task API endpoints."""
     
-    def test_create_task(self, auth_headers):
+    def test_create_task(self):
         """Test task creation endpoint."""
         task_data = {
             "title": "API Test Task",
@@ -49,7 +32,7 @@ class TestTaskAPI:
             "priority": "high"
         }
         
-        response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+        response = client.post("/api/tasks", json=task_data)
         assert response.status_code == 201
         
         data = response.json()
@@ -61,13 +44,13 @@ class TestTaskAPI:
         assert "created_at" in data
         assert "updated_at" in data
     
-    def test_create_task_minimal(self, auth_headers):
+    def test_create_task_minimal(self):
         """Test creating task with minimal data."""
         task_data = {
             "title": "Minimal Task"
         }
         
-        response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+        response = client.post("/api/tasks", json=task_data)
         assert response.status_code == 201
         
         data = response.json()
@@ -75,39 +58,39 @@ class TestTaskAPI:
         assert data["status"] == "pending"
         assert data["priority"] == "medium"  # Default values
     
-    def test_create_task_with_email_link(self, auth_headers):
+    def test_create_task_with_email_link(self):
         """Test creating task with email association."""
         task_data = {
             "title": "Email-linked Task",
             "email_id": "test-email-123"
         }
         
-        response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+        response = client.post("/api/tasks", json=task_data)
         assert response.status_code == 201
         
         data = response.json()
         assert data["email_id"] == "test-email-123"
     
-    def test_create_task_invalid_data(self, auth_headers):
+    def test_create_task_invalid_data(self):
         """Test task creation with invalid data."""
         task_data = {
             "title": "",  # Empty title should fail
             "priority": "invalid_priority"
         }
         
-        response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+        response = client.post("/api/tasks", json=task_data)
         assert response.status_code == 422  # Validation error
     
-    def test_get_tasks_paginated(self, auth_headers):
+    def test_get_tasks_paginated(self):
         """Test getting paginated tasks."""
         # Create some tasks first
         for i in range(5):
             task_data = {"title": f"Pagination Test Task {i+1}"}
-            response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+            response = client.post("/api/tasks", json=task_data)
             assert response.status_code == 201
         
         # Get first page
-        response = client.get("/api/tasks?page=1&limit=3", headers=auth_headers)
+        response = client.get("/api/tasks?page=1&limit=3")
         assert response.status_code == 200
         
         data = response.json()
@@ -118,23 +101,23 @@ class TestTaskAPI:
         assert data["has_next"] is True
         
         # Get second page
-        response = client.get("/api/tasks?page=2&limit=3", headers=auth_headers)
+        response = client.get("/api/tasks?page=2&limit=3")
         assert response.status_code == 200
         
         data = response.json()
         assert len(data["tasks"]) >= 2
     
-    def test_get_tasks_with_filters(self, auth_headers):
+    def test_get_tasks_with_filters(self):
         """Test getting tasks with filters."""
         # Create tasks with different properties
         high_priority_task = {"title": "High Priority Task", "priority": "high"}
         pending_task = {"title": "Pending Task", "status": "pending"}
         
-        client.post("/api/tasks", json=high_priority_task, headers=auth_headers)
-        client.post("/api/tasks", json=pending_task, headers=auth_headers)
+        client.post("/api/tasks", json=high_priority_task)
+        client.post("/api/tasks", json=pending_task)
         
         # Filter by priority
-        response = client.get("/api/tasks?priority=high", headers=auth_headers)
+        response = client.get("/api/tasks?priority=high")
         assert response.status_code == 200
         
         data = response.json()
@@ -142,13 +125,13 @@ class TestTaskAPI:
         assert all(task["priority"] == "high" for task in data["tasks"])
         
         # Filter by status
-        response = client.get("/api/tasks?status=pending", headers=auth_headers)
+        response = client.get("/api/tasks?status=pending")
         assert response.status_code == 200
         
         data = response.json()
         assert all(task["status"] == "pending" for task in data["tasks"])
     
-    def test_get_tasks_with_search(self, auth_headers):
+    def test_get_tasks_with_search(self):
         """Test task search functionality."""
         # Create tasks with searchable content
         searchable_task = {
@@ -160,44 +143,44 @@ class TestTaskAPI:
             "description": "Other work"
         }
         
-        client.post("/api/tasks", json=searchable_task, headers=auth_headers)
-        client.post("/api/tasks", json=other_task, headers=auth_headers)
+        client.post("/api/tasks", json=searchable_task)
+        client.post("/api/tasks", json=other_task)
         
         # Search for "important"
-        response = client.get("/api/tasks?search=important", headers=auth_headers)
+        response = client.get("/api/tasks?search=important")
         assert response.status_code == 200
         
         data = response.json()
         assert len(data["tasks"]) >= 1
         # Should find the task with "Important" in title
     
-    def test_get_specific_task(self, auth_headers):
+    def test_get_specific_task(self):
         """Test getting a specific task by ID."""
         # Create a task first
         task_data = {"title": "Specific Task Test"}
-        create_response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+        create_response = client.post("/api/tasks", json=task_data)
         assert create_response.status_code == 201
         
         task_id = create_response.json()["id"]
         
         # Get the specific task
-        response = client.get(f"/api/tasks/{task_id}", headers=auth_headers)
+        response = client.get(f"/api/tasks/{task_id}")
         assert response.status_code == 200
         
         data = response.json()
         assert data["id"] == task_id
         assert data["title"] == "Specific Task Test"
     
-    def test_get_nonexistent_task(self, auth_headers):
+    def test_get_nonexistent_task(self):
         """Test getting a task that doesn't exist."""
-        response = client.get("/api/tasks/99999", headers=auth_headers)
+        response = client.get("/api/tasks/99999")
         assert response.status_code == 404
     
-    def test_update_task(self, auth_headers):
+    def test_update_task(self):
         """Test updating a task."""
         # Create a task first
         task_data = {"title": "Original Title"}
-        create_response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+        create_response = client.post("/api/tasks", json=task_data)
         assert create_response.status_code == 201
         
         task_id = create_response.json()["id"]
@@ -209,7 +192,7 @@ class TestTaskAPI:
             "priority": "high"
         }
         
-        response = client.put(f"/api/tasks/{task_id}", json=update_data, headers=auth_headers)
+        response = client.put(f"/api/tasks/{task_id}", json=update_data)
         assert response.status_code == 200
         
         data = response.json()
@@ -217,44 +200,44 @@ class TestTaskAPI:
         assert data["status"] == "in_progress"
         assert data["priority"] == "high"
     
-    def test_update_nonexistent_task(self, auth_headers):
+    def test_update_nonexistent_task(self):
         """Test updating a task that doesn't exist."""
         update_data = {"title": "Updated Title"}
-        response = client.put("/api/tasks/99999", json=update_data, headers=auth_headers)
+        response = client.put("/api/tasks/99999", json=update_data)
         assert response.status_code == 404
     
-    def test_delete_task(self, auth_headers):
+    def test_delete_task(self):
         """Test deleting a task."""
         # Create a task first
         task_data = {"title": "Task to Delete"}
-        create_response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+        create_response = client.post("/api/tasks", json=task_data)
         assert create_response.status_code == 201
         
         task_id = create_response.json()["id"]
         
         # Delete the task
-        response = client.delete(f"/api/tasks/{task_id}", headers=auth_headers)
+        response = client.delete(f"/api/tasks/{task_id}")
         assert response.status_code == 200
         
         data = response.json()
         assert "message" in data
         
         # Verify it's gone
-        get_response = client.get(f"/api/tasks/{task_id}", headers=auth_headers)
+        get_response = client.get(f"/api/tasks/{task_id}")
         assert get_response.status_code == 404
     
-    def test_delete_nonexistent_task(self, auth_headers):
+    def test_delete_nonexistent_task(self):
         """Test deleting a task that doesn't exist."""
-        response = client.delete("/api/tasks/99999", headers=auth_headers)
+        response = client.delete("/api/tasks/99999")
         assert response.status_code == 404
     
-    def test_bulk_update_tasks(self, auth_headers):
+    def test_bulk_update_tasks(self):
         """Test bulk task updates."""
         # Create multiple tasks
         task_ids = []
         for i in range(3):
             task_data = {"title": f"Bulk Update Task {i+1}"}
-            response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+            response = client.post("/api/tasks", json=task_data)
             assert response.status_code == 201
             task_ids.append(response.json()["id"])
         
@@ -267,7 +250,7 @@ class TestTaskAPI:
             }
         }
         
-        response = client.post("/api/tasks/bulk-update", json=bulk_data, headers=auth_headers)
+        response = client.post("/api/tasks/bulk-update", json=bulk_data)
         assert response.status_code == 200
         
         data = response.json()
@@ -276,20 +259,20 @@ class TestTaskAPI:
             assert task["status"] == "completed"
             assert task["priority"] == "high"
     
-    def test_bulk_delete_tasks(self, auth_headers):
+    def test_bulk_delete_tasks(self):
         """Test bulk task deletion."""
         # Create multiple tasks
         task_ids = []
         for i in range(3):
             task_data = {"title": f"Bulk Delete Task {i+1}"}
-            response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+            response = client.post("/api/tasks", json=task_data)
             assert response.status_code == 201
             task_ids.append(response.json()["id"])
         
         # Bulk delete
         bulk_data = {"task_ids": task_ids}
         
-        response = client.post("/api/tasks/bulk-delete", json=bulk_data, headers=auth_headers)
+        response = client.post("/api/tasks/bulk-delete", json=bulk_data)
         assert response.status_code == 200
         
         data = response.json()
@@ -297,42 +280,28 @@ class TestTaskAPI:
         
         # Verify all tasks are gone
         for task_id in task_ids:
-            get_response = client.get(f"/api/tasks/{task_id}", headers=auth_headers)
+            get_response = client.get(f"/api/tasks/{task_id}")
             assert get_response.status_code == 404
     
-    def test_link_email_to_task(self, auth_headers):
+    def test_link_email_to_task(self):
         """Test linking an email to a task."""
         # Create a task first
         task_data = {"title": "Task for Email Link"}
-        create_response = client.post("/api/tasks", json=task_data, headers=auth_headers)
+        create_response = client.post("/api/tasks", json=task_data)
         assert create_response.status_code == 201
         
         task_id = create_response.json()["id"]
         email_id = "test-email-456"
         
         # Link email to task
-        response = client.post(f"/api/tasks/{task_id}/link-email?email_id={email_id}", headers=auth_headers)
+        response = client.post(f"/api/tasks/{task_id}/link-email?email_id={email_id}")
         assert response.status_code == 200
         
         data = response.json()
         assert "message" in data
         assert data["task"]["email_id"] == email_id
     
-    def test_unauthorized_access(self):
-        """Test accessing endpoints without authentication."""
-        # Try to create task without auth
-        task_data = {"title": "Unauthorized Task"}
-        response = client.post("/api/tasks", json=task_data)
-        assert response.status_code == 403
-        
-        # Try to get tasks without auth
-        response = client.get("/api/tasks")
-        assert response.status_code == 403
-        
-        # Try to get specific task without auth
-        response = client.get("/api/tasks/1")
-        assert response.status_code == 403
-    
+
     def test_user_isolation(self):
         """Test that users can only access their own tasks."""
         # Create two users

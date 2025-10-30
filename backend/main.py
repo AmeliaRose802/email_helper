@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from backend.core.config import settings
 from backend.database.connection import db_manager
-from backend.api import auth
+
 
 
 @asynccontextmanager
@@ -138,7 +138,7 @@ async def root():
 
 
 # Include routers
-app.include_router(auth.router, prefix="/auth", tags=["authentication"])
+# Note: Authentication is disabled - app runs without auth
 
 # Import and include email router
 from backend.api import emails

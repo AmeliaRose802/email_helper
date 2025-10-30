@@ -32,17 +32,11 @@ def mock_user():
     return {"user_id": "test_user_123", "email": "test@example.com"}
 
 
-@pytest.fixture
-def auth_headers(mock_user):
-    """Mock authentication headers."""
-    with patch('backend.api.processing.get_current_user', return_value=mock_user):
-        yield
-
 
 class TestProcessingAPI:
     """Test suite for Processing API endpoints."""
     
-    def test_start_processing_success(self, client, auth_headers):
+    def test_start_processing_success(self, client):
         """Test successful processing start."""
         email_ids = ["email_1", "email_2", "email_3"]
         
@@ -59,7 +53,7 @@ class TestProcessingAPI:
         assert data["email_count"] == 3
         assert "message" in data
     
-    def test_start_processing_empty_emails(self, client, auth_headers):
+    def test_start_processing_empty_emails(self, client):
         """Test processing start with empty email list."""
         response = client.post(
             "/api/processing/start",
@@ -69,7 +63,7 @@ class TestProcessingAPI:
         assert response.status_code == 400
         assert "No email IDs provided" in response.json()["detail"]
     
-    def test_start_processing_too_many_emails(self, client, auth_headers):
+    def test_start_processing_too_many_emails(self, client):
         """Test processing start with too many emails."""
         email_ids = [f"email_{i}" for i in range(101)]  # 101 emails
         
@@ -82,7 +76,7 @@ class TestProcessingAPI:
         assert "Too many emails" in response.json()["detail"]
     
     @pytest.mark.asyncio
-    async def test_get_processing_status_success(self, client, auth_headers):
+    async def test_get_processing_status_success(self, client):
         """Test getting processing status."""
         # Create a test pipeline
         email_ids = ["email_1", "email_2"]
@@ -99,7 +93,7 @@ class TestProcessingAPI:
         assert "jobs_completed" in data
         assert "jobs_failed" in data
     
-    def test_get_processing_status_not_found(self, client, auth_headers):
+    def test_get_processing_status_not_found(self, client):
         """Test getting status for non-existent pipeline."""
         response = client.get("/api/processing/nonexistent_pipeline/status")
         
@@ -107,7 +101,7 @@ class TestProcessingAPI:
         assert "Pipeline not found" in response.json()["detail"]
     
     @pytest.mark.asyncio
-    async def test_get_pipeline_jobs_success(self, client, auth_headers):
+    async def test_get_pipeline_jobs_success(self, client):
         """Test getting pipeline jobs."""
         # Create a test pipeline
         email_ids = ["email_1", "email_2"]
@@ -130,7 +124,7 @@ class TestProcessingAPI:
         assert "progress_percentage" in job
     
     @pytest.mark.asyncio
-    async def test_cancel_processing_success(self, client, auth_headers):
+    async def test_cancel_processing_success(self, client):
         """Test successful processing cancellation."""
         # Create a test pipeline
         email_ids = ["email_1", "email_2"]
@@ -145,14 +139,14 @@ class TestProcessingAPI:
         pipeline = await job_queue.get_pipeline(pipeline_id)
         assert pipeline.status == "cancelled"
     
-    def test_cancel_processing_not_found(self, client, auth_headers):
+    def test_cancel_processing_not_found(self, client):
         """Test cancelling non-existent pipeline."""
         response = client.post("/api/processing/nonexistent_pipeline/cancel")
         
         assert response.status_code == 404
         assert "Pipeline not found" in response.json()["detail"]
     
-    def test_get_processing_stats(self, client, auth_headers):
+    def test_get_processing_stats(self, client):
         """Test getting processing statistics."""
         response = client.get("/api/processing/stats")
         

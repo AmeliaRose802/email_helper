@@ -1,6 +1,6 @@
 // Category badge component for AI email categorization
 import React from 'react';
-import { getCategoryColor, getCategoryLabel } from '@/utils/emailUtils';
+import { getCategoryLabel } from '@/utils/emailUtils';
 
 interface CategoryBadgeProps {
   category: string;
@@ -17,15 +17,14 @@ export const CategoryBadge: React.FC<CategoryBadgeProps> = ({
   showConfidence = false,
   className = '',
 }) => {
-  const color = getCategoryColor(category);
   const label = getCategoryLabel(category);
   
   const sizeClass = `category-badge--${size}`;
+  const categoryClass = `category-badge--${category.replace(/_/g, '-')}`;
   
   return (
     <span
-      className={`category-badge ${sizeClass} ${className}`}
-      style={{ backgroundColor: color }}
+      className={`category-badge ${sizeClass} ${categoryClass} ${className}`}
       title={confidence ? `${label} (${Math.round(confidence * 100)}% confidence)` : label}
     >
       {label}

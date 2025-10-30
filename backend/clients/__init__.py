@@ -1,5 +1,5 @@
 """Backend clients for Email Helper API."""
 
-from .graph_client import GraphClient
+# Graph API client removed - app uses COM interface only
 
-__all__ = ["GraphClient"]
+__all__ = []

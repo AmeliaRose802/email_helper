@@ -21,44 +21,11 @@ def reset_deps():
     reset_dependencies()
 
 
-@pytest.fixture
-def auth_token():
-    """Get authentication token for testing."""
-    # Register a test user
-    response = client.post("/auth/register", json={
-        "username": "testuser_ai",
-        "email": "testai@example.com",
-        "password": "testpass123"
-    })
-    
-    # Login to get token
-    login_response = client.post("/auth/login", json={
-        "username": "testuser_ai",
-        "password": "testpass123"
-    })
-    
-    if login_response.status_code == 200:
-        return login_response.json()["access_token"]
-    else:
-        # If user already exists, just login
-        login_response = client.post("/auth/login", json={
-            "username": "testuser_ai",
-            "password": "testpass123"
-        })
-        return login_response.json()["access_token"]
-
-
-@pytest.fixture
-def auth_headers(auth_token):
-    """Get authorization headers for testing."""
-    return {"Authorization": f"Bearer {auth_token}"}
-
-
 class TestAIClassification:
     """Tests for email classification endpoint."""
     
     @patch('backend.services.ai_service.AIService.classify_email_async')
-    def test_classify_email_success(self, mock_classify, auth_headers):
+    def test_classify_email_success(self, mock_classify):
         """Test successful email classification."""
         # Mock AI service response
         mock_classify.return_value = {
@@ -77,8 +44,7 @@ class TestAIClassification:
         
         response = client.post(
             "/api/ai/classify",
-            json=request_data,
-            headers=auth_headers
+            json=request_data
         )
         
         assert response.status_code == 200
@@ -90,7 +56,7 @@ class TestAIClassification:
         assert isinstance(data["alternative_categories"], list)
     
     @patch('backend.services.ai_service.AIService.classify_email_async')
-    def test_classify_email_with_error(self, mock_classify, auth_headers):
+    def test_classify_email_with_error(self, mock_classify):
         """Test email classification with AI service error."""
         # Mock AI service error
         mock_classify.return_value = {
@@ -109,25 +75,14 @@ class TestAIClassification:
         
         response = client.post(
             "/api/ai/classify",
-            json=request_data,
-            headers=auth_headers
+            json=request_data
         )
         
         assert response.status_code == 500
         assert "AI classification failed" in response.json()["detail"]
     
-    def test_classify_email_unauthorized(self):
-        """Test email classification without authentication."""
-        request_data = {
-            "subject": "Test email",
-            "content": "Test content",
-            "sender": "test@example.com"
-        }
-        
-        response = client.post("/api/ai/classify", json=request_data)
-        assert response.status_code == 401
-    
-    def test_classify_email_invalid_data(self, auth_headers):
+
+    def test_classify_email_invalid_data(self):
         """Test email classification with invalid request data."""
         request_data = {
             "subject": "",  # Empty subject
@@ -137,8 +92,7 @@ class TestAIClassification:
         
         response = client.post(
             "/api/ai/classify",
-            json=request_data,
-            headers=auth_headers
+            json=request_data
         )
         
         # Should still process but might return error from AI service
@@ -149,7 +103,7 @@ class TestActionItemExtraction:
     """Tests for action item extraction endpoint."""
     
     @patch('backend.services.ai_service.AIService.extract_action_items')
-    def test_extract_action_items_success(self, mock_extract, auth_headers):
+    def test_extract_action_items_success(self, mock_extract):
         """Test successful action item extraction."""
         # Mock AI service response
         mock_extract.return_value = {
@@ -171,8 +125,7 @@ class TestActionItemExtraction:
         
         response = client.post(
             "/api/ai/action-items",
-            json=request_data,
-            headers=auth_headers
+            json=request_data
         )
         
         assert response.status_code == 200
@@ -183,7 +136,7 @@ class TestActionItemExtraction:
         assert data["confidence"] == 0.85
     
     @patch('backend.services.ai_service.AIService.extract_action_items')
-    def test_extract_action_items_no_items(self, mock_extract, auth_headers):
+    def test_extract_action_items_no_items(self, mock_extract):
         """Test action item extraction with no action items found."""
         # Mock AI service response with no action items
         mock_extract.return_value = {
@@ -204,8 +157,7 @@ class TestActionItemExtraction:
         
         response = client.post(
             "/api/ai/action-items",
-            json=request_data,
-            headers=auth_headers
+            json=request_data
         )
         
         assert response.status_code == 200
@@ -218,7 +170,7 @@ class TestEmailSummarization:
     """Tests for email summarization endpoint."""
     
     @patch('backend.services.ai_service.AIService.generate_summary')
-    def test_summarize_email_brief(self, mock_summarize, auth_headers):
+    def test_summarize_email_brief(self, mock_summarize):
         """Test brief email summarization."""
         # Mock AI service response
         mock_summarize.return_value = {
@@ -234,8 +186,7 @@ class TestEmailSummarization:
         
         response = client.post(
             "/api/ai/summarize",
-            json=request_data,
-            headers=auth_headers
+            json=request_data
         )
         
         assert response.status_code == 200
@@ -246,7 +197,7 @@ class TestEmailSummarization:
         assert "processing_time" in data
     
     @patch('backend.services.ai_service.AIService.generate_summary')
-    def test_summarize_email_detailed(self, mock_summarize, auth_headers):
+    def test_summarize_email_detailed(self, mock_summarize):
         """Test detailed email summarization."""
         # Mock AI service response
         mock_summarize.return_value = {
@@ -262,8 +213,7 @@ class TestEmailSummarization:
         
         response = client.post(
             "/api/ai/summarize",
-            json=request_data,
-            headers=auth_headers
+            json=request_data
         )
         
         assert response.status_code == 200
@@ -276,7 +226,7 @@ class TestAITemplates:
     """Tests for AI templates endpoint."""
     
     @patch('backend.services.ai_service.AIService.get_available_templates')
-    def test_get_available_templates(self, mock_templates, auth_headers):
+    def test_get_available_templates(self, mock_templates):
         """Test getting available prompt templates."""
         # Mock AI service response
         mock_templates.return_value = {
@@ -292,7 +242,7 @@ class TestAITemplates:
             }
         }
         
-        response = client.get("/api/ai/templates", headers=auth_headers)
+        response = client.get("/api/ai/templates")
         
         assert response.status_code == 200
         data = response.json()
@@ -306,7 +256,7 @@ class TestAIHealthCheck:
     
     @patch('backend.services.ai_service.AIService._ensure_initialized')
     @patch('backend.services.ai_service.AIService.get_available_templates')
-    def test_ai_health_check_healthy(self, mock_templates, mock_init, auth_headers):
+    def test_ai_health_check_healthy(self, mock_templates, mock_init):
         """Test AI health check when services are healthy."""
         # Mock successful initialization
         mock_init.return_value = None
@@ -315,7 +265,7 @@ class TestAIHealthCheck:
             "descriptions": {}
         }
         
-        response = client.get("/api/ai/health", headers=auth_headers)
+        response = client.get("/api/ai/health")
         
         assert response.status_code == 200
         data = response.json()
@@ -323,12 +273,12 @@ class TestAIHealthCheck:
         assert data["templates_available"] == 2
     
     @patch('backend.services.ai_service.AIService._ensure_initialized')
-    def test_ai_health_check_unhealthy(self, mock_init, auth_headers):
+    def test_ai_health_check_unhealthy(self, mock_init):
         """Test AI health check when services are unhealthy."""
         # Mock initialization failure
         mock_init.side_effect = RuntimeError("AI services not available")
         
-        response = client.get("/api/ai/health", headers=auth_headers)
+        response = client.get("/api/ai/health")
         
         assert response.status_code == 503
         data = response.json()
@@ -339,7 +289,7 @@ class TestAIHealthCheck:
 class TestAIServiceIntegration:
     """Integration tests for AI service endpoints."""
     
-    def test_full_email_processing_workflow(self, auth_headers):
+    def test_full_email_processing_workflow(self):
         """Test full workflow: classify -> extract action items -> summarize."""
         sample_email = {
             "subject": "Project Review Meeting - Action Required",
@@ -350,8 +300,7 @@ class TestAIServiceIntegration:
         # Test classification
         classify_response = client.post(
             "/api/ai/classify",
-            json=sample_email,
-            headers=auth_headers
+            json=sample_email
         )
         
         # Test action items
@@ -359,8 +308,7 @@ class TestAIServiceIntegration:
             "/api/ai/action-items",
             json={
                 "email_content": f"Subject: {sample_email['subject']}\nFrom: {sample_email['sender']}\n\n{sample_email['content']}"
-            },
-            headers=auth_headers
+            }
         )
         
         # Test summarization
@@ -368,8 +316,7 @@ class TestAIServiceIntegration:
             "/api/ai/summarize",
             json={
                 "email_content": f"Subject: {sample_email['subject']}\nFrom: {sample_email['sender']}\n\n{sample_email['content']}"
-            },
-            headers=auth_headers
+            }
         )
         
         # All endpoints should either succeed or fail gracefully

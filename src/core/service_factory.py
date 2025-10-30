@@ -31,7 +31,8 @@ if src_dir not in sys.path:
 # Import modules from src directory
 from ai_processor import AIProcessor
 from task_persistence import TaskPersistence
-from .interfaces import EmailProvider, AIProvider, StorageProvider
+from outlook_manager import OutlookManager
+from .interfaces import EmailProvider, AIProvider, StorageProvider, OutlookManagerInterface
 
 
 class ServiceFactory:
@@ -56,6 +57,14 @@ class ServiceFactory:
     def get_task_persistence(self) -> StorageProvider:
         """Get TaskPersistence instance."""
         return self._get_or_create('task_persistence', lambda: TaskPersistence())
+    
+    def get_outlook_manager(self) -> OutlookManagerInterface:
+        """Get OutlookManager instance."""
+        return self._get_or_create('outlook_manager', lambda: OutlookManager())
+        
+    def has_service(self, service_name: str) -> bool:
+        """Check if a service instance exists."""
+        return service_name in self._instances
         
     def reset(self):
         """Reset all instances (useful for testing)."""
