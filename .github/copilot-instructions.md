@@ -283,11 +283,16 @@ def call_ai_service(prompt, data):
 1. Create feature branches for new functionality
 2. Write tests before implementing features (TDD when appropriate)
 3. **RUN AND VERIFY ALL TESTS PASS** - Execute the test suite frequently during development
-4. Update documentation **in the appropriate docs/ subfolder** for new features
-5. Test integration with existing components
-6. **Run full test suite before commits** - Ensure nothing is broken
-7. Submit pull requests with clear descriptions
-8. **Include test results in PR descriptions** - Show that tests pass and cover new functionality
+4. **IF TESTS FAIL** - Create a Beads issue to track the problem:
+   - Add entry to `.beads/issues.jsonl` in JSONL format
+   - Include: test names, error messages, impact assessment, proposed solution
+   - Set appropriate priority (1=high, 2=medium, 3=low)
+   - Label with "testing", "bug", or relevant categories
+5. Update documentation **in the appropriate docs/ subfolder** for new features
+6. Test integration with existing components
+7. **Run full test suite before commits** - Ensure nothing is broken
+8. Submit pull requests with clear descriptions
+9. **Include test results in PR descriptions** - Show that tests pass and cover new functionality
 
 ### Documentation Guidelines During Development
 
