@@ -481,6 +481,59 @@ async def get_accuracy_stats(
         )
 
 
+@router.post("/emails/prefetch")
+async def prefetch_emails(
+    email_ids: List[str] = Body(...),
+    provider: EmailProvider = Depends(get_email_provider)
+):
+    """Prefetch multiple emails by their IDs for background loading.
+    
+    This endpoint fetches the full content of multiple emails in one request,
+    useful for prefetching the next page of emails in the background.
+    
+    Args:
+        email_ids: List of email IDs to prefetch
+        provider: Email provider instance
+    
+    Returns:
+        Dictionary with fetched emails and success/error counts
+    """
+    try:
+        emails = []
+        success_count = 0
+        error_count = 0
+        errors = []
+        
+        for email_id in email_ids:
+            try:
+                email = await provider.get_email_content(email_id)
+                if email:
+                    emails.append(email)
+                    success_count += 1
+                else:
+                    error_count += 1
+                    errors.append(f"Email {email_id} not found")
+            except Exception as e:
+                error_count += 1
+                errors.append(f"Failed to fetch email {email_id}: {str(e)}")
+                logger.error(f"Error prefetching email {email_id}: {e}")
+        
+        return {
+            "emails": emails,
+            "success_count": success_count,
+            "error_count": error_count,
+            "errors": errors if errors else []
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to prefetch emails: {str(e)}"
+        )
+
+
 @router.get("/emails/{email_id}", response_model=Dict[str, Any])
 async def get_email(
     email_id: str,
