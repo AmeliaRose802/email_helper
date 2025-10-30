@@ -9,7 +9,7 @@ This module provides advanced email analysis including:
 
 import json
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from datetime import datetime
 
 from utils import parse_json_with_fallback, parse_date_string, format_date_for_display

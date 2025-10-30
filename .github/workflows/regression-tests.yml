@@ -1,0 +1,182 @@
+name: Regression Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+  schedule:
+    # Run regression tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  regression-tests:
+    name: Run Regression Test Suite
+    runs-on: windows-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+        shell: pwsh
+      
+      - name: Create required directories
+        run: |
+          New-Item -ItemType Directory -Force -Path runtime_data/database
+          New-Item -ItemType Directory -Force -Path user_specific_data
+          New-Item -ItemType Directory -Force -Path test/test_data/regression
+        shell: pwsh
+      
+      - name: Run regression tests
+        run: |
+          python -m pytest test/test_regressions.py -v --tb=short -m "not skip"
+        shell: pwsh
+        env:
+          PYTEST_CURRENT_TEST: regression
+      
+      - name: Run date parsing regression tests
+        run: |
+          python -m pytest test/test_date_utils.py -v --tb=short
+        shell: pwsh
+      
+      - name: Run JSON handling regression tests
+        run: |
+          python -m pytest test/test_json_utils.py -v --tb=short
+        shell: pwsh
+      
+      - name: Generate regression test report
+        if: always()
+        run: |
+          python -m pytest test/test_regressions.py --co -q > regression_test_inventory.txt
+          Get-Content regression_test_inventory.txt
+        shell: pwsh
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-test-results
+          path: |
+            regression_test_inventory.txt
+            .pytest_cache/
+          retention-days: 30
+      
+      - name: Comment on PR with results
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Regression tests failed. Please review the test results and ensure no functionality has been broken.'
+            })
+      
+  classification-accuracy:
+    name: Email Classification Accuracy Tests
+    runs-on: windows-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        shell: pwsh
+      
+      - name: Create required directories
+        run: |
+          New-Item -ItemType Directory -Force -Path runtime_data/database
+          New-Item -ItemType Directory -Force -Path user_specific_data
+        shell: pwsh
+      
+      - name: Run classification regression tests
+        run: |
+          python -m pytest test/test_regressions.py::TestEmailClassificationRegression -v --tb=short
+        shell: pwsh
+  
+  deduplication-tests:
+    name: Task Deduplication Regression Tests
+    runs-on: windows-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        shell: pwsh
+      
+      - name: Create required directories
+        run: |
+          New-Item -ItemType Directory -Force -Path runtime_data/database
+          New-Item -ItemType Directory -Force -Path user_specific_data
+        shell: pwsh
+      
+      - name: Run deduplication regression tests
+        run: |
+          python -m pytest test/test_regressions.py::TestTaskDeduplicationRegression -v --tb=short
+        shell: pwsh
+  
+  workflow-integration:
+    name: Workflow Integration Regression Tests
+    runs-on: windows-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        shell: pwsh
+      
+      - name: Create required directories
+        run: |
+          New-Item -ItemType Directory -Force -Path runtime_data/database
+          New-Item -ItemType Directory -Force -Path user_specific_data
+        shell: pwsh
+      
+      - name: Run workflow integration regression tests
+        run: |
+          python -m pytest test/test_regressions.py::TestWorkflowIntegrationRegression -v --tb=short
+        shell: pwsh
