@@ -3,8 +3,14 @@
 
 # Core dependencies
 pandas>=2.0.0                   # Data processing and CSV operations
-pywin32>=306                    # Outlook COM integration (Windows only)
-python-dotenv>=1.0.0           # Environment variable management
+pywin32>=306                    # Outlook COM integration - provides pythoncom, win32com, pywintypes (Windows only)
+python-dotenv>=1.0.0            # Environment variable management
+pydantic>=2.0.0                 # Data validation and settings management
+pydantic-settings>=2.0.0        # Settings management using pydantic (used in backend/core/config.py)
+
+# Backend API
+fastapi>=0.100.0                # FastAPI web framework for backend API
+uvicorn[standard]>=0.23.0       # ASGI server for FastAPI
 
 # Azure OpenAI integration  
 openai>=1.3.0                  # Azure OpenAI client library

@@ -20,32 +20,17 @@ export const CategoryBadge: React.FC<CategoryBadgeProps> = ({
   const color = getCategoryColor(category);
   const label = getCategoryLabel(category);
   
-  const sizeClasses = {
-    small: 'px-2 py-1 text-xs',
-    medium: 'px-3 py-1 text-sm',
-    large: 'px-4 py-2 text-base',
-  };
-  
-  const badgeStyle = {
-    backgroundColor: color,
-    color: 'white',
-    borderRadius: '12px',
-    fontWeight: '500',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    whiteSpace: 'nowrap' as const,
-  };
+  const sizeClass = `category-badge--${size}`;
   
   return (
     <span
-      className={`category-badge ${sizeClasses[size]} ${className}`}
-      style={badgeStyle}
+      className={`category-badge ${sizeClass} ${className}`}
+      style={{ backgroundColor: color }}
       title={confidence ? `${label} (${Math.round(confidence * 100)}% confidence)` : label}
     >
       {label}
       {showConfidence && confidence && (
-        <span className="confidence-indicator" style={{ fontSize: '0.8em', opacity: 0.9 }}>
+        <span className="category-badge__confidence">
           {Math.round(confidence * 100)}%
         </span>
       )}

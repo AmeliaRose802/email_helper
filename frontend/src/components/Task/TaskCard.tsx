@@ -45,7 +45,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete }) =>
       ref={drag as unknown as React.Ref<HTMLDivElement>}
       className={`task-card ${priorityColors[task.priority]} ${isDragging ? 'dragging' : ''}`}
       onClick={handleCardClick}
-      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
     >
       <div className="task-card-header">
         <h4 className="task-title">{task.title}</h4>
@@ -83,7 +82,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete }) =>
           <div className="progress-bar">
             <div 
               className="progress-fill"
-              style={{ width: `${task.progress}%` }}
+              style={{ '--progress-width': `${task.progress}%` } as React.CSSProperties}
             />
           </div>
         </div>
