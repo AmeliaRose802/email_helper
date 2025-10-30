@@ -23,11 +23,6 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
 sys.path.append(os.path.join(parent_dir, 'src'))
 
-from test.conftest import (
-    database_with_schema, in_memory_database, 
-    temp_prompts_directory, temp_directory
-)
-
 
 # ============================================================================
 # Fixtures for Integration Testing
@@ -178,7 +173,7 @@ def mock_ai_processor():
 
 
 @pytest.fixture
-def mock_task_persistence(database_with_schema):
+def mock_task_persistence():
     """Mock TaskPersistence for integration testing."""
     persistence = MagicMock()
     
