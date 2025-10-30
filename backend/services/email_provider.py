@@ -1,9 +1,10 @@
 """Generic EmailProvider interface implementation for Email Helper API.
 
-This module provides the generic EmailProvider service that abstracts
-email access across different providers (Graph API, IMAP, etc.) while
-maintaining compatibility with the existing EmailProvider interface
-from src/core/interfaces.py.
+This module provides the generic EmailProvider service interface
+for email access while maintaining compatibility with the existing
+EmailProvider interface from src/core/interfaces.py.
+
+Currently only COM-based email access (Outlook on Windows) is supported.
 """
 
 from abc import ABC, abstractmethod
@@ -176,10 +177,8 @@ _email_provider: Optional[EmailProvider] = None
 def get_email_provider_instance() -> EmailProvider:
     """Get or create email provider instance.
     
-    Provider selection priority:
-    1. COM provider if use_com_backend is True (Windows + Outlook)
-    2. Graph API provider if credentials are configured
-    3. Mock provider for development/testing
+    Only COM provider (Windows + Outlook) is supported.
+    Set use_com_backend=True in settings to enable.
     """
     global _email_provider
     
@@ -200,8 +199,7 @@ def get_email_provider_instance() -> EmailProvider:
         if _email_provider is None:
             raise RuntimeError(
                 "No email provider configured. Please configure COM Adapter:\n"
-                "Set use_com_backend=True in settings\n"
-                "Graph API is no longer supported."
+                "Set use_com_backend=True in settings"
             )
     
     return _email_provider

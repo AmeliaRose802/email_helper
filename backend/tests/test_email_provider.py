@@ -190,20 +190,29 @@ class TestMockEmailProvider:
 class TestEmailProviderFactory:
     """Test email provider factory functions."""
     
-    def test_get_email_provider_instance(self):
-        """Test getting email provider instance."""
-        provider = get_email_provider_instance()
-        assert isinstance(provider, EmailProvider)
-        assert isinstance(provider, MockEmailProvider)
+    @pytest.fixture(autouse=True)
+    def reset_provider(self):
+        """Reset global provider before each test."""
+        import backend.services.email_provider as ep
+        ep._email_provider = None
+        yield
+        ep._email_provider = None
     
-    def test_singleton_behavior(self):
+    def test_get_email_provider_raises_without_config(self):
+        """Test that factory raises error when no provider is configured."""
+        with pytest.raises(RuntimeError, match="No email provider configured"):
+            get_email_provider_instance()
+    
+    def test_singleton_behavior_with_mock_settings(self, monkeypatch):
         """Test that factory returns same instance."""
+        # Mock settings to enable COM provider
+        from unittest.mock import Mock
+        mock_provider = MockEmailProvider()
+        
+        # Patch the global provider
+        import backend.services.email_provider as ep
+        ep._email_provider = mock_provider
+        
         provider1 = get_email_provider_instance()
         provider2 = get_email_provider_instance()
         assert provider1 is provider2
-    
-    def test_provider_is_authenticated_initially(self):
-        """Test provider initial state."""
-        provider = get_email_provider_instance()
-        # Should not be authenticated initially
-        assert not provider.authenticated
