@@ -25,7 +25,7 @@ describe('Backend API Integration Tests', () => {
     backendAvailable = await isBackendAvailable();
     if (!backendAvailable) {
       console.warn(
-        '⚠️  Backend server not available at http://localhost:8000. Skipping integration tests.'
+        '⚠️  Backend server not available at http://localhost:8000. Integration tests will be skipped.'
       );
       console.warn('   To run these tests, start the backend server: python run_backend.py');
     }
@@ -38,12 +38,7 @@ describe('Backend API Integration Tests', () => {
   });
 
   describe('Health Check (T1-T4 Backend Status)', () => {
-    it('should connect to backend health endpoint', async () => {
-      if (!backendAvailable) {
-        console.log('⏭️  Skipping health check - backend not available');
-        return;
-      }
-
+    it('should connect to backend health endpoint', { skip: !backendAvailable }, async () => {
       const response = await fetch(`${BACKEND_URL}/health`);
       expect(response.ok).toBe(true);
 
@@ -56,12 +51,7 @@ describe('Backend API Integration Tests', () => {
   });
 
   describe('Authentication API (T1)', () => {
-    it('should have auth endpoints available', async () => {
-      if (!backendAvailable) {
-        console.log('⏭️  Skipping auth tests - backend not available');
-        return;
-      }
-
+    it('should have auth endpoints available', { skip: !backendAvailable }, async () => {
       // Test registration endpoint exists (should return 422 for empty body)
       const registerResponse = await fetch(`${BACKEND_URL}/auth/register`, {
         method: 'POST',
@@ -81,12 +71,7 @@ describe('Backend API Integration Tests', () => {
   });
 
   describe('Email API (T2)', () => {
-    it('should have email endpoints available', async () => {
-      if (!backendAvailable) {
-        console.log('⏭️  Skipping email tests - backend not available');
-        return;
-      }
-
+    it('should have email endpoints available', { skip: !backendAvailable }, async () => {
       // Test emails endpoint exists (should return 403/401 without auth)
       const emailsResponse = await fetch(`${BACKEND_URL}/api/emails`);
       expect([401, 403]).toContain(emailsResponse.status);
@@ -94,12 +79,7 @@ describe('Backend API Integration Tests', () => {
   });
 
   describe('AI Processing API (T3)', () => {
-    it('should have AI endpoints available', async () => {
-      if (!backendAvailable) {
-        console.log('⏭️  Skipping AI tests - backend not available');
-        return;
-      }
-
+    it('should have AI endpoints available', { skip: !backendAvailable }, async () => {
       // Test AI classify endpoint exists (should return 403/401 without auth)
       const classifyResponse = await fetch(`${BACKEND_URL}/api/ai/classify`, {
         method: 'POST',
@@ -111,12 +91,7 @@ describe('Backend API Integration Tests', () => {
   });
 
   describe('Task Management API (T4)', () => {
-    it('should have task endpoints available', async () => {
-      if (!backendAvailable) {
-        console.log('⏭️  Skipping task tests - backend not available');
-        return;
-      }
-
+    it('should have task endpoints available', { skip: !backendAvailable }, async () => {
       // Test tasks endpoint exists (should return 403/401 without auth)
       const tasksResponse = await fetch(`${BACKEND_URL}/api/tasks`);
       expect([401, 403]).toContain(tasksResponse.status);
@@ -124,12 +99,7 @@ describe('Backend API Integration Tests', () => {
   });
 
   describe('API Documentation', () => {
-    it('should have OpenAPI docs available', async () => {
-      if (!backendAvailable) {
-        console.log('⏭️  Skipping docs tests - backend not available');
-        return;
-      }
-
+    it('should have OpenAPI docs available', { skip: !backendAvailable }, async () => {
       const docsResponse = await fetch(`${BACKEND_URL}/docs`);
       expect(docsResponse.ok).toBe(true);
 
