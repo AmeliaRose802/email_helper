@@ -442,7 +442,7 @@ async def get_email(
     import time
     start_time = time.time()
     
-    email = provider.get_email_content(email_id)
+    email = await provider.get_email_content(email_id)
     
     elapsed = time.time() - start_time
     if elapsed > 1.0:  # Log if slower than 1 second

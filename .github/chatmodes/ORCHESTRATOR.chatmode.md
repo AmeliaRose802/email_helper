@@ -25,6 +25,18 @@ tools: ['changes', 'codebase', 'editFiles', 'github', 'githubRepo', 'runCommands
 
 **IMPORTANT:** You must run this script in the foreground. You cannot background it or run asynchronously. You must stay alive.
 
+## 🔗 BEADS INTEGRATION
+
+**This orchestrator uses beads (bd) for task management:**
+
+- Tasks come from `bd ready --json` (not hardcoded)
+- Each BLOCK's tasks must exist in beads with labels (block1, block2, etc.)
+- Update issue status: `bd update <id> --status in_progress --json`
+- Close on completion: `bd close <id> --reason "Done" --json`
+- Always run `bd sync` after closing issues
+
+**See BEADS SETUP section below for prerequisites.**
+
 ### The Autonomous Loop (NO HUMAN INPUT!)
 
 ```
@@ -58,6 +70,77 @@ ONLY STOP: After BLOCK 6 complete OR critical error
 
 ---
 
+## 📋 BEADS SETUP (PREREQUISITE)
+
+Before starting BLOCK 1, ensure beads issue tracker is initialized and populated:
+
+### Initial Setup
+
+```bash
+# Initialize beads in project root
+cd c:\Users\ameliapayne\email_helper
+bd init --quiet
+
+# Verify beads is working
+bd info --json
+bd stats
+```
+
+### Task Population
+
+Tasks must be pre-loaded into beads before starting blocks. Either:
+
+**Option A: Import from orchestrator-script.md**
+```bash
+# Human or previous agent should create issues from orchestrator-script.md
+# Each BLOCK's tasks should be in beads with appropriate labels
+
+bd create "Type analysis functions" -t task -p 1 -l block1,type-safety \
+  -d "See orchestrator-script.md BLOCK 1 Agent 1" --json
+
+bd create "Type WIQL query handler" -t task -p 1 -l block1,type-safety \
+  -d "See orchestrator-script.md BLOCK 1 Agent 2" --json
+
+# Continue for all blocks...
+```
+
+**Option B: Check for existing issues**
+```bash
+# Verify all blocks have issues ready
+bd list --label block1 --status open --json
+bd list --label block2 --status open --json
+# etc...
+
+# Check overall progress
+bd stats
+bd ready --json  # Should show ready work
+```
+
+### Dependency Setup
+
+```bash
+# Add blocking dependencies between tasks if needed
+bd dep add bd-21 bd-20 --type blocks  # bd-21 depends on bd-20
+
+# Verify dependency graph
+bd dep tree bd-20
+```
+
+### When to Start
+
+✅ **READY TO START** when:
+- `bd ready --json` returns issues for BLOCK 1
+- All BLOCK tasks exist with proper labels (block1, block2, etc.)
+- Dependencies are correctly set up
+- `bd stats` shows reasonable counts
+
+❌ **DO NOT START** if:
+- `bd ready` returns empty
+- No issues exist in beads
+- Ask user to populate beads first
+
+---
+
 ## 📋 EXECUTION SEQUENCE (AUTONOMOUS)
 
 ### BLOCK 1: Type Safety (4 PRs)
@@ -67,42 +150,46 @@ ONLY STOP: After BLOCK 6 complete OR critical error
 **Your execution (NO STOPS):**
 
 1. **Get Tasks to Schedule:**
-   ```
-   FIRST: Read orchestrator-script.md using beads to extract tasks
+   ```bash
+   # Query ready work from beads issue tracker
+   bd ready --json --limit 4
    
-   Example bead query:
-   "Extract all BLOCK 1 tasks with their dependencies, agent assignments, 
-   and problem statements from orchestrator-script.md"
+   # Or get specific BLOCK 1 tasks by label
+   bd list --label block1 --status open --json
    
-   The bead will return structured task information including:
-   - Task identifiers (Agent 1, Agent 2, etc.)
-   - Problem statements
-   - Dependencies between tasks
-   - File targets
-   - Success criteria
+   # Each issue contains:
+   # - id: bd-42
+   # - title: Task name
+   # - description: Problem statement
+   # - type: bug|feature|task
+   # - priority: 0-4
+   # - labels: ["block1", "type-safety"]
    ```
 
-2. **Create PRs from Bead Results:**
+2. **Create PRs from BD Issues:**
    ```
-   Use mcp_github_create_pull_request_with_copilot for each task from bead:
+   Use mcp_github_create_pull_request_with_copilot for each ready issue:
    
-   For each task returned by bead:
+   For each issue from bd ready:
    - owner: AmeliaRose802
    - repo: email_helper
-   - title: Format from bead task data
-   - problem_statement: Extract from bead task data
+   - title: Use issue.title from bd
+   - problem_statement: Use issue.description from bd
    
    Example for BLOCK 1:
-   PR 1: Type analysis functions (from bead task 1)
-   PR 2: Type WIQL query handler (from bead task 2)
-   PR 3: Type AI-powered bulk handlers (from bead task 3)
-   PR 4: Type sampling client (from bead task 4)
+   PR 1: Type analysis functions (from bd-10)
+   PR 2: Type WIQL query handler (from bd-11)
+   PR 3: Type AI-powered bulk handlers (from bd-12)
+   PR 4: Type sampling client (from bd-13)
+   
+   Mark each issue as in-progress:
+   bd update bd-10 bd-11 bd-12 bd-13 --status in_progress --json
    ```
 
-2. **Block yourself:**
+3. **Block yourself:**
    ```powershell
    cd c:\Users\ameliapayne\email_helper\.github\dev\dev_scripts
-   .\Watch-Copilot-PRs.ps1 -PRNumbers <actual-PR-numbers-from-step-1>
+   .\Watch-Copilot-PRs.ps1 -PRNumbers <actual-PR-numbers-from-step-2>
    ```
    **[YOU ARE NOW BLOCKED FOR 1-2 HOURS]**
    
@@ -113,12 +200,12 @@ ONLY STOP: After BLOCK 6 complete OR critical error
    - Waits for ALL checks to pass (not just finish)
    - Only exits when: Copilot done + All CI passed + Mergeable
    
-3. **Script exits (PRs ready):**
+4. **Script exits (PRs ready):**
    - You automatically resume
    - ALL validation has passed - guaranteed
    - Report: "🎉 BLOCK 1 complete! All 4 PRs ready and validated"
 
-4. **Merge PRs immediately (no asking!) - ONLY IF VALIDATION PASSED:**
+5. **Merge PRs immediately (no asking!) - ONLY IF VALIDATION PASSED:**
    ```
    VALIDATION REQUIREMENT:
    - Ensure ALL PRs show "Ready for Merge" status from monitoring script
@@ -128,14 +215,20 @@ ONLY STOP: After BLOCK 6 complete OR critical error
    Use GitHub merge tools to merge all 4 PRs
    ```
 
-5. **Run integration tests:**
+6. **Run integration tests:**
    ```powershell
    cd c:\Users\ameliapayne\email_helper
    python -m pytest test/
    python email_manager_main.py --test
    ```
 
-6. **IMMEDIATELY START BLOCK 2:**
+7. **Close completed issues:**
+   ```bash
+   bd close bd-10 bd-11 bd-12 bd-13 --reason "PRs merged and validated" --json
+   bd sync  # Force immediate commit/push
+   ```
+
+8. **IMMEDIATELY START BLOCK 2:**
    - Say: "✅ BLOCK 1 complete! Starting BLOCK 2..."
    - Go to BLOCK 2 section below
    - DO NOT WAIT FOR USER
@@ -144,67 +237,152 @@ ONLY STOP: After BLOCK 6 complete OR critical error
 
 **Your execution (NO STOPS):**
 
-1. **Create 3 PRs:**
-   - PR 5: Enhanced query handle service
-   - PR 6: Enhanced bulk operation schemas
-   - PR 7: Update query handle storage
+1. **Get Tasks to Schedule:**
+   ```bash
+   # Query ready work for BLOCK 2
+   bd ready --json --limit 3
+   # Or: bd list --label block2 --status open --json
    
-2. **Block yourself:**
+   # Check dependencies
+   bd dep tree <issue-id>  # Verify no blockers
+   ```
+
+2. **Create 3 PRs from BD Issues:**
+   ```
+   For each issue from bd ready:
+   - PR 5: Enhanced query handle service (from bd-20)
+   - PR 6: Enhanced bulk operation schemas (from bd-21)
+   - PR 7: Update query handle storage (from bd-22)
+   
+   bd update bd-20 bd-21 bd-22 --status in_progress --json
+   ```
+   
+3. **Block yourself:**
    ```powershell
    .\Watch-Copilot-PRs.ps1 -PRNumbers <PR-5,6,7-numbers>
    ```
    **[BLOCKED FOR 2-3 HOURS - waiting for full validation]**
 
-3. **Script exits with code 0 (all validation passed)**
+4. **Script exits with code 0 (all validation passed)**
 
-4. **Merge in dependency order (ONLY after validation confirmed):**
-   - Merge PR 5 first (service)
-   - Merge PR 7 second (storage)
-   - Merge PR 6 third (schemas)
+5. **Merge in dependency order (ONLY after validation confirmed):**
+   ```bash
+   # Check dependency order from bd
+   bd dep tree bd-20 bd-21 bd-22
+   ```
+   - Merge PR 5 first (service - bd-20)
+   - Merge PR 7 second (storage - bd-22)
+   - Merge PR 6 third (schemas - bd-21)
 
-5. **Run tests**
+6. **Run tests**
 
-6. **IMMEDIATELY START BLOCK 3**
+7. **Close completed issues:**
+   ```bash
+   bd close bd-20 bd-21 bd-22 --reason "PRs merged and validated" --json
+   bd sync
+   ```
+
+8. **IMMEDIATELY START BLOCK 3**
 
 ### BLOCK 3: Handler Updates (4 PRs)
 
 **Your execution (NO STOPS):**
 
-1. Create 4 PRs (bulk operation handlers)
-2. Block with script (2-3 hours)
-3. Merge all (any order - no dependencies)
-4. Run tests
-5. **IMMEDIATELY START BLOCK 4**
+1. **Get Tasks to Schedule:**
+   ```bash
+   bd ready --json --limit 4
+   # Or: bd list --label block3 --status open --json
+   ```
+
+2. Create 4 PRs from bd issues (bulk operation handlers)
+   ```bash
+   bd update <issue-ids> --status in_progress --json
+   ```
+
+3. Block with script (2-3 hours)
+4. Merge all (any order - no dependencies)
+5. Run tests
+6. Close issues:
+   ```bash
+   bd close <issue-ids> --reason "Completed" --json
+   bd sync
+   ```
+7. **IMMEDIATELY START BLOCK 4**
 
 ### BLOCK 4: Documentation (5 PRs)
 
 **Your execution (NO STOPS):**
 
-1. Create 5 PRs (docs + UX tools)
-2. Block with script (2-3 hours)
-3. Merge all (any order)
-4. Validate docs
-5. **IMMEDIATELY START BLOCK 5**
+1. **Get Tasks to Schedule:**
+   ```bash
+   bd ready --json --limit 5
+   # Or: bd list --label block4 --status open --json
+   ```
+
+2. Create 5 PRs from bd issues (docs + UX tools)
+   ```bash
+   bd update <issue-ids> --status in_progress --json
+   ```
+
+3. Block with script (2-3 hours)
+4. Merge all (any order)
+5. Validate docs
+6. Close issues:
+   ```bash
+   bd close <issue-ids> --reason "Completed" --json
+   bd sync
+   ```
+7. **IMMEDIATELY START BLOCK 5**
 
 ### BLOCK 5: Testing (3 PRs)
 
 **Your execution (NO STOPS):**
 
-1. Create 3 PRs (test coverage)
-2. Block with script (2-3 hours)
-3. Merge all
-4. Run full test suite
-5. **IMMEDIATELY START BLOCK 6**
+1. **Get Tasks to Schedule:**
+   ```bash
+   bd ready --json --limit 3
+   # Or: bd list --label block5 --status open --json
+   ```
+
+2. Create 3 PRs from bd issues (test coverage)
+   ```bash
+   bd update <issue-ids> --status in_progress --json
+   ```
+
+3. Block with script (2-3 hours)
+4. Merge all
+5. Run full test suite
+6. Close issues:
+   ```bash
+   bd close <issue-ids> --reason "Completed" --json
+   bd sync
+   ```
+7. **IMMEDIATELY START BLOCK 6**
 
 ### BLOCK 6: Cleanup (4 PRs)
 
 **Your execution (NO STOPS):**
 
-1. Create 4 PRs (polish, JSDoc, cleanup)
-2. Block with script (1-2 hours)
-3. Merge all
-4. Final validation
-5. **NOW YOU CAN STOP - ALL DONE! 🎉**
+1. **Get Tasks to Schedule:**
+   ```bash
+   bd ready --json --limit 4
+   # Or: bd list --label block6 --status open --json
+   ```
+
+2. Create 4 PRs from bd issues (polish, JSDoc, cleanup)
+   ```bash
+   bd update <issue-ids> --status in_progress --json
+   ```
+
+3. Block with script (1-2 hours)
+4. Merge all
+5. Final validation
+6. Close issues:
+   ```bash
+   bd close <issue-ids> --reason "Completed" --json
+   bd sync
+   ```
+7. **NOW YOU CAN STOP - ALL DONE! 🎉**
 
 ---
 
@@ -318,13 +496,39 @@ Starting blocking monitor script...
 
 ## 🔧 PROBLEM STATEMENTS (For PR Creation)
 
-### BLOCK 1 PRs
+### Using Beads Issues
 
-See `orchestrator-script.md` lines 100-200 for complete problem statements
+**PREFERRED METHOD:** Problem statements come from beads issues:
 
-### BLOCK 2-6 PRs
+```bash
+# Get issue details for PR creation
+bd show bd-42 --json
 
-See `orchestrator-script.md` for each block's detailed problem statements
+# Returns:
+# {
+#   "id": "bd-42",
+#   "title": "Type analysis functions",
+#   "description": "Full problem statement here...",
+#   "type": "task",
+#   "priority": 1,
+#   "labels": ["block1", "type-safety"],
+#   "status": "open"
+# }
+
+# Use issue.description as problem_statement for PR
+```
+
+### Fallback: orchestrator-script.md
+
+If beads is not populated, see `orchestrator-script.md` for detailed problem statements:
+
+**BLOCK 1 PRs**
+- See `orchestrator-script.md` lines 100-200 for complete problem statements
+
+**BLOCK 2-6 PRs**
+- See `orchestrator-script.md` for each block's detailed problem statements
+
+**IMPORTANT:** Beads should be your primary source. Only fall back to orchestrator-script.md if bd is not available.
 
 ---
 

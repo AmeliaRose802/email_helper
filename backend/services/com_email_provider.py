@@ -16,10 +16,8 @@ Thread Safety:
     proper synchronization for concurrent access.
 """
 
-import sys
 import logging
 import asyncio
-from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from fastapi import HTTPException
@@ -31,14 +29,11 @@ except ImportError:
     PYTHONCOM_AVAILABLE = False
     pythoncom = None
 
-# Add src to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
 from backend.services.email_provider import EmailProvider
 
 # Import OutlookEmailAdapter - only available on Windows
 try:
-    from adapters.outlook_email_adapter import OutlookEmailAdapter
+    from backend.services.outlook.adapters.outlook_email_adapter import OutlookEmailAdapter
     COM_AVAILABLE = True
 except ImportError:
     COM_AVAILABLE = False

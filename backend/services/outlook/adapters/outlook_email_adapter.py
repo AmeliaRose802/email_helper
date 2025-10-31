@@ -8,8 +8,6 @@ The adapter maintains full backward compatibility while providing a clean
 interface for dependency injection and testing.
 """
 
-import sys
-from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 try:
@@ -17,11 +15,8 @@ try:
 except ImportError:
     pythoncom = None
 
-# Add src to Python path if needed
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from core.interfaces import EmailProvider
-from outlook_manager import OutlookManager
+from backend.services.outlook.interfaces import EmailProvider
+from backend.services.outlook.outlook_manager import OutlookManager
 
 
 class OutlookEmailAdapter(EmailProvider):

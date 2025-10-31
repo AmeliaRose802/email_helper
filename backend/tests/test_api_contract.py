@@ -54,7 +54,7 @@ def mock_email_provider():
             "conversation_id": "conv1"
         }
     ])
-    provider.get_email_content = Mock(return_value={
+    provider.get_email_content = AsyncMock(return_value={
         "id": "email1",
         "subject": "Test Email",
         "sender": "test@example.com",
@@ -261,12 +261,10 @@ class TestEmailEndpoints:
         # Should return 422 for validation error
         assert response.status_code == 422
     
-    @patch("backend.api.emails.get_email_provider")
-    def test_get_email_by_id(self, mock_get_provider, client, mock_email_provider):
+    def test_get_email_by_id(self, client, mock_email_provider):
         """Test GET /api/emails/{email_id}."""
-        # Configure mock to return email content
-        mock_get_provider.return_value = mock_email_provider
-        mock_email_provider.get_email_content = Mock(return_value={
+        # Configure mock to return specific email content
+        mock_email_provider.get_email_content = AsyncMock(return_value={
             'id': 'test-123',
             'subject': 'Test Email',
             'body': 'Test body',
@@ -283,7 +281,7 @@ class TestEmailEndpoints:
     
     def test_get_email_not_found(self, client, mock_email_provider):
         """Test GET /api/emails/{email_id} with non-existent email."""
-        mock_email_provider.get_email_content = Mock(return_value=None)
+        mock_email_provider.get_email_content = AsyncMock(return_value=None)
         
         response = client.get("/api/emails/nonexistent")
         
