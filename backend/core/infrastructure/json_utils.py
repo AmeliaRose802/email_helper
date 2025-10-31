@@ -74,13 +74,13 @@ def parse_json_with_fallback(json_str: str, fallback_data: Optional[Dict[str, An
     cleaned = clean_json_response(json_str)
     
     try:
-        return json.loads(cleaned)
+        return json.loads(cleaned)  # type: ignore[no-any-return]
     except json.JSONDecodeError:
         # Try repair
         repaired = repair_json_response(cleaned)
         if repaired:
             try:
-                return json.loads(repaired)
+                return json.loads(repaired)  # type: ignore[no-any-return]
             except json.JSONDecodeError:
                 pass
         

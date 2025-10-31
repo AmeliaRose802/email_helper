@@ -499,40 +499,33 @@ class TestWorkflowPerformance:
     
     @pytest.mark.asyncio
     async def test_batch_email_processing_performance(
-        self, mock_complete_email_provider
+        self, mock_complete_email_provider, mock_ai_orchestrator, mock_azure_config_obj
     ):
         """Test processing multiple emails efficiently."""
         # Setup for batch processing
-        with patch('backend.core.business.ai_orchestrator.AIOrchestrator') as mock_ai_class:
-            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
-                mock_ai = MagicMock()
-                
-                # Return quick results for batch
-                mock_ai.execute_prompty.return_value = json.dumps({
-                    "category": "optional_fyi",
-                    "confidence": 0.85,
-                    "reasoning": "Test",
-                    "alternatives": []
-                })
-                mock_ai_class.return_value = mock_ai
-                
-                from backend.services.ai_service import AIService
-                
-                ai_service = AIService()
-                ai_service._ensure_initialized()
-                
-                # Process multiple emails
-                emails = mock_complete_email_provider.get_emails("Inbox", count=10)
-                
-                classified = []
-                for email in emails[:3]:  # Process subset
-                    email_text = f"Subject: {email['subject']}\n\n{email['body']}"
-                    classification = await ai_service.classify_email(email_text)
-                    classified.append(classification)
-                
-                # Verify batch completed
-                assert len(classified) == 3
-                assert all('category' in c for c in classified)
+        mock_ai_orchestrator.execute_prompty.return_value = json.dumps({
+            "category": "optional_fyi",
+            "confidence": 0.85,
+            "reasoning": "Test",
+            "alternatives": []
+        })
+        
+        # Use dependency injection
+        from backend.services.ai_service import AIService
+        ai_service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
+        
+        # Process multiple emails
+        emails = mock_complete_email_provider.get_emails("Inbox", count=10)
+        
+        classified = []
+        for email in emails[:3]:  # Process subset
+            email_text = f"Subject: {email['subject']}\n\n{email['body']}"
+            classification = await ai_service.classify_email(email_text)
+            classified.append(classification)
+        
+        # Verify batch completed
+        assert len(classified) == 3
+        assert all('category' in c for c in classified)
     
     @pytest.mark.asyncio
     async def test_concurrent_email_operations(
@@ -589,27 +582,24 @@ class TestWorkflowDataPersistence:
             "alternatives": []
         })
         
-        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
-                from backend.services.ai_service import AIService
-                
-                ai_service = AIService()
-                ai_service._ensure_initialized()
-                
-                # Process and categorize
-                emails = mock_complete_email_provider.get_emails("Inbox", count=1)
-                email = emails[0]
-                
-                email_text = f"Subject: {email['subject']}\n\n{email['body']}"
-                classification = await ai_service.classify_email(email_text)
-                
-                # Simulate persistence
-                email_with_category = {
-                    **email,
-                    'ai_category': classification['category'],
-                    'ai_confidence': classification['confidence']
-                }
-                
-                assert email_with_category['ai_category'] == 'required_personal_action'
-                assert email_with_category['ai_confidence'] == 0.90
+        # Use dependency injection
+        from backend.services.ai_service import AIService
+        ai_service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
+        
+        # Process and categorize
+        emails = mock_complete_email_provider.get_emails("Inbox", count=1)
+        email = emails[0]
+        
+        email_text = f"Subject: {email['subject']}\n\n{email['body']}"
+        classification = await ai_service.classify_email(email_text)
+        
+        # Simulate persistence
+        email_with_category = {
+            **email,
+            'ai_category': classification['category'],
+            'ai_confidence': classification['confidence']
+        }
+        
+        assert email_with_category['ai_category'] == 'required_personal_action'
+        assert email_with_category['ai_confidence'] == 0.90
 

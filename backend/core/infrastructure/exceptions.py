@@ -120,7 +120,7 @@ class EmailError(EmailHelperError):
 class EmailServiceUnavailableError(EmailError):
     """Raised when email service (Outlook) is unavailable."""
     
-    def __init__(self, message: str = "Email service unavailable", **kwargs):
+    def __init__(self, message: str = "Email service unavailable", **kwargs: Any):
         super().__init__(message, recoverable=True, **kwargs)
     
     def _default_user_message(self) -> str:
@@ -164,7 +164,7 @@ class DatabaseError(EmailHelperError):
 class DatabaseConnectionError(DatabaseError):
     """Raised when database connection fails."""
     
-    def __init__(self, message: str = "Database connection failed", **kwargs):
+    def __init__(self, message: str = "Database connection failed", **kwargs: Any):
         super().__init__(message, recoverable=True, **kwargs)
     
     def _default_user_message(self) -> str:
@@ -181,7 +181,7 @@ class DatabaseIntegrityError(DatabaseError):
 class DatabaseQueryError(DatabaseError):
     """Raised when database query fails."""
     
-    def __init__(self, message: str = "Database query failed", **kwargs):
+    def __init__(self, message: str = "Database query failed", **kwargs: Any):
         super().__init__(message, recoverable=True, **kwargs)
     
     def _default_user_message(self) -> str:
@@ -211,7 +211,7 @@ class TaskValidationError(TaskError):
 class TaskPersistenceError(TaskError):
     """Raised when task persistence operations fail."""
     
-    def __init__(self, message: str = "Task persistence failed", **kwargs):
+    def __init__(self, message: str = "Task persistence failed", **kwargs: Any):
         super().__init__(message, recoverable=True, **kwargs)
     
     def _default_user_message(self) -> str:
@@ -222,7 +222,7 @@ class TaskPersistenceError(TaskError):
 class ValidationError(EmailHelperError):
     """Raised when input validation fails."""
     
-    def __init__(self, message: str, field: Optional[str] = None, **kwargs):
+    def __init__(self, message: str, field: Optional[str] = None, **kwargs: Any):
         details = kwargs.get('details', {})
         if field:
             details['field'] = field
@@ -247,7 +247,7 @@ class DataParsingError(EmailHelperError):
 class NetworkError(EmailHelperError):
     """Raised for network-related errors."""
     
-    def __init__(self, message: str = "Network error", **kwargs):
+    def __init__(self, message: str = "Network error", **kwargs: Any):
         super().__init__(message, recoverable=True, **kwargs)
     
     def _default_user_message(self) -> str:
@@ -257,7 +257,7 @@ class NetworkError(EmailHelperError):
 class ExternalServiceError(EmailHelperError):
     """Raised when external service call fails."""
     
-    def __init__(self, service_name: str, message: str, **kwargs):
+    def __init__(self, service_name: str, message: str, **kwargs: Any):
         details = kwargs.get('details', {})
         details['service'] = service_name
         kwargs['details'] = details
@@ -272,7 +272,7 @@ class ExternalServiceError(EmailHelperError):
 class RateLimitError(EmailHelperError):
     """Raised when rate limit is exceeded."""
     
-    def __init__(self, message: str = "Rate limit exceeded", retry_after: Optional[int] = None, **kwargs):
+    def __init__(self, message: str = "Rate limit exceeded", retry_after: Optional[int] = None, **kwargs: Any):
         details = kwargs.get('details', {})
         if retry_after:
             details['retry_after'] = retry_after
@@ -309,7 +309,7 @@ class FileAccessError(ResourceError):
 class ResourceNotAvailableError(ResourceError):
     """Raised when required resource is not available."""
     
-    def __init__(self, resource_name: str, message: Optional[str] = None, **kwargs):
+    def __init__(self, resource_name: str, message: Optional[str] = None, **kwargs: Any):
         msg = message or f"Resource not available: {resource_name}"
         details = kwargs.get('details', {})
         details['resource'] = resource_name
@@ -339,7 +339,7 @@ class AuthorizationError(EmailHelperError):
 class TimeoutError(EmailHelperError):
     """Raised when operation times out."""
     
-    def __init__(self, operation: str, timeout_seconds: Optional[int] = None, **kwargs):
+    def __init__(self, operation: str, timeout_seconds: Optional[int] = None, **kwargs: Any):
         message = f"Operation timed out: {operation}"
         details = kwargs.get('details', {})
         details['operation'] = operation

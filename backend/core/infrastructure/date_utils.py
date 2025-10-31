@@ -30,14 +30,14 @@ from typing import Optional, Any
 def format_datetime_for_storage(dt: Any) -> str:
     """Format datetime object for CSV storage"""
     if hasattr(dt, 'strftime'):
-        return dt.strftime('%Y-%m-%d %H:%M:%S')
+        return dt.strftime('%Y-%m-%d %H:%M:%S')  # type: ignore[no-any-return]
     return str(dt)
 
 
 def format_date_for_display(dt: Any) -> str:
     """Format datetime for display"""
     if hasattr(dt, 'strftime'):
-        return dt.strftime('%Y-%m-%d %H:%M')
+        return dt.strftime('%Y-%m-%d %H:%M')  # type: ignore[no-any-return]
     return str(dt)
 
 

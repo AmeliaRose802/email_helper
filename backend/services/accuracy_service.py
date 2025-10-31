@@ -22,14 +22,14 @@ def calculate_accuracy_stats() -> Dict[str, Any]:
         - per-category stats (total, correct, accuracy, precision, recall, f1)
     """
     with db_manager.get_connection() as conn:
-        cursor = conn.execute(""""""
+        cursor = conn.execute("""
             SELECT ai_category, category
             FROM emails
             WHERE ai_category IS NOT NULL 
               AND ai_category != ''
               AND category IS NOT NULL
               AND category != ''
-        """""")
+        """)
         
         rows = cursor.fetchall()
     

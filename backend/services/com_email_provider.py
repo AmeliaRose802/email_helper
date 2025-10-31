@@ -16,6 +16,7 @@ Thread Safety:
     proper synchronization for concurrent access.
 """
 
+import sys
 import logging
 import asyncio
 from pathlib import Path
@@ -31,6 +32,7 @@ except ImportError:
     pythoncom = None
 
 # Add src to Python path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from backend.services.email_provider import EmailProvider
 
@@ -62,7 +64,10 @@ def requires_com(func):
             import time
             time.sleep(0.2)
             if not self.adapter.connect():
-                raise RuntimeError("Failed to connect to Outlook after retry")
+                raise HTTPException(
+                    status_code=401,
+                    detail="Failed to connect to Outlook after retry. Please ensure Outlook is running."
+                )
         
         return func(self, *args, **kwargs)
     
