@@ -399,7 +399,15 @@ def mock_email_provider():
     provider.get_folders = Mock(return_value=[])
     provider.mark_as_read = Mock(return_value=True)
     provider.move_email = Mock(return_value=True)
-    provider.get_conversation_thread = Mock(return_value=[])
+    provider.get_conversation_thread = Mock(return_value=[
+        {
+            "id": "test_email_1",
+            "subject": "Test Email 1",
+            "sender": "sender1@example.com",
+            "body": "Test body 1",
+            "date": "2024-01-01T10:00:00"
+        }
+    ])
     return provider
 
 

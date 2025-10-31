@@ -351,7 +351,11 @@ class TestEmailEndpoints:
             response = client.get("/api/emails/accuracy-stats")
             assert response.status_code == 200
             data = response.json()
-            assert "total_classifications" in data or "accuracy" in data
+            # Accuracy stats returns structured results
+            assert "total_emails" in data
+            assert "overall_accuracy" in data
+            assert "total_correct" in data
+            assert "categories" in data
     
     def test_prefetch_emails(self, client, mock_email_provider):
         """Test POST /api/emails/prefetch."""
@@ -405,6 +409,10 @@ class TestEmailEndpoints:
             data = response.json()
             assert "conversation_id" in data
             assert "emails" in data
+            assert data["conversation_id"] == "conv_1"
+            assert isinstance(data["emails"], list)
+            assert len(data["emails"]) > 0, "Expected at least one email in conversation thread"
+            assert data["total"] == len(data["emails"])
     
     def test_update_email_classification(self, client, mock_processing_service):
         """Test PUT /api/emails/:id/classification."""
@@ -472,7 +480,11 @@ class TestEmailEndpoints:
             })
             assert response.status_code == 200
             data = response.json()
-            assert "status" in data or "insights" in data
+            # Holistic analysis returns structured results
+            assert "truly_relevant_actions" in data
+            assert "superseded_actions" in data
+            assert "duplicate_groups" in data
+            assert "expired_items" in data
 
 
 class TestTaskEndpoints:
