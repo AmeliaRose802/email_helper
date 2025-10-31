@@ -23,33 +23,13 @@ class TestEmailAPI:
     """Test email API endpoints."""
     
     @pytest.fixture
-    def auth_headers(self):
-        """Get authentication headers for test user."""
-        # Register a test user
-        user_data = {
-            "username": "emailtest",
-            "email": "emailtest@example.com",
-            "password": "testpassword123"
-        }
-        client.post("/auth/register", json=user_data)
-        
-        # Login to get token
-        login_response = client.post("/auth/login", json={
-            "username": user_data["username"],
-            "password": user_data["password"]
-        })
-        
-        token = login_response.json()["access_token"]
-        return {"Authorization": f"Bearer {token}"}
-    
-    @pytest.fixture
     def mock_provider(self):
         """Mock email provider for testing."""
         provider = MockEmailProvider()
         provider.authenticate({"test": "mock"})
         return provider
     
-    def test_get_emails_success(self, auth_headers, mock_provider):
+    def test_get_emails_success(self, mock_provider):
         """Test successful email retrieval."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -71,7 +51,7 @@ class TestEmailAPI:
             assert data["limit"] == 50
             assert data["has_more"] is False
     
-    def test_get_emails_with_pagination(self, auth_headers, mock_provider):
+    def test_get_emails_with_pagination(self, mock_provider):
         """Test email retrieval with pagination."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -86,7 +66,7 @@ class TestEmailAPI:
             assert data["offset"] == 0
             assert data["has_more"] is True  # Since we requested exactly the limit
     
-    def test_get_emails_with_folder(self, auth_headers, mock_provider):
+    def test_get_emails_with_folder(self, mock_provider):
         """Test email retrieval from specific folder."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -100,7 +80,7 @@ class TestEmailAPI:
             assert len(data["emails"]) == 0
     
 
-    def test_get_email_by_id_success(self, auth_headers, mock_provider):
+    def test_get_email_by_id_success(self, mock_provider):
         """Test successful email retrieval by ID."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -115,7 +95,7 @@ class TestEmailAPI:
             assert data["sender"] == "test1@example.com"
             assert "body" in data
     
-    def test_get_email_by_id_not_found(self, auth_headers, mock_provider):
+    def test_get_email_by_id_not_found(self, mock_provider):
         """Test email retrieval for non-existing ID."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -126,7 +106,7 @@ class TestEmailAPI:
             data = response.json()
             assert "not found" in data["message"].lower()
     
-    def test_mark_email_as_read_success(self, auth_headers, mock_provider):
+    def test_mark_email_as_read_success(self, mock_provider):
         """Test successful marking email as read."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -140,7 +120,7 @@ class TestEmailAPI:
             assert data["email_id"] == "mock-email-1"
             assert "successfully" in data["message"].lower()
     
-    def test_mark_email_as_read_failure(self, auth_headers, mock_provider):
+    def test_mark_email_as_read_failure(self, mock_provider):
         """Test failed marking email as read."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -153,7 +133,7 @@ class TestEmailAPI:
             assert data["success"] is False
             assert data["email_id"] == "non-existing"
     
-    def test_move_email_success(self, auth_headers, mock_provider):
+    def test_move_email_success(self, mock_provider):
         """Test successful email move."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -167,7 +147,7 @@ class TestEmailAPI:
             assert data["email_id"] == "mock-email-1"
             assert "sent" in data["message"].lower()
     
-    def test_move_email_failure(self, auth_headers, mock_provider):
+    def test_move_email_failure(self, mock_provider):
         """Test failed email move."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -180,7 +160,7 @@ class TestEmailAPI:
             assert data["success"] is False
             assert data["email_id"] == "non-existing"
     
-    def test_get_folders_success(self, auth_headers, mock_provider):
+    def test_get_folders_success(self, mock_provider):
         """Test successful folder retrieval."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -202,7 +182,7 @@ class TestEmailAPI:
             assert "name" in folder
             assert "type" in folder
     
-    def test_get_conversation_thread_success(self, auth_headers, mock_provider):
+    def test_get_conversation_thread_success(self, mock_provider):
         """Test successful conversation thread retrieval."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -220,7 +200,7 @@ class TestEmailAPI:
             assert data["total"] == 1
             assert data["emails"][0]["conversation_id"] == "conv-1"
     
-    def test_get_conversation_thread_empty(self, auth_headers, mock_provider):
+    def test_get_conversation_thread_empty(self, mock_provider):
         """Test conversation thread retrieval for non-existing conversation."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -234,7 +214,7 @@ class TestEmailAPI:
             assert len(data["emails"]) == 0
             assert data["total"] == 0
     
-    def test_batch_process_emails_success(self, auth_headers, mock_provider):
+    def test_batch_process_emails_success(self, mock_provider):
         """Test successful batch email processing."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
@@ -266,7 +246,7 @@ class TestEmailAPI:
             assert "action_items" in result
             assert "priority" in result
     
-    def test_batch_process_emails_with_failures(self, auth_headers, mock_provider):
+    def test_batch_process_emails_with_failures(self, mock_provider):
         """Test batch email processing with some failures."""
         with patch('backend.services.email_provider.get_email_provider_instance') as mock_get_provider:
             mock_get_provider.return_value = mock_provider

@@ -26,21 +26,10 @@ def client():
     app.dependency_overrides.clear()
 
 
-@pytest.fixture
-def mock_auth():
-    """Mock authentication to bypass auth requirements."""
-    mock_user = Mock()
-    mock_user.username = "testuser"
-    mock_user.email = "test@example.com"
-    
-    with patch('backend.api.auth.get_current_user', return_value=mock_user):
-        yield mock_user
-
-
 class TestEmailEndpointsWithDI:
     """Test email endpoints using dependency injection."""
     
-    def test_get_emails_with_com_provider(self, client, mock_auth):
+    def test_get_emails_with_com_provider(self, client):
         """Test /api/emails endpoint uses COM provider when configured."""
         mock_provider = Mock()
         mock_provider.authenticate.return_value = True
@@ -69,7 +58,7 @@ class TestEmailEndpointsWithDI:
                 # Verify COM provider was called
                 mock_provider.get_emails.assert_called_once()
     
-    def test_get_emails_with_standard_provider(self, client, mock_auth):
+    def test_get_emails_with_standard_provider(self, client):
         """Test /api/emails endpoint uses standard provider when COM not configured."""
         mock_provider = Mock()
         mock_provider.get_emails.return_value = [
@@ -90,7 +79,7 @@ class TestEmailEndpointsWithDI:
                 data = response.json()
                 assert 'emails' in data
     
-    def test_get_folders_with_di(self, client, mock_auth):
+    def test_get_folders_with_di(self, client):
         """Test /api/folders endpoint uses dependency injection."""
         mock_provider = Mock()
         mock_provider.authenticate.return_value = True
@@ -111,7 +100,7 @@ class TestEmailEndpointsWithDI:
                 assert len(data['folders']) == 2
                 assert data['folders'][0]['name'] == 'Inbox'
     
-    def test_mark_as_read_with_di(self, client, mock_auth):
+    def test_mark_as_read_with_di(self, client):
         """Test mark as read endpoint uses dependency injection."""
         mock_provider = Mock()
         mock_provider.authenticate.return_value = True
@@ -132,7 +121,7 @@ class TestEmailEndpointsWithDI:
 class TestAIEndpointsWithDI:
     """Test AI endpoints using dependency injection."""
     
-    def test_classify_email_with_ai_service(self, client, mock_auth):
+    def test_classify_email_with_ai_service(self, client):
         """Test /api/ai/classify endpoint uses AI service."""
         from backend.core.dependencies import get_ai_service
         from backend.main import app
@@ -173,7 +162,7 @@ class TestAIEndpointsWithDI:
         finally:
             app.dependency_overrides.pop(get_ai_service, None)
     
-    def test_extract_action_items_with_di(self, client, mock_auth):
+    def test_extract_action_items_with_di(self, client):
         """Test action item extraction uses dependency injection."""
         from backend.core.dependencies import get_ai_service
         from backend.main import app
@@ -210,7 +199,7 @@ class TestAIEndpointsWithDI:
         finally:
             app.dependency_overrides.pop(get_ai_service, None)
     
-    def test_summarize_email_with_di(self, client, mock_auth):
+    def test_summarize_email_with_di(self, client):
         """Test email summarization uses dependency injection."""
         from backend.core.dependencies import get_ai_service
         from backend.main import app
@@ -242,7 +231,7 @@ class TestAIEndpointsWithDI:
         finally:
             app.dependency_overrides.pop(get_ai_service, None)
     
-    def test_ai_health_check_with_di(self, client, mock_auth):
+    def test_ai_health_check_with_di(self, client):
         """Test AI health check uses dependency injection."""
         from backend.core.dependencies import get_ai_service
         from backend.main import app
@@ -273,7 +262,7 @@ class TestAIEndpointsWithDI:
 class TestErrorHandlingWithDI:
     """Test error handling for dependency injection failures."""
     
-    def test_email_endpoint_handles_provider_initialization_failure(self, client, mock_auth):
+    def test_email_endpoint_handles_provider_initialization_failure(self, client):
         """Test graceful handling when email provider initialization fails."""
         with patch('backend.core.dependencies.settings') as mock_settings:
             mock_settings.use_com_backend = True
@@ -285,7 +274,7 @@ class TestErrorHandlingWithDI:
                     # Should return 503 Service Unavailable
                     assert response.status_code == 503
     
-    def test_ai_endpoint_handles_service_initialization_failure(self, client, mock_auth):
+    def test_ai_endpoint_handles_service_initialization_failure(self, client):
         """Test graceful handling when AI service initialization fails."""
         with patch('backend.core.dependencies.AIService', side_effect=Exception("AI not available")):
             request_data = {
@@ -303,7 +292,7 @@ class TestErrorHandlingWithDI:
 class TestBackwardCompatibility:
     """Test backward compatibility with existing endpoints."""
     
-    def test_existing_endpoints_still_work(self, client, mock_auth):
+    def test_existing_endpoints_still_work(self, client):
         """Test that existing endpoints continue to work with DI changes."""
         mock_provider = Mock()
         mock_provider.get_emails.return_value = []
