@@ -71,6 +71,8 @@ describe('Backend API Integration Tests', () => {
         
         return new Response('Not Found', { status: 404 });
       }) as typeof global.fetch;
+    } else {
+      console.log('✅ Backend is available - running integration tests against real server');
     }
   });
 
@@ -78,7 +80,6 @@ describe('Backend API Integration Tests', () => {
     if (!backendAvailable) {
       global.fetch = originalFetch;
     }
-    console.log('✅ Backend integration tests completed');
   });
 
   describe('Health Check (T1-T4 Backend Status)', () => {
