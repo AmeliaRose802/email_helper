@@ -13,7 +13,7 @@ import json
 @pytest.fixture
 def mock_ai_orchestrator():
     """Create a mock AIOrchestrator for testing."""
-    orchestrator = MagicMock()
+    orchestrator = Mock()
     orchestrator.execute_prompty = Mock()
     orchestrator.classify_email_with_explanation = Mock(return_value={
         'category': 'work_relevant',
@@ -40,14 +40,21 @@ def mock_azure_config():
 
 
 @pytest.fixture
+def mock_azure_config_obj():
+    """Alias for mock_azure_config for test compatibility."""
+    config = MagicMock()
+    config.endpoint = "https://test.openai.azure.com"
+    config.api_key = "test-key"
+    config.deployment_name = "test-deployment"
+    return config
+
+
+@pytest.fixture
 def com_ai_service(mock_ai_orchestrator, mock_azure_config):
-    """Create AIService with mocked dependencies."""
-    with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-        with patch('backend.services.ai_service.get_azure_config', return_value=mock_azure_config):
-            from backend.services.ai_service import AIService
-            service = AIService()
-            service._ensure_initialized()
-            return service
+    """Create AIService with mocked dependencies via DI."""
+    from backend.services.ai_service import AIService
+    service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config)
+    return service
 
 
 @pytest.mark.integration
@@ -55,17 +62,18 @@ def com_ai_service(mock_ai_orchestrator, mock_azure_config):
 class TestAIEmailClassificationIntegration:
     """Integration tests for AI email classification workflows."""
     
-    async def test_classify_email_workflow(self, com_ai_service, mock_ai_orchestrator):
+    async def test_classify_email_workflow(self, com_ai_service):
         """Test complete email classification workflow."""
-        # Setup mock classification result
-        mock_ai_orchestrator.classify_email_with_explanation.return_value = {
+        # Setup mock classification result - configure the mock orchestrator
+        from unittest.mock import Mock
+        com_ai_service.ai_orchestrator.classify_email_with_explanation = Mock(return_value={
             "category": "required_personal_action",
             "confidence": 0.95,
             "explanation": "Email contains action items requiring personal response",
             "alternatives": [
                 {"category": "optional_fyi", "confidence": 0.05}
             ]
-        }
+        })
         
         # Classify email
         email_content = """
@@ -89,7 +97,7 @@ class TestAIEmailClassificationIntegration:
         assert len(result['alternatives']) == 1
         
         # Verify AI processor was called
-        mock_ai_orchestrator.classify_email_with_explanation.assert_called_once()
+        com_ai_service.ai_orchestrator.classify_email_with_explanation.assert_called_once()
     
     async def test_classify_multiple_email_types(self, mock_ai_orchestrator, mock_azure_config_obj):
         """Test classification of different email types."""
@@ -108,18 +116,15 @@ class TestAIEmailClassificationIntegration:
             "alternatives": []
         }
         
-        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
-                from backend.services.ai_service import AIService
-                service = AIService()
-                service._ensure_initialized()
+        from backend.services.ai_service import AIService
+        service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
+
+        # Classify email
+        result = await service.classify_email(email_test['content'])
         
-                # Classify email
-                result = await service.classify_email(email_test['content'])
-                
-                # Verify
-                assert result['category'] == email_test['expected_category']
-                assert result['confidence'] == email_test['confidence']
+        # Verify
+        assert result['category'] == email_test['expected_category']
+        assert result['confidence'] == email_test['confidence']
     
     async def test_classification_with_context(self, mock_ai_orchestrator, mock_azure_config_obj):
         """Test email classification with additional context."""
@@ -130,37 +135,31 @@ class TestAIEmailClassificationIntegration:
             "alternatives": []
         }
         
-        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
-                from backend.services.ai_service import AIService
-                service = AIService()
-                service._ensure_initialized()
-        
-                email_content = "Subject: Quick Question\nCan you help with this?"
-                context = "This is from your direct manager about an urgent project"
-                
-                result = await service.classify_email(email_content, context=context)
-                
-                assert result['category'] == 'required_personal_action'
-                assert result['confidence'] > 0.9
+        from backend.services.ai_service import AIService
+        service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
 
-    async def test_classification_error_handling(self, mock_ai_orchestrator):
+        email_content = "Subject: Quick Question\nCan you help with this?"
+        context = "This is from your direct manager about an urgent project"
+        
+        result = await service.classify_email(email_content, context=context)
+        
+        assert result['category'] == 'required_personal_action'
+        assert result['confidence'] > 0.9
+
+    async def test_classification_error_handling(self, mock_ai_orchestrator, mock_azure_config_obj):
         """Test classification with AI service errors."""
         # Simulate AI error - will trigger fallback
         mock_ai_orchestrator.classify_email_with_explanation.side_effect = Exception("AI service unavailable")
         
-        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-            with patch('backend.services.ai_service.get_azure_config', return_value=MagicMock()):
-                from backend.services.ai_service import AIService
-                service = AIService()
-                service._ensure_initialized()
+        from backend.services.ai_service import AIService
+        service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
+
+        result = await service.classify_email("Test email")
         
-                result = await service.classify_email("Test email")
-                
-                # Should return fallback classification
-                assert 'category' in result
-                assert result['confidence'] < 1.0
-                assert 'error' in result
+        # Should return fallback classification
+        assert 'category' in result
+        assert result['confidence'] < 1.0
+        assert 'error' in result
 
 
 @pytest.mark.integration

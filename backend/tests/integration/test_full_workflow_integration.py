@@ -276,8 +276,8 @@ class TestCompleteEmailProcessingWorkflow:
     ):
         """Test workflow: retrieve emails → generate summaries."""
         # Setup AI service
-        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.ai_service.get_azure_config'):
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator') as mock_ai_class:
+            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
                 mock_ai = MagicMock()
                 
                 # Return summaries
@@ -492,8 +492,8 @@ class TestWorkflowPerformance:
     ):
         """Test processing multiple emails efficiently."""
         # Setup for batch processing
-        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.ai_service.get_azure_config'):
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator') as mock_ai_class:
+            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
                 mock_ai = MagicMock()
                 
                 # Return quick results for batch
@@ -601,3 +601,4 @@ class TestWorkflowDataPersistence:
                 
                 assert email_with_category['ai_category'] == 'required_personal_action'
                 assert email_with_category['ai_confidence'] == 0.90
+

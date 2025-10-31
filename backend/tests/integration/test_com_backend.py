@@ -93,8 +93,8 @@ class TestEmailRetrievalToClassification:
                     assert_email_structure(email)
         
         # Step 2: Classify emails via AI service
-        with patch('backend.services.ai_service.AIProcessor', return_value=mock_ai_for_classification):
-            with patch('backend.services.ai_service.get_azure_config'):
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_for_classification):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
                 from backend.services.ai_service import AIService
                 
                 ai_service = AIService()
@@ -133,8 +133,8 @@ class TestEmailRetrievalToClassification:
                 emails = provider.get_emails()
         
         # Classify all emails
-        with patch('backend.services.ai_service.AIProcessor', return_value=mock_ai_for_classification):
-            with patch('backend.services.ai_service.get_azure_config'):
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_for_classification):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
                 from backend.services.ai_service import AIService
                 
                 ai_service = AIService()
@@ -188,8 +188,8 @@ class TestEmailProcessingToActionItems:
                 assert len(emails) == 1
                 email = emails[0]
         
-        with patch('backend.services.ai_service.AIProcessor', return_value=ai_processor):
-            with patch('backend.services.ai_service.get_azure_config'):
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=ai_processor):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
                 from backend.services.ai_service import AIService
                 
                 # Step 2: Extract action items
@@ -237,8 +237,8 @@ class TestEmailProcessingToActionItems:
                 provider.authenticate({})
                 emails = provider.get_emails()
         
-        with patch('backend.services.ai_service.AIProcessor', return_value=ai_processor):
-            with patch('backend.services.ai_service.get_azure_config'):
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=ai_processor):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
                 from backend.services.ai_service import AIService
                 
                 ai_service = AIService()
@@ -284,8 +284,8 @@ class TestEmailSummarizationWorkflow:
                 provider.authenticate({})
                 emails = provider.get_emails()
         
-        with patch('backend.services.ai_service.AIProcessor', return_value=ai_processor):
-            with patch('backend.services.ai_service.get_azure_config'):
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=ai_processor):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
                 from backend.services.ai_service import AIService
                 
                 ai_service = AIService()
@@ -332,8 +332,8 @@ class TestDuplicateDetectionWorkflow:
                 
                 assert len(emails) == 3
         
-        with patch('backend.services.ai_service.AIProcessor', return_value=ai_processor):
-            with patch('backend.services.ai_service.get_azure_config'):
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=ai_processor):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
                 from backend.services.ai_service import AIService
                 
                 ai_service = AIService()
@@ -393,8 +393,8 @@ class TestFullEmailProcessingPipeline:
                 assert results["emails_retrieved"] == 1
         
         # Steps 2-4: AI processing
-        with patch('backend.services.ai_service.AIProcessor', return_value=ai_processor):
-            with patch('backend.services.ai_service.get_azure_config'):
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=ai_processor):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
                 from backend.services.ai_service import AIService
                 
                 ai_service = AIService()
@@ -462,8 +462,8 @@ class TestErrorScenarios:
         ai_processor = Mock()
         ai_processor.execute_prompty = Mock(side_effect=Exception("AI service unavailable"))
         
-        with patch('backend.services.ai_service.AIProcessor', return_value=ai_processor):
-            with patch('backend.services.ai_service.get_azure_config'):
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=ai_processor):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
                 from backend.services.ai_service import AIService
                 
                 ai_service = AIService()
@@ -601,3 +601,4 @@ class TestEdgeCases:
                 
                 assert len(emails) == 1
                 assert len(emails[0]["body"]) == 10000
+
