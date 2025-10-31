@@ -7,11 +7,7 @@ import logging
 from unittest.mock import Mock, patch
 from datetime import datetime
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
-from core.exceptions import (
+from backend.core.infrastructure.exceptions import (
     EmailHelperError,
     AIServiceUnavailableError,
     EmailNotFoundError,
@@ -19,14 +15,9 @@ from core.exceptions import (
     DatabaseConnectionError,
     RateLimitError
 )
-from utils.error_utils import (
+from backend.core.infrastructure.error_utils import (
     standardized_error_handler,
-    safe_execute,
-    with_error_handling,
-    error_boundary,
-    retry_on_error,
-    ErrorAggregator,
-    graceful_degradation
+    safe_execute
 )
 
 

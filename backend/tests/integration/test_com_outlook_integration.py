@@ -139,15 +139,23 @@ class TestCOMOutlookIntegration:
         assert folders[0]['item_count'] == 25
         mock_outlook_adapter.get_folders.assert_called_once()
     
-    def test_email_content_retrieval(self, com_email_provider, mock_outlook_adapter):
+    @pytest.mark.asyncio
+    async def test_email_content_retrieval(self, com_email_provider, mock_outlook_adapter):
         """Test detailed email content retrieval."""
+        mock_outlook_adapter.get_email_by_id.return_value = {
+            'id': 'email-123',
+            'subject': 'Test Email',
+            'sender': 'test@example.com',
+            'body': 'Initial body',
+            'importance': 'Normal'
+        }
         mock_outlook_adapter.get_email_body.return_value = "Full email body with details"
         
         # Authenticate
         com_email_provider.authenticate({})
         
         # Get email content
-        content = com_email_provider.get_email_content('email-123')
+        content = await com_email_provider.get_email_content('email-123')
         assert content['id'] == 'email-123'
         assert 'Full email body' in content['body']
         mock_outlook_adapter.get_email_body.assert_called_once_with('email-123')
@@ -236,17 +244,20 @@ class TestCOMOutlookErrorHandling:
         # Provider should mark itself as not authenticated
         assert not com_email_provider.authenticated
     
-    def test_not_authenticated_error(self, com_email_provider):
+    def test_not_authenticated_error(self, com_email_provider, mock_outlook_adapter):
         """Test operations without authentication."""
         # Don't authenticate
         com_email_provider.authenticated = False
         
-        # Try to get emails without authenticating
+        # Simulate connection failure
+        mock_outlook_adapter.connect.return_value = False
+        
+        # Try to get emails without authenticating (connection will fail)
         with pytest.raises(HTTPException) as exc_info:
             com_email_provider.get_emails("Inbox")
         
         assert exc_info.value.status_code == 401
-        assert "Not authenticated" in str(exc_info.value.detail)
+        assert "Failed to connect" in str(exc_info.value.detail)
     
     def test_folder_not_found_error(self, com_email_provider, mock_outlook_adapter):
         """Test handling of non-existent folder access."""
@@ -262,19 +273,20 @@ class TestCOMOutlookErrorHandling:
         assert exc_info.value.status_code == 500
         assert "Folder 'NonExistent' not found" in str(exc_info.value.detail)
     
-    def test_email_not_found_error(self, com_email_provider, mock_outlook_adapter):
+    @pytest.mark.asyncio
+    async def test_email_not_found_error(self, com_email_provider, mock_outlook_adapter):
         """Test handling of non-existent email access."""
         com_email_provider.authenticate({})
         
         # Simulate email not found
-        mock_outlook_adapter.get_email_body.side_effect = ValueError("Email not found")
+        mock_outlook_adapter.get_email_by_id.return_value = None
         
-        # Should raise HTTPException with 500 status
+        # Should raise HTTPException with 404 status
         with pytest.raises(HTTPException) as exc_info:
-            com_email_provider.get_email_content("nonexistent-email")
+            await com_email_provider.get_email_content("nonexistent-email")
         
-        assert exc_info.value.status_code == 500
-        assert "Email not found" in str(exc_info.value.detail)
+        assert exc_info.value.status_code == 404
+        assert "not found" in str(exc_info.value.detail).lower()
     
     def test_com_exception_handling(self, com_email_provider, mock_outlook_adapter):
         """Test handling of general COM exceptions."""

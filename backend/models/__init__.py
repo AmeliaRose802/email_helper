@@ -1,6 +1,5 @@
 """Pydantic models for FastAPI Email Helper API."""
 
-from .user import User, UserCreate, UserLogin, UserInDB, Token, TokenData
 from .email import Email, EmailCreate, EmailUpdate, EmailInDB, EmailClassification, EmailBatch, EmailBatchResult
 from .task import Task, TaskCreate, TaskUpdate, TaskInDB
 from .ai_models import (
@@ -11,7 +10,6 @@ from .ai_models import (
 )
 
 __all__ = [
-    "User", "UserCreate", "UserLogin", "UserInDB", "Token", "TokenData",
     "Email", "EmailCreate", "EmailUpdate", "EmailInDB", 
     "EmailClassification", "EmailBatch", "EmailBatchResult",
     "Task", "TaskCreate", "TaskUpdate", "TaskInDB",

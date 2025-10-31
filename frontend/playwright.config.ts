@@ -78,10 +78,11 @@ export default defineConfig({
   webServer: [
     {
       // Backend server (FastAPI on port 8000)
-      command: 'cd .. && python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000',
+      command: 'python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000',
       url: 'http://localhost:8000/health',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000, // 2 minutes to start
+      cwd: '..',  // Run from project root, not frontend/
       stdout: 'ignore',
       stderr: 'pipe',
     },

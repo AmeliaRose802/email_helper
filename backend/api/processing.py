@@ -86,6 +86,8 @@ async def start_processing(
             "message": f"Processing started for {len(request.email_ids)} emails"
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to start processing: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to start processing: {str(e)}")

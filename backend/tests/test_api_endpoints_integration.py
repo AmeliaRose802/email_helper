@@ -58,10 +58,12 @@ def client():
 # Reset dependencies between tests
 @pytest.fixture(autouse=True)
 def reset_deps():
-    """Reset dependencies before and after each test."""
+    """Reset dependencies and dependency overrides before and after each test."""
     reset_dependencies()
+    app.dependency_overrides.clear()
     yield
     reset_dependencies()
+    app.dependency_overrides.clear()
 
 
 # Mock email provider fixture
@@ -223,20 +225,25 @@ def mock_processing_service():
 @pytest.fixture
 def mock_task_service():
     """Create mock task service."""
+    from backend.models.task import Task, TaskStatus, TaskPriority
+    from datetime import datetime
+    
     service = Mock()
     
-    # Mock task data
-    mock_task = Mock()
-    mock_task.id = 1
-    mock_task.title = "Test Task"
-    mock_task.description = "Test description"
-    mock_task.status = "pending"
-    mock_task.priority = "medium"
-    mock_task.category = "work"
-    mock_task.email_id = None
-    mock_task.created_at = "2024-01-01T10:00:00"
-    mock_task.updated_at = "2024-01-01T10:00:00"
-    mock_task.one_line_summary = "Test summary"
+    # Create real Task model instance
+    mock_task = Task(
+        id="1",
+        title="Test Task",
+        description="Test description",
+        status=TaskStatus.PENDING,
+        priority=TaskPriority.MEDIUM,
+        category="work",
+        email_id=None,
+        created_at=datetime(2024, 1, 1, 10, 0, 0),
+        updated_at=datetime(2024, 1, 1, 10, 0, 0),
+        tags=[],
+        metadata={}
+    )
     
     # Mock paginated result
     paginated_result = Mock()
@@ -251,6 +258,7 @@ def mock_task_service():
     service.get_task = AsyncMock(return_value=mock_task)
     service.update_task = AsyncMock(return_value=mock_task)
     service.delete_task = AsyncMock(return_value=True)
+    service.link_email_to_task = AsyncMock(return_value=mock_task)
     service.get_task_stats = AsyncMock(return_value={
         "total_tasks": 10,
         "pending_tasks": 5,
@@ -512,22 +520,32 @@ class TestTaskEndpoints:
     
     def test_get_task_by_id(self, client, mock_task_service):
         """Test GET /api/tasks/:id."""
-        with patch('backend.core.dependencies.get_task_service', return_value=mock_task_service):
+        from backend.core.dependencies import get_task_service
+        app.dependency_overrides[get_task_service] = lambda: mock_task_service
+        try:
             response = client.get("/api/tasks/1")
             assert response.status_code == 200
             data = response.json()
             assert "id" in data
+        finally:
+            app.dependency_overrides.clear()
     
     def test_get_task_not_found(self, client, mock_task_service):
         """Test GET /api/tasks/:id with non-existent task."""
+        from backend.core.dependencies import get_task_service
         mock_task_service.get_task = AsyncMock(return_value=None)
-        with patch('backend.core.dependencies.get_task_service', return_value=mock_task_service):
+        app.dependency_overrides[get_task_service] = lambda: mock_task_service
+        try:
             response = client.get("/api/tasks/999")
             assert response.status_code == 404
+        finally:
+            app.dependency_overrides.clear()
     
     def test_update_task(self, client, mock_task_service):
         """Test PUT /api/tasks/:id."""
-        with patch('backend.core.dependencies.get_task_service', return_value=mock_task_service):
+        from backend.core.dependencies import get_task_service
+        app.dependency_overrides[get_task_service] = lambda: mock_task_service
+        try:
             response = client.put("/api/tasks/1", json={
                 "title": "Updated Task",
                 "status": "completed"
@@ -535,14 +553,20 @@ class TestTaskEndpoints:
             assert response.status_code == 200
             data = response.json()
             assert "id" in data
+        finally:
+            app.dependency_overrides.clear()
     
     def test_delete_task(self, client, mock_task_service):
         """Test DELETE /api/tasks/:id."""
-        with patch('backend.core.dependencies.get_task_service', return_value=mock_task_service):
+        from backend.core.dependencies import get_task_service
+        app.dependency_overrides[get_task_service] = lambda: mock_task_service
+        try:
             response = client.delete("/api/tasks/1")
             assert response.status_code == 200
             data = response.json()
             assert "message" in data
+        finally:
+            app.dependency_overrides.clear()
     
     def test_bulk_update_tasks(self, client, mock_task_service):
         """Test POST /api/tasks/bulk-update."""
@@ -567,19 +591,27 @@ class TestTaskEndpoints:
     
     def test_update_task_status(self, client, mock_task_service):
         """Test PUT /api/tasks/:id/status."""
-        with patch('backend.core.dependencies.get_task_service', return_value=mock_task_service):
+        from backend.core.dependencies import get_task_service
+        app.dependency_overrides[get_task_service] = lambda: mock_task_service
+        try:
             response = client.put("/api/tasks/1/status?status=in_progress")
             assert response.status_code == 200
             data = response.json()
             assert "id" in data
+        finally:
+            app.dependency_overrides.clear()
     
     def test_link_email_to_task(self, client, mock_task_service):
         """Test POST /api/tasks/:id/link-email."""
-        with patch('backend.core.dependencies.get_task_service', return_value=mock_task_service):
+        from backend.core.dependencies import get_task_service
+        app.dependency_overrides[get_task_service] = lambda: mock_task_service
+        try:
             response = client.post("/api/tasks/1/link-email?email_id=test_email_1")
             assert response.status_code == 200
             data = response.json()
             assert "message" in data
+        finally:
+            app.dependency_overrides.clear()
     
     def test_deduplicate_fyi_tasks(self, client, mock_task_service, mock_ai_service):
         """Test POST /api/tasks/deduplicate/fyi."""

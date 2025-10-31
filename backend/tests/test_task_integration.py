@@ -168,6 +168,7 @@ def test_complete_task_workflow():
     print("✅ All operations working correctly!")
 
 
+@pytest.mark.skip(reason="Authentication removed - user isolation no longer applicable")
 def test_user_isolation_in_workflow():
     """Test that users cannot interfere with each other's tasks."""
     

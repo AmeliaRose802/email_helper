@@ -91,11 +91,9 @@ class TestAIEmailClassificationIntegration:
         # Verify AI processor was called
         mock_ai_orchestrator.classify_email_with_explanation.assert_called_once()
     
-    @pytest.mark.skip(reason="Non-deterministic AI classification - requires real Azure OpenAI")
-    async def test_classify_multiple_email_types(self, mock_ai_orchestrator):
+    async def test_classify_multiple_email_types(self, mock_ai_orchestrator, mock_azure_config_obj):
         """Test classification of different email types."""
-        # This test demonstrates classification across different email types
-        # In practice, each would be tested individually in unit tests
+        # Test demonstrates classification with proper mocking
         email_test = {
             'content': 'Subject: Team Meeting\nJoin us for weekly standup tomorrow at 10am',
             'expected_category': 'optional_event',
@@ -111,7 +109,7 @@ class TestAIEmailClassificationIntegration:
         }
         
         with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-            with patch('backend.services.ai_service.get_azure_config', return_value=MagicMock()):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
                 from backend.services.ai_service import AIService
                 service = AIService()
                 service._ensure_initialized()
@@ -123,8 +121,7 @@ class TestAIEmailClassificationIntegration:
                 assert result['category'] == email_test['expected_category']
                 assert result['confidence'] == email_test['confidence']
     
-    @pytest.mark.skip(reason="Non-deterministic AI classification - requires real Azure OpenAI")
-    async def test_classification_with_context(self, mock_ai_orchestrator):
+    async def test_classification_with_context(self, mock_ai_orchestrator, mock_azure_config_obj):
         """Test email classification with additional context."""
         mock_ai_orchestrator.classify_email_with_explanation.return_value = {
             "category": "required_personal_action",
@@ -134,7 +131,7 @@ class TestAIEmailClassificationIntegration:
         }
         
         with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-            with patch('backend.services.ai_service.get_azure_config', return_value=MagicMock()):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
                 from backend.services.ai_service import AIService
                 service = AIService()
                 service._ensure_initialized()

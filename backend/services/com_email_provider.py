@@ -310,6 +310,9 @@ class COMEmailProvider(EmailProvider):
             loop = asyncio.get_event_loop()
             return await loop.run_in_executor(None, self._get_email_content_sync, email_id)
             
+        except HTTPException:
+            # Re-raise HTTPExceptions as-is (including 404)
+            raise
         except RuntimeError as e:
             self.logger.error(f"Connection error: {e}")
             self.authenticated = False

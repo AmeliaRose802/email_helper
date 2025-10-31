@@ -27,32 +27,6 @@ class AIService:
         self.azure_config = None
         self._initialized = False
     
-    def _parse_email_content(self, email_content: str) -> Dict[str, str]:
-        """Parse email content to extract subject, sender, and body.
-        
-        Args:
-            email_content: Full email text (may include Subject:, From: headers)
-            
-        Returns:
-            Dict with keys: subject, sender, body
-        """
-        lines = email_content.split('\n')
-        subject = "No subject"
-        sender = "Unknown sender"
-        body = email_content
-        
-        # Simple parsing to extract subject and sender
-        for line in lines[:5]:  # Check first few lines
-            if line.startswith('Subject:'):
-                subject = line.replace('Subject:', '').strip()
-            elif line.startswith('From:'):
-                sender = line.replace('From:', '').strip()
-            elif line.strip() == '':
-                body = '\n'.join(lines[lines.index(line)+1:])
-                break
-        
-        return {"subject": subject, "sender": sender, "body": body}
-    
     async def _run_sync(self, func, *args):
         """Run synchronous function in executor to avoid blocking event loop.
         
@@ -66,80 +40,30 @@ class AIService:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, func, *args)
     
-    def _classification_fallback(self, error_msg: str) -> Dict[str, Any]:
-        """Generate fallback classification response."""
-        return {
-            "category": "work_relevant",
-            "confidence": 0.5,
-            "reasoning": f"Classification failed: {error_msg}",
-            "alternatives": [],
-            "error": error_msg
+    def _error_response(self, response_type: str, error_msg: str) -> Dict[str, Any]:
+        """Generate error response based on type."""
+        error_responses = {
+            "classification": {"category": "work_relevant", "confidence": 0.5, "reasoning": error_msg, "alternatives": []},
+            "action_items": {"action_items": [], "urgency": "unknown", "deadline": None, "confidence": 0.0, "action_required": "Unable to extract action items", "explanation": error_msg},
+            "summary": {"summary": f"Unable to generate summary: {error_msg}", "key_points": [], "confidence": 0.0}
         }
+        return {**error_responses.get(response_type, {}), "error": error_msg}
     
-    def _action_items_fallback(self, error_msg: str) -> Dict[str, Any]:
-        """Generate fallback action items response."""
-        return {
-            "action_items": [],
-            "urgency": "unknown",
-            "deadline": None,
-            "confidence": 0.0,
-            "due_date": None,
-            "action_required": "Unable to extract action items",
-            "explanation": f"Action item extraction failed: {error_msg}",
-            "relevance": "Unknown relevance due to processing error",
-            "links": [],
-            "error": error_msg
-        }
-    
-    def _summary_fallback(self, error_msg: str) -> Dict[str, Any]:
-        """Generate fallback summary response."""
-        return {
-            "summary": f"Unable to generate summary: {error_msg}",
-            "key_points": [],
-            "confidence": 0.0,
-            "error": error_msg
-        }
-    
-    def _parse_json_result(self, result: Any, fallback: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse JSON result from AI with fallback.
+    @staticmethod
+    def _parse_email_headers(email_content: str) -> tuple[str, str, str]:
+        """Parse email headers from content.
         
-        Args:
-            result: Result from AI (may be string or dict)
-            fallback: Fallback dict to return if parsing fails
-            
         Returns:
-            Parsed dict or fallback
+            tuple: (subject, sender, body)
         """
-        if isinstance(result, dict):
-            return result
-        if isinstance(result, str):
-            try:
-                return json.loads(result)
-            except json.JSONDecodeError:
-                return fallback
-        return fallback
-    
-    def _execute_prompty_with_email(self, template: str, email_content: str, context: str = "") -> Any:
-        """Execute prompty template with parsed email content.
-        
-        Args:
-            template: Prompty template filename
-            email_content: Full email content to parse
-            context: Additional context
-            
-        Returns:
-            Result from prompty execution
-        """
-        parsed = self._parse_email_content(email_content)
-        inputs = {
-            'context': context,
-            'username': 'User',
-            'subject': parsed["subject"],
-            'sender': parsed["sender"],
-            'date': 'Recent',
-            'body': parsed["body"]
-        }
-        return self.ai_orchestrator.execute_prompty(template, inputs)
+        lines = email_content.split('\n', 5)
+        subject = sender = ""
+        for i, line in enumerate(lines[:5]):
+            if line.startswith('Subject:'): subject = line[8:].strip()
+            elif line.startswith('From:'): sender = line[5:].strip()
+            elif not line.strip():
+                return subject, sender, '\n'.join(lines[i+1:])
+        return subject, sender, email_content
     
     def _convert_email_for_orchestrator(self, email: Dict[str, Any]) -> Dict[str, Any]:
         """Convert API email format to AIOrchestrator format."""
@@ -170,7 +94,7 @@ class AIService:
         email_content: str, 
         context: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Async wrapper for email classification using full email content.
+        """Async wrapper for email classification.
         
         Args:
             email_content: Full email text (may include Subject:, From: headers)
@@ -180,73 +104,29 @@ class AIService:
             Dict containing classification results with category, confidence, and reasoning
         """
         self._ensure_initialized()
-        
         try:
-            return await self._run_sync(
-                self._classify_email_sync,
-                email_content,
-                context or ""
-            )
+            return await self._run_sync(self._classify_email_sync, email_content, context or "")
         except Exception as e:
-            return self._classification_fallback(str(e))
-    
-    async def classify_email_async(
-        self, 
-        subject: str, 
-        content: str, 
-        sender: str, 
-        context: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Async wrapper for email classification.
-        
-        Args:
-            subject: Email subject line
-            content: Email body content
-            sender: Email sender address
-            context: Additional context for classification
-            
-        Returns:
-            Dict containing classification results with category, confidence, and reasoning
-        """
-        self._ensure_initialized()
-        email_text = f"Subject: {subject}\nFrom: {sender}\n\n{content}"
-        
-        try:
-            return await self._run_sync(
-                self._classify_email_sync,
-                email_text,
-                context or ""
-            )
-        except Exception as e:
-            return self._classification_fallback(str(e))
+            return self._error_response("classification", str(e))
     
     def _classify_email_sync(self, email_content: str, context: str) -> Dict[str, Any]:
         """Synchronous email classification for thread pool execution."""
-        try:
-            # Use the enhanced classification method with explanation
-            result = self.ai_orchestrator.classify_email_with_explanation(
-                email_content, 
-                learning_data=[]  # Empty learning data for now
-            )
-            
-            # Ensure result is in expected format
-            if isinstance(result, dict):
-                return {
-                    "category": result.get("category", "work_relevant"),
-                    "confidence": result.get("confidence", 0.8),
-                    "reasoning": result.get("explanation", "Classification completed"),
-                    "alternatives": result.get("alternatives", [])
-                }
-            else:
-                # Fallback for string results
-                return {
-                    "category": str(result) if result else "work_relevant",
-                    "confidence": 0.8,
-                    "reasoning": "Email classified successfully",
-                    "alternatives": []
-                }
-        except Exception as e:
-            raise RuntimeError(f"Email classification failed: {e}")
+        result = self.ai_orchestrator.classify_email_with_explanation(email_content, learning_data=[])
+        
+        if isinstance(result, dict):
+            return {
+                "category": result.get("category", "work_relevant"),
+                "confidence": result.get("confidence", 0.8),
+                "reasoning": result.get("explanation", "Classification completed"),
+                "alternatives": result.get("alternatives", [])
+            }
+        
+        return {
+            "category": str(result) if result else "work_relevant",
+            "confidence": 0.8,
+            "reasoning": "Email classified successfully",
+            "alternatives": []
+        }
     
     async def extract_action_items(
         self, 
@@ -263,50 +143,47 @@ class AIService:
             Dict containing action items, urgency, deadline, and other details
         """
         self._ensure_initialized()
-        
         try:
-            return await self._run_sync(
-                self._extract_action_items_sync,
-                email_content,
-                context or ""
-            )
+            return await self._run_sync(self._extract_action_items_sync, email_content, context or "")
         except Exception as e:
-            return self._action_items_fallback(str(e))
+            return self._error_response("action_items", str(e))
+    
+    @staticmethod
+    def _parse_ai_result(result: Any, default_action: str = "Review email content") -> Dict[str, Any]:
+        """Parse AI result into dict, handling string/dict/other types."""
+        if isinstance(result, dict):
+            return result
+        if isinstance(result, str):
+            try:
+                return json.loads(result)
+            except json.JSONDecodeError:
+                return {"action_required": default_action, "explanation": "Unable to parse structured response"}
+        return {"action_required": default_action}
     
     def _extract_action_items_sync(self, email_content: str, context: str) -> Dict[str, Any]:
         """Synchronous action item extraction for thread pool execution."""
-        try:
-            result = self._execute_prompty_with_email(
-                'summerize_action_item.prompty',
-                email_content,
-                context
-            )
-            
-            # Parse JSON result with fallback
-            fallback = {
-                "due_date": "No specific deadline",
-                "action_required": "Review email content",
-                "explanation": "Unable to parse structured response",
-                "relevance": "Email requires attention",
-                "links": []
-            }
-            parsed_result = self._parse_json_result(result, fallback)
-            
-            # Convert to expected API format
-            return {
-                "action_items": [parsed_result.get("action_required", "Review email")] if parsed_result.get("action_required") else [],
-                "urgency": "medium",
-                "deadline": parsed_result.get("due_date"),
-                "confidence": 0.8,
-                "due_date": parsed_result.get("due_date"),
-                "action_required": parsed_result.get("action_required"),
-                "explanation": parsed_result.get("explanation"),
-                "relevance": parsed_result.get("relevance"),
-                "links": parsed_result.get("links", [])
-            }
-            
-        except Exception as e:
-            raise RuntimeError(f"Action item extraction failed: {e}")
+        subject, sender, body = self._parse_email_headers(email_content)
+        
+        inputs = {
+            'context': context, 'username': 'User',
+            'subject': subject or 'No subject', 'sender': sender or 'Unknown',
+            'date': 'Recent', 'body': body
+        }
+        result = self.ai_orchestrator.execute_prompty('summerize_action_item.prompty', inputs)
+        parsed = self._parse_ai_result(result)
+        
+        action = parsed.get("action_required", "Review email")
+        return {
+            "action_items": [action] if action else [],
+            "urgency": "medium",
+            "deadline": parsed.get("due_date"),
+            "confidence": 0.8,
+            "due_date": parsed.get("due_date"),
+            "action_required": action,
+            "explanation": parsed.get("explanation"),
+            "relevance": parsed.get("relevance"),
+            "links": parsed.get("links", [])
+        }
     
     async def generate_summary(
         self,
@@ -323,42 +200,31 @@ class AIService:
             Dict containing summary, key points, and confidence
         """
         self._ensure_initialized()
-        
         try:
-            return await self._run_sync(
-                self._generate_summary_sync,
-                email_content,
-                summary_type
-            )
+            return await self._run_sync(self._generate_summary_sync, email_content, summary_type)
         except Exception as e:
-            return self._summary_fallback(str(e))
+            return self._error_response("summary", str(e))
     
     def _generate_summary_sync(self, email_content: str, summary_type: str) -> Dict[str, Any]:
         """Synchronous summary generation for thread pool execution."""
-        try:
-            result = self._execute_prompty_with_email(
-                'email_one_line_summary.prompty',
-                email_content,
-                f'Summary type: {summary_type}'
-            )
-            
-            # Process result
-            summary_text = str(result).strip() if result else "Unable to generate summary"
-            
-            # Generate key points (simple extraction)
-            key_points = []
-            if len(summary_text) > 20:
-                sentences = summary_text.split('.')
-                key_points = [s.strip() for s in sentences if len(s.strip()) > 10][:3]
-            
-            return {
-                "summary": summary_text,
-                "key_points": key_points,
-                "confidence": 0.8 if len(summary_text) > 20 else 0.5
-            }
-            
-        except Exception as e:
-            raise RuntimeError(f"Summary generation failed: {e}")
+        subject, sender, body = self._parse_email_headers(email_content)
+        
+        inputs = {
+            'context': f'Summary type: {summary_type}', 'username': 'User',
+            'subject': subject or 'No subject', 'sender': sender or 'Unknown',
+            'date': 'Recent', 'body': body
+        }
+        result = self.ai_orchestrator.execute_prompty('email_one_line_summary.prompty', inputs)
+        
+        summary_text = str(result).strip() if result else "Unable to generate summary"
+        is_good = result and len(summary_text) > 20
+        key_points = [s.strip() for s in summary_text.split('.') if len(s.strip()) > 10][:3] if is_good else []
+        
+        return {
+            "summary": summary_text,
+            "key_points": key_points,
+            "confidence": 0.8 if is_good else 0.5
+        }
     
     async def analyze_holistically(
         self,
@@ -374,12 +240,8 @@ class AIService:
             superseded_actions, duplicate_groups, and expired_items
         """
         self._ensure_initialized()
-        
         try:
-            return await self._run_sync(
-                self._analyze_holistically_sync,
-                emails
-            )
+            return await self._run_sync(self._analyze_holistically_sync, emails)
         except Exception as e:
             return {
                 "truly_relevant_actions": [],
@@ -391,23 +253,19 @@ class AIService:
     
     def _analyze_holistically_sync(self, emails: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Synchronous holistic analysis for thread pool execution."""
-        try:
-            email_data_list = [self._convert_email_for_orchestrator(email) for email in emails]
-            analysis, notes = self.ai_orchestrator.analyze_inbox_holistically(email_data_list)
-            
-            if not analysis:
-                return {
-                    "truly_relevant_actions": [],
-                    "superseded_actions": [],
-                    "duplicate_groups": [],
-                    "expired_items": [],
-                    "notes": notes
-                }
-            
-            return analysis
-            
-        except Exception as e:
-            raise RuntimeError(f"Holistic analysis failed: {e}")
+        email_data_list = [self._convert_email_for_orchestrator(email) for email in emails]
+        analysis, notes = self.ai_orchestrator.analyze_inbox_holistically(email_data_list)
+        
+        if not analysis:
+            return {
+                "truly_relevant_actions": [],
+                "superseded_actions": [],
+                "duplicate_groups": [],
+                "expired_items": [],
+                "notes": notes
+            }
+        
+        return analysis
     
     def _extract_template_description(self, template_file: Path) -> str:
         """Extract description from prompty template YAML frontmatter."""

@@ -876,6 +876,71 @@ button:disabled, a:disabled {
   text-shadow: 0 0 15px rgba(0, 230, 255, 0.4);
 }
 
+/* Dashboard Settings Section */
+.dashboard-settings-section {
+  background: var(--color-card-bg);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--color-border);
+}
+
+.dashboard-settings-section h3 {
+  margin-top: 0;
+}
+
+.dashboard-settings-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-settings-label {
+  font-weight: 500;
+}
+
+.dashboard-settings-input {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  width: 100px;
+  font-size: 1rem;
+}
+
+.dashboard-settings-hint {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.dashboard-settings-note {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+/* Dashboard StatCard Elements */
+.stat-card-icon {
+  margin-right: 0.5rem;
+}
+
+.stat-card-loading {
+  padding: 1rem 0;
+}
+
+.stat-card-skeleton-item {
+  margin-top: 0.5rem;
+}
+
+.stat-card-stat-primary {
+  font-size: 1.5rem;
+}
+
+.stat-card-stat-secondary {
+  font-size: 1rem;
+}
+
 /* ============================================
    LOADING STATES & SPINNERS
    ============================================ */

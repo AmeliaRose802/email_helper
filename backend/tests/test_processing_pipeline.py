@@ -105,7 +105,7 @@ class TestProcessingAPI:
         """Test getting pipeline jobs."""
         # Create a test pipeline
         email_ids = ["email_1", "email_2"]
-        pipeline_id = await job_queue.create_pipeline(email_ids, "test_user_123")
+        pipeline_id = await job_queue.create_pipeline(email_ids, "default_user")
         
         response = client.get(f"/api/processing/{pipeline_id}/jobs")
         

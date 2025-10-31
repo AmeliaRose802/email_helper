@@ -50,7 +50,7 @@ class TestTaskService:
         assert result.id is not None
         assert result.title == "Test Task"
         assert result.description == "Test task description"
-        assert result.status == TaskStatus.TODO
+        assert result.status == TaskStatus.PENDING
         assert result.priority == TaskPriority.HIGH
         assert result.due_date is not None
         assert result.created_at is not None
@@ -151,7 +151,7 @@ class TestTaskService:
     async def test_get_tasks_with_status_filter(self, task_service: TaskService, test_user_id: int):
         """Test filtered task retrieval by status."""
         # Create tasks with different statuses
-        task1_data = TaskCreate(title="Pending Task", status=TaskStatus.TODO)
+        task1_data = TaskCreate(title="Pending Task", status=TaskStatus.PENDING)
         task2_data = TaskCreate(title="In Progress Task", status=TaskStatus.IN_PROGRESS)
         
         await task_service.create_task(task1_data, test_user_id)
@@ -164,7 +164,7 @@ class TestTaskService:
         )
         
         assert len(result.tasks) == 1
-        assert result.tasks[0].status == TaskStatus.TODO
+        assert result.tasks[0].status == TaskStatus.PENDING
         assert result.tasks[0].title == "Pending Task"
     
     @pytest.mark.asyncio

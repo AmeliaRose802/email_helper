@@ -79,8 +79,9 @@ class ClassificationEngine:
         few_shot_examples = self._get_few_shot_examples(email_content, learning_data)
         
         # Build context with examples
+        learning_data_len = len(learning_data) if hasattr(learning_data, '__len__') else 0
         context = f"""{self.context_manager.get_standard_context()}
-Learning History: {len(learning_data)} previous decisions"""
+Learning History: {learning_data_len} previous decisions"""
         
         if few_shot_examples:
             context += "\n\nSimilar Examples from Past Classifications:"
@@ -186,13 +187,22 @@ Learning History: {len(learning_data)} previous decisions"""
         
         Args:
             email_content: Current email data
-            learning_data: DataFrame of historical classifications
+            learning_data: DataFrame of historical classifications or list
             max_examples: Maximum number of examples to return
             
         Returns:
             list: List of example dicts with subject, sender, body, category
         """
-        if learning_data.empty:
+        # Handle both DataFrame and list/empty cases
+        if learning_data is None:
+            return []
+        if isinstance(learning_data, list):
+            if not learning_data:
+                return []
+            # Convert list to DataFrame-like access if needed
+            # For now, lists don't support few-shot examples
+            return []
+        if hasattr(learning_data, 'empty') and learning_data.empty:
             return []
         
         # Filter for successful classifications

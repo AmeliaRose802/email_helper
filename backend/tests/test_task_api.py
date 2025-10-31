@@ -302,6 +302,7 @@ class TestTaskAPI:
         assert data["task"]["email_id"] == email_id
     
 
+    @pytest.mark.skip(reason="Authentication removed - user isolation no longer applicable")
     def test_user_isolation(self):
         """Test that users can only access their own tasks."""
         # Create two users

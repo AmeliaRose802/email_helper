@@ -75,7 +75,8 @@ async def root():
     return {
         "message": "Email Helper API",
         "version": settings.app_version,
-        "docs": "/docs"
+        "docs": "/docs",
+        "health": "/health"
     }
 
 
@@ -88,6 +89,7 @@ app.include_router(ai.router, prefix="/api", tags=["ai"])
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 app.include_router(processing.router, prefix="/api", tags=["processing"])
 app.include_router(settings_api.router, prefix="/api", tags=["settings"])
+
 
 
 if __name__ == "__main__":

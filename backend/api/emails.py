@@ -1,10 +1,8 @@
 """Email endpoints for FastAPI Email Helper API."""
 
-from typing import List, Optional, Dict, Any, Callable
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Body, BackgroundTasks
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import json
 import asyncio
 import logging
 from datetime import datetime
@@ -17,6 +15,30 @@ from backend.models.email import Email, EmailBatch, EmailBatchResult
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _diagnose_error(error: Exception, email_id: str, context: str = "processing") -> None:
+    """Diagnose and log API/AI errors with specific error type identification.
+    
+    Args:
+        error: The exception that occurred
+        email_id: ID of the email being processed (truncated for logging)
+        context: Description of what was being done (e.g., "action extraction", "classification")
+    """
+    error_type = type(error).__name__
+    error_msg = str(error).lower()
+    email_short = email_id[:30] if len(email_id) > 30 else email_id
+    
+    if 'content_filter' in error_msg or 'responsibleaipolicyviolation' in error_msg or 'content management policy' in error_msg:
+        logger.warning(f"[Task Extraction] ⚠️ CONTENT FILTER blocked {context} for {email_short}: {error}")
+    elif 'rate' in error_msg or 'quota' in error_msg or '429' in error_msg or 'throttl' in error_msg:
+        logger.warning(f"[Task Extraction] ⏱️ RATE LIMIT hit during {context} for {email_short}: {error}")
+    elif 'timeout' in error_msg or 'connection' in error_msg or 'network' in error_msg:
+        logger.warning(f"[Task Extraction] 🔌 CONNECTION ERROR during {context} for {email_short}: {error}")
+    elif 'badrequest' in error_msg or 'invalid' in error_msg:
+        logger.warning(f"[Task Extraction] ⚠️ BAD REQUEST during {context} for {email_short}: {error}")
+    else:
+        logger.error(f"[Task Extraction] ❌ UNEXPECTED ERROR ({error_type}) during {context} for {email_short}: {error}")
 
 
 def handle_errors(default_message: str = "Operation failed"):
@@ -292,9 +314,6 @@ async def get_email_stats(
     Args:
         limit: Maximum number of emails to process (10-1000, default: 100)
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    
     try:
         logger.info("Getting email stats for localhost user (limit: %d)", limit)
         
@@ -313,7 +332,7 @@ async def get_email_stats(
             try:
                 folder_emails = provider.get_emails(folder_name=folder_name, count=100)
                 emails_by_folder[folder_name] = len(folder_emails)
-            except:
+            except Exception:
                 emails_by_folder[folder_name] = 0
         
         # Count by sender (top 5)
@@ -390,11 +409,8 @@ async def get_accuracy_stats(
         - overall accuracy percentage
         - per-category stats (total, correct, accuracy, precision, recall, f1)
     """
-    import logging
     from backend.database.connection import db_manager
     from collections import defaultdict
-    
-    logger = logging.getLogger(__name__)
     
     try:
         with db_manager.get_connection() as conn:
@@ -573,7 +589,7 @@ async def get_email(
     import time
     start_time = time.time()
     
-    email = await provider.get_email_content(email_id)
+    email = provider.get_email_content(email_id)
     
     elapsed = time.time() - start_time
     if elapsed > 1.0:  # Log if slower than 1 second
@@ -815,9 +831,6 @@ async def bulk_apply_to_outlook(
     Returns:
         Results of the bulk apply operation
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    
     try:
         if not request.email_ids:
             raise HTTPException(
@@ -1039,8 +1052,6 @@ async def extract_tasks_from_emails(
     from backend.services.task_service import get_task_service
     from backend.models.task import TaskCreate, TaskPriority, TaskStatus
     
-    logger = logging.getLogger(__name__)
-    
     if not request.email_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1205,7 +1216,6 @@ async def extract_tasks_from_emails(
                             
                             # Determine priority
                             priority = 'high' if 'urgent' in email.get('subject', '').lower() else 'medium'
-                            priority = 'high' if 'urgent' in email.get('subject', '').lower() else 'medium'
                             if ai_category == 'required_personal_action':
                                 priority = 'high'
                             
@@ -1216,7 +1226,7 @@ async def extract_tasks_from_emails(
                                 try:
                                     from dateutil import parser
                                     due_date = parser.parse(due_date_str)
-                                except:
+                                except Exception:
                                     due_date = None
                             
                             # Build description with all relevant info
@@ -1252,18 +1262,7 @@ async def extract_tasks_from_emails(
                                 logger.info(f"[Task Extraction] ⏭️ Skipped: No action required for {email_id[:30]}")
                             
                     except Exception as task_error:
-                        error_type = type(task_error).__name__
-                        error_msg = str(task_error).lower()
-                        
-                        # Detailed error diagnosis
-                        if 'content_filter' in error_msg or 'responsibleaipolicyviolation' in error_msg:
-                            logger.warning(f"[Task Extraction] ⚠️ CONTENT FILTER blocked action extraction for email {email_id[:30]}: {task_error}")
-                        elif 'rate' in error_msg or 'quota' in error_msg or '429' in error_msg:
-                            logger.warning(f"[Task Extraction] ⏱️ RATE LIMIT hit during action extraction for email {email_id[:30]}: {task_error}")
-                        elif 'timeout' in error_msg or 'connection' in error_msg:
-                            logger.warning(f"[Task Extraction] 🔌 CONNECTION ERROR during action extraction for email {email_id[:30]}: {task_error}")
-                        else:
-                            logger.error(f"[Task Extraction] ❌ UNKNOWN ERROR ({error_type}) creating task for email {email_id[:30]}: {task_error}")
+                        _diagnose_error(task_error, email_id, "action extraction")
                 
                 elif ai_category in JOB_CATEGORIES:
                     # Create job listing task
@@ -1303,7 +1302,7 @@ async def extract_tasks_from_emails(
                             try:
                                 from dateutil import parser
                                 due_date = parser.parse(action_result['due_date'])
-                            except:
+                            except Exception:
                                 due_date = None
                         
                         task_data = TaskCreate(
@@ -1323,15 +1322,7 @@ async def extract_tasks_from_emails(
                         logger.info(f"[Task Extraction] Created job listing task for email {email_id[:20]}...")
                         
                     except Exception as job_error:
-                        error_type = type(job_error).__name__
-                        error_msg = str(job_error).lower()
-                        
-                        if 'content_filter' in error_msg or 'responsibleaipolicyviolation' in error_msg:
-                            logger.warning(f"[Task Extraction] ⚠️ CONTENT FILTER blocked job listing extraction for email {email_id[:30]}: {job_error}")
-                        elif 'rate' in error_msg or 'quota' in error_msg or '429' in error_msg:
-                            logger.warning(f"[Task Extraction] ⏱️ RATE LIMIT hit during job listing extraction for email {email_id[:30]}: {job_error}")
-                        else:
-                            logger.error(f"[Task Extraction] ❌ ERROR ({error_type}) creating job listing for email {email_id[:30]}: {job_error}")
+                        _diagnose_error(job_error, email_id, "job listing extraction")
                 
                 elif ai_category in EVENT_CATEGORIES:
                     # Create optional event task
@@ -1391,15 +1382,7 @@ async def extract_tasks_from_emails(
                         logger.info(f"[Task Extraction] Created event task for email {email_id[:20]}...")
                         
                     except Exception as event_error:
-                        error_type = type(event_error).__name__
-                        error_msg = str(event_error).lower()
-                        
-                        if 'content_filter' in error_msg or 'responsibleaipolicyviolation' in error_msg:
-                            logger.warning(f"[Task Extraction] ⚠️ CONTENT FILTER blocked event extraction for email {email_id[:30]}: {event_error}")
-                        elif 'rate' in error_msg or 'quota' in error_msg or '429' in error_msg:
-                            logger.warning(f"[Task Extraction] ⏱️ RATE LIMIT hit during event extraction for email {email_id[:30]}: {event_error}")
-                        else:
-                            logger.error(f"[Task Extraction] ❌ ERROR ({error_type}) creating event task for email {email_id[:30]}: {event_error}")
+                        _diagnose_error(event_error, email_id, "event extraction")
                 
                 elif ai_category in SUMMARY_CATEGORIES:
                     # Create informational tasks for FYI and newsletters
@@ -1457,35 +1440,14 @@ async def extract_tasks_from_emails(
                         logger.info(f"[Task Extraction] Created {ai_category} summary for email {email_id[:20]}...")
                         
                     except Exception as summary_error:
-                        error_type = type(summary_error).__name__
-                        error_msg = str(summary_error).lower()
-                        
-                        if 'content_filter' in error_msg or 'responsibleaipolicyviolation' in error_msg:
-                            logger.warning(f"[Task Extraction] ⚠️ CONTENT FILTER blocked {ai_category} summary for email {email_id[:30]}: {summary_error}")
-                        elif 'rate' in error_msg or 'quota' in error_msg or '429' in error_msg:
-                            logger.warning(f"[Task Extraction] ⏱️ RATE LIMIT hit during {ai_category} summary for email {email_id[:30]}: {summary_error}")
-                        else:
-                            logger.error(f"[Task Extraction] ❌ ERROR ({error_type}) creating {ai_category} summary for email {email_id[:30]}: {summary_error}")
+                        _diagnose_error(summary_error, email_id, f"{ai_category} summary generation")
                 
                 # ⏱️ RATE LIMITING: 2-second delay between emails to prevent Azure OpenAI throttling
                 # This ensures we stay well under rate limits and reduces "AI service unavailable" errors
                 await asyncio.sleep(2.0)
                 
             except Exception as e:
-                error_type = type(e).__name__
-                error_msg = str(e).lower()
-                
-                # 🔍 TOP-LEVEL ERROR DIAGNOSIS - Shows exact failure reason
-                if 'content_filter' in error_msg or 'responsibleaipolicyviolation' in error_msg or 'content management policy' in error_msg:
-                    logger.warning(f"[Task Extraction] ⚠️ CONTENT FILTER: Email {email_id[:30]} blocked by Azure content policy. Email contains flagged content.")
-                elif 'rate' in error_msg or 'quota' in error_msg or '429' in error_msg or 'throttl' in error_msg:
-                    logger.warning(f"[Task Extraction] ⏱️ RATE LIMIT: Throttled while processing email {email_id[:30]}. Azure OpenAI rate limit exceeded. Error: {e}")
-                elif 'timeout' in error_msg or 'connection' in error_msg or 'network' in error_msg:
-                    logger.warning(f"[Task Extraction] 🔌 CONNECTION: Network issue processing email {email_id[:30]}. Error: {e}")
-                elif 'badrequest' in error_msg or 'invalid' in error_msg:
-                    logger.warning(f"[Task Extraction] ⚠️ BAD REQUEST: Invalid data in email {email_id[:30]}. Error: {e}")
-                else:
-                    logger.error(f"[Task Extraction] ❌ UNEXPECTED ERROR ({error_type}) processing email {email_id[:30]}: {e}")
+                _diagnose_error(e, email_id, "email processing")
                 continue
         
         logger.info(f"[Task Extraction] Completed: {tasks_created} tasks, {summaries_created} summaries created")
@@ -1533,8 +1495,6 @@ async def sync_emails_to_database(
     """
     import logging
     from backend.database.connection import db_manager
-    
-    logger = logging.getLogger(__name__)
     
     if not request.emails:
         raise HTTPException(
@@ -1673,9 +1633,6 @@ async def analyze_holistically(
     Returns:
         Holistic analysis results with categorized emails
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    
     if not request.emails:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

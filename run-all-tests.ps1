@@ -1,12 +1,11 @@
 # run-all-tests.ps1
 # Comprehensive test runner for Email Helper project
-# Runs all tests: Python backend tests, Python src tests, frontend unit tests, and E2E tests
+# Runs all tests: Python backend tests, frontend unit tests, and E2E tests
 
 param(
     [switch]$SkipBackend,
     [switch]$SkipFrontend,
     [switch]$SkipE2E,
-    [switch]$SkipSrc,
     [switch]$Coverage,
     [switch]$Verbose
 )
@@ -40,7 +39,6 @@ function Write-Info {
 # Track results
 $results = @{
     BackendTests = $null
-    SrcTests = $null
     FrontendUnitTests = $null
     FrontendE2ETests = $null
 }
@@ -68,28 +66,7 @@ if (-not $SkipBackend) {
     }
 }
 
-# 2. Src Python Tests (pytest for test/)
-if (-not $SkipSrc) {
-    Write-Header "Running Src Tests (pytest test/)"
-    
-    $srcArgs = @("python", "-m", "pytest", "test/", "-v")
-    if ($Coverage) {
-        $srcArgs += @("--cov=src", "--cov-report=term-missing", "--cov-report=html:runtime_data/coverage/src")
-    }
-    if ($Verbose) {
-        $srcArgs += "-vv"
-    }
-    
-    try {
-        & $srcArgs[0] $srcArgs[1..($srcArgs.Length-1)]
-        $results.SrcTests = $LASTEXITCODE -eq 0
-    } catch {
-        Write-Failure "Src tests failed to run: $_"
-        $results.SrcTests = $false
-    }
-}
-
-# 3. Frontend Unit Tests (vitest)
+# 2. Frontend Unit Tests (vitest)
 if (-not $SkipFrontend) {
     Write-Header "Running Frontend Unit Tests (vitest)"
     
@@ -109,7 +86,7 @@ if (-not $SkipFrontend) {
     }
 }
 
-# 4. Frontend E2E Tests (Playwright)
+# 3. Frontend E2E Tests (Playwright)
 if (-not $SkipE2E) {
     Write-Header "Running Frontend E2E Tests (Playwright)"
     

@@ -110,41 +110,43 @@ def mock_complete_ai_service():
 class TestCompleteEmailProcessingWorkflow:
     """Test complete end-to-end email processing workflows."""
     
-    @pytest.mark.skip(reason="Mock configuration issues - AI processor not properly mocked in async context")
     @pytest.mark.asyncio
     async def test_email_retrieval_to_classification_pipeline(
-        self, mock_complete_email_provider
+        self, mock_complete_email_provider, mock_ai_orchestrator, mock_azure_config_obj
     ):
         """Test full workflow: retrieve emails → classify each."""
-        # Setup AI service
-        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.ai_service.get_azure_config'):
-                mock_ai = MagicMock()
-                
-                # Return different classifications for different emails
-                classifications = [
-                    json.dumps({
-                        "category": "required_personal_action",
-                        "confidence": 0.95,
-                        "reasoning": "Urgent deadline requires action",
-                        "alternatives": []
-                    }),
-                    json.dumps({
-                        "category": "optional_event",
-                        "confidence": 0.88,
-                        "reasoning": "Meeting invitation",
-                        "alternatives": []
-                    }),
-                    json.dumps({
-                        "category": "optional_fyi",
-                        "confidence": 0.92,
-                        "reasoning": "Informational update",
-                        "alternatives": []
-                    })
-                ]
-                mock_ai.execute_prompty.side_effect = classifications
-                mock_ai_class.return_value = mock_ai
-                
+        # Setup AI orchestrator with different classifications for different emails
+        classifications = [
+            {
+                "category": "required_personal_action",
+                "confidence": 0.95,
+                "reasoning": "Urgent deadline requires action",
+                "alternatives": []
+            },
+            {
+                "category": "optional_event",
+                "confidence": 0.88,
+                "reasoning": "Meeting invitation",
+                "alternatives": []
+            },
+            {
+                "category": "optional_fyi",
+                "confidence": 0.92,
+                "reasoning": "Informational update",
+                "alternatives": []
+            }
+        ]
+        
+        call_count = [0]
+        def classify_side_effect(*args, **kwargs):
+            result = classifications[call_count[0] % len(classifications)]
+            call_count[0] += 1
+            return result
+        
+        mock_ai_orchestrator.classify_email_with_explanation = Mock(side_effect=classify_side_effect)
+        
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
                 from backend.services.ai_service import AIService
                 ai_service = AIService()
                 ai_service._ensure_initialized()
@@ -178,53 +180,61 @@ class TestCompleteEmailProcessingWorkflow:
                 # Verify confidence levels
                 assert all(email['confidence'] > 0.8 for email in classified_emails)
     
-    @pytest.mark.skip(reason="Mock configuration issues - AI processor not properly mocked in async context")
     @pytest.mark.asyncio
     async def test_email_retrieval_to_action_extraction_pipeline(
-        self, mock_complete_email_provider
+        self, mock_complete_email_provider, mock_ai_orchestrator, mock_azure_config_obj
     ):
         """Test workflow: retrieve emails → extract action items."""
-        # Setup AI service
-        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.ai_service.get_azure_config'):
-                mock_ai = MagicMock()
-                
-                # Return action items for emails
-                action_results = [
-                    json.dumps({
-                        "action_items": [
-                            {
-                                "action": "Submit project report",
-                                "deadline": "Friday",
-                                "priority": "high"
-                            }
-                        ],
-                        "action_required": "Submit project report by Friday",
-                        "explanation": "Manager requires report submission",
-                        "confidence": 0.94
-                    }),
-                    json.dumps({
-                        "action_items": [
-                            {
-                                "action": "Attend team meeting",
-                                "deadline": "Tomorrow at 10am",
-                                "priority": "medium"
-                            }
-                        ],
-                        "action_required": "Attend meeting tomorrow",
-                        "explanation": "Meeting attendance requested",
-                        "confidence": 0.89
-                    }),
-                    json.dumps({
-                        "action_items": [],
-                        "action_required": "No action required",
-                        "explanation": "Informational email only",
-                        "confidence": 0.96
-                    })
-                ]
-                mock_ai.execute_prompty.side_effect = action_results
-                mock_ai_class.return_value = mock_ai
-                
+        # Setup AI orchestrator with action item results
+        action_results = [
+            json.dumps({
+                "action_items": [
+                    {
+                        "action": "Submit project report",
+                        "deadline": "Friday",
+                        "priority": "high"
+                    }
+                ],
+                "action_required": "Submit project report by Friday",
+                "explanation": "Manager requires report submission",
+                "confidence": 0.94,
+                "relevance": "high",
+                "links": []
+            }),
+            json.dumps({
+                "action_items": [
+                    {
+                        "action": "Attend team meeting",
+                        "deadline": "Tomorrow at 10am",
+                        "priority": "medium"
+                    }
+                ],
+                "action_required": "Attend meeting tomorrow",
+                "explanation": "Meeting attendance requested",
+                "confidence": 0.89,
+                "relevance": "medium",
+                "links": []
+            }),
+            json.dumps({
+                "action_items": [],
+                "action_required": "No action required",
+                "explanation": "Informational email only",
+                "confidence": 0.96,
+                "relevance": "low",
+                "links": []
+            })
+        ]
+        
+        call_count = [0]
+        def action_side_effect(*args, **kwargs):
+            result = action_results[call_count[0] % len(action_results)]
+            call_count[0] += 1
+            return result
+        
+        mock_ai_orchestrator.execute_prompty = Mock(side_effect=action_side_effect)
+        
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
                 from backend.services.ai_service import AIService
                 ai_service = AIService()
                 ai_service._ensure_initialized()
@@ -305,41 +315,43 @@ class TestCompleteEmailProcessingWorkflow:
                 assert 'meeting' in summarized_emails[1]['summary'].lower()
                 assert 'system' in summarized_emails[2]['summary'].lower()
     
-    @pytest.mark.skip(reason="Mock configuration issues - AI processor not properly mocked in async context")
     @pytest.mark.asyncio
     async def test_complete_email_processing_pipeline(
-        self, mock_complete_email_provider
+        self, mock_complete_email_provider, mock_ai_orchestrator, mock_azure_config_obj
     ):
         """Test full pipeline: retrieve → classify → extract actions → summarize."""
-        # Setup AI service
-        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.ai_service.get_azure_config'):
-                mock_ai = MagicMock()
-                
-                # Mock responses for complete pipeline
-                responses = [
-                    # First email: classification
-                    json.dumps({
-                        "category": "required_personal_action",
-                        "confidence": 0.95,
-                        "reasoning": "Urgent action required",
-                        "alternatives": []
-                    }),
-                    # First email: action extraction
-                    json.dumps({
-                        "action_items": [
-                            {"action": "Submit report", "deadline": "Friday", "priority": "high"}
-                        ],
-                        "action_required": "Submit report",
-                        "explanation": "Report needed",
-                        "confidence": 0.93
-                    }),
-                    # First email: summary
-                    "Urgent project report due Friday"
-                ]
-                mock_ai.execute_prompty.side_effect = responses
-                mock_ai_class.return_value = mock_ai
-                
+        # Setup AI orchestrator with complete pipeline responses
+        call_count = [0]
+        
+        def execute_prompty_side_effect(*args, **kwargs):
+            idx = call_count[0]
+            call_count[0] += 1
+            if idx == 0:
+                # Action extraction
+                return json.dumps({
+                    "action_items": [
+                        {"action": "Submit report", "deadline": "Friday", "priority": "high"}
+                    ],
+                    "action_required": "Submit report",
+                    "explanation": "Report needed",
+                    "confidence": 0.93,
+                    "relevance": "high",
+                    "links": []
+                })
+            else:
+                # Summary
+                return "Urgent project report due Friday"
+        
+        mock_ai_orchestrator.classify_email_with_explanation = Mock(return_value={
+            "category": "required_personal_action",
+            "confidence": 0.95,
+            "reasoning": "Urgent action required",
+            "alternatives": []
+        })
+        mock_ai_orchestrator.execute_prompty = Mock(side_effect=execute_prompty_side_effect)
+        
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
                 from backend.services.ai_service import AIService
                 ai_service = AIService()
                 ai_service._ensure_initialized()
@@ -401,16 +413,14 @@ class TestWorkflowErrorHandling:
                 
                 assert exc_info.value.status_code == 401
     
-    @pytest.mark.skip(reason="Mock configuration issues - AI processor not properly mocked in async context")
     @pytest.mark.asyncio
-    async def test_ai_classification_failure_handling(self):
+    async def test_ai_classification_failure_handling(self, mock_ai_orchestrator, mock_azure_config_obj):
         """Test handling of AI classification failures."""
-        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.ai_service.get_azure_config'):
-                mock_ai = MagicMock()
-                mock_ai.execute_prompty.side_effect = Exception("AI service unavailable")
-                mock_ai_class.return_value = mock_ai
-                
+        # Simulate AI error
+        mock_ai_orchestrator.classify_email_with_explanation = Mock(side_effect=Exception("AI service unavailable"))
+        
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
                 from backend.services.ai_service import AIService
                 
                 ai_service = AIService()
@@ -422,29 +432,33 @@ class TestWorkflowErrorHandling:
                 assert 'category' in result
                 assert 'error' in result
     
-    @pytest.mark.skip(reason="Mock configuration issues - AI processor not properly mocked in async context")
     @pytest.mark.asyncio
     async def test_partial_workflow_failure_recovery(
-        self, mock_complete_email_provider
+        self, mock_complete_email_provider, mock_ai_orchestrator, mock_azure_config_obj
     ):
         """Test recovery from partial workflow failures."""
-        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.ai_service.get_azure_config'):
-                mock_ai = MagicMock()
-                
-                # First call succeeds, second fails, third succeeds
-                mock_ai.execute_prompty.side_effect = [
-                    json.dumps({
-                        "category": "required_personal_action",
-                        "confidence": 0.92,
-                        "reasoning": "Test",
-                        "alternatives": []
-                    }),
-                    Exception("Temporary failure"),
-                    "Summary text"
-                ]
-                mock_ai_class.return_value = mock_ai
-                
+        # Setup: first execute_prompty call fails, second succeeds
+        call_count = [0]
+        def execute_prompty_side_effect(*args, **kwargs):
+            idx = call_count[0]
+            call_count[0] += 1
+            if idx == 0:
+                # First call (action extraction) fails
+                raise Exception("Temporary failure")
+            else:
+                # Second call (summary) succeeds
+                return "Summary text"
+        
+        mock_ai_orchestrator.classify_email_with_explanation = Mock(return_value={
+            "category": "required_personal_action",
+            "confidence": 0.92,
+            "reasoning": "Test",
+            "alternatives": []
+        })
+        mock_ai_orchestrator.execute_prompty = Mock(side_effect=execute_prompty_side_effect)
+        
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
                 from backend.services.ai_service import AIService
                 
                 ai_service = AIService()
@@ -552,23 +566,20 @@ class TestWorkflowDataPersistence:
         assert len(processed_state) == 3
         assert all(state['processed'] for state in processed_state.values())
     
-    @pytest.mark.skip(reason="Mock configuration issues - AI processor not properly mocked in async context")
     @pytest.mark.asyncio
     async def test_email_categorization_persistence(
-        self, mock_complete_email_provider
+        self, mock_complete_email_provider, mock_ai_orchestrator, mock_azure_config_obj
     ):
         """Test persisting email categories after classification."""
-        with patch('backend.services.ai_service.AIProcessor') as mock_ai_class:
-            with patch('backend.services.ai_service.get_azure_config'):
-                mock_ai = MagicMock()
-                mock_ai.execute_prompty.return_value = json.dumps({
-                    "category": "required_personal_action",
-                    "confidence": 0.90,
-                    "reasoning": "Test",
-                    "alternatives": []
-                })
-                mock_ai_class.return_value = mock_ai
-                
+        mock_ai_orchestrator.classify_email_with_explanation = Mock(return_value={
+            "category": "required_personal_action",
+            "confidence": 0.90,
+            "reasoning": "Test",
+            "alternatives": []
+        })
+        
+        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
+            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
                 from backend.services.ai_service import AIService
                 
                 ai_service = AIService()

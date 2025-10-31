@@ -19,7 +19,11 @@ def reset_deps():
 @pytest.fixture
 def client():
     """Create test client."""
-    return TestClient(app)
+    # Clear any existing dependency overrides
+    app.dependency_overrides.clear()
+    yield TestClient(app)
+    # Clean up after test
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -128,65 +132,56 @@ class TestEmailEndpointsWithDI:
 class TestAIEndpointsWithDI:
     """Test AI endpoints using dependency injection."""
     
-    def test_classify_email_with_com_ai_service(self, client, mock_auth):
-        """Test /api/ai/classify endpoint uses COM AI service when configured."""
+    def test_classify_email_with_ai_service(self, client, mock_auth):
+        """Test /api/ai/classify endpoint uses AI service."""
+        from backend.core.dependencies import get_ai_service
+        from backend.main import app
+        from unittest.mock import AsyncMock
+        
         mock_service = Mock()
         mock_service._ensure_initialized = Mock()
-        mock_service.classify_email_async = Mock(return_value={
+        mock_service.classify_email = AsyncMock(return_value={
             'category': 'required_personal_action',
             'confidence': 0.95,
             'reasoning': 'Email requires immediate attention',
             'alternatives': []
         })
+        mock_service.generate_summary = AsyncMock(return_value={'summary': 'Test summary', 'key_points': [], 'confidence': 0.8})
         
-        with patch('backend.core.dependencies.settings') as mock_settings:
-            mock_settings.use_com_backend = True
-            
-            with patch('backend.core.dependencies.COMAIService', return_value=mock_service):
-                request_data = {
-                    'subject': 'Urgent: Action Required',
-                    'content': 'Please review and approve.',
-                    'sender': 'manager@example.com'
-                }
-                
-                response = client.post("/api/ai/classify", json=request_data)
-                
-                assert response.status_code == 200
-                data = response.json()
-                assert data['category'] == 'required_personal_action'
-                assert data['confidence'] == 0.95
-    
-    def test_classify_email_with_standard_ai_service(self, client, mock_auth):
-        """Test /api/ai/classify endpoint uses standard AI service when COM not configured."""
-        mock_service = Mock()
-        mock_service.classify_email_async = Mock(return_value={
-            'category': 'work_relevant',
-            'confidence': 0.85,
-            'reasoning': 'Work-related email',
-            'alternatives': []
-        })
+        # Use dependency_overrides instead of patching
+        app.dependency_overrides[get_ai_service] = lambda: mock_service
         
-        with patch('backend.core.dependencies.settings') as mock_settings:
-            mock_settings.use_com_backend = False
+        try:
+            request_data = {
+                'subject': 'Urgent: Action Required',
+                'content': 'Please review and approve.',
+                'sender': 'manager@example.com'
+            }
             
-            with patch('backend.core.dependencies.AIService', return_value=mock_service):
-                request_data = {
-                    'subject': 'Project Update',
-                    'content': 'Here is the status.',
-                    'sender': 'colleague@example.com'
-                }
-                
-                response = client.post("/api/ai/classify", json=request_data)
-                
-                assert response.status_code == 200
-                data = response.json()
-                assert 'category' in data
+            response = client.post("/api/ai/classify", json=request_data)
+            
+            # Debug output
+            if response.status_code != 200:
+                import json
+                print(f"\nResponse status: {response.status_code}")
+                print(f"Response body: {json.dumps(response.json(), indent=2)}")
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert data['category'] == 'required_personal_action'
+            assert data['confidence'] == 0.95
+        finally:
+            app.dependency_overrides.pop(get_ai_service, None)
     
     def test_extract_action_items_with_di(self, client, mock_auth):
         """Test action item extraction uses dependency injection."""
+        from backend.core.dependencies import get_ai_service
+        from backend.main import app
+        from unittest.mock import AsyncMock
+        
         mock_service = Mock()
         mock_service._ensure_initialized = Mock()
-        mock_service.extract_action_items = Mock(return_value={
+        mock_service.extract_action_items = AsyncMock(return_value={
             'action_items': ['Review document', 'Submit report'],
             'urgency': 'high',
             'deadline': '2024-01-15',
@@ -198,67 +193,81 @@ class TestAIEndpointsWithDI:
             'links': []
         })
         
-        with patch('backend.core.dependencies.settings') as mock_settings:
-            mock_settings.use_com_backend = True
+        # Use dependency_overrides instead of patching
+        app.dependency_overrides[get_ai_service] = lambda: mock_service
+        
+        try:
+            request_data = {
+                'email_content': 'Please review the attached document by Friday.'
+            }
             
-            with patch('backend.core.dependencies.COMAIService', return_value=mock_service):
-                request_data = {
-                    'email_content': 'Please review the attached document by Friday.'
-                }
-                
-                response = client.post("/api/ai/action-items", json=request_data)
-                
-                assert response.status_code == 200
-                data = response.json()
-                assert 'action_items' in data
-                assert len(data['action_items']) == 2
+            response = client.post("/api/ai/action-items", json=request_data)
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert 'action_items' in data
+            assert len(data['action_items']) == 2
+        finally:
+            app.dependency_overrides.pop(get_ai_service, None)
     
     def test_summarize_email_with_di(self, client, mock_auth):
         """Test email summarization uses dependency injection."""
+        from backend.core.dependencies import get_ai_service
+        from backend.main import app
+        from unittest.mock import AsyncMock
+        
         mock_service = Mock()
         mock_service._ensure_initialized = Mock()
-        mock_service.generate_summary = Mock(return_value={
+        mock_service.generate_summary = AsyncMock(return_value={
             'summary': 'Brief summary of email content',
             'key_points': ['Point 1', 'Point 2'],
             'confidence': 0.88
         })
         
-        with patch('backend.core.dependencies.settings') as mock_settings:
-            mock_settings.use_com_backend = True
+        # Use dependency_overrides instead of patching
+        app.dependency_overrides[get_ai_service] = lambda: mock_service
+        
+        try:
+            request_data = {
+                'email_content': 'Long email content here...',
+                'summary_type': 'brief'
+            }
             
-            with patch('backend.core.dependencies.COMAIService', return_value=mock_service):
-                request_data = {
-                    'email_content': 'Long email content here...',
-                    'summary_type': 'brief'
-                }
-                
-                response = client.post("/api/ai/summarize", json=request_data)
-                
-                assert response.status_code == 200
-                data = response.json()
-                assert 'summary' in data
-                assert data['summary'] == 'Brief summary of email content'
+            response = client.post("/api/ai/summarize", json=request_data)
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert 'summary' in data
+            assert data['summary'] == 'Brief summary of email content'
+        finally:
+            app.dependency_overrides.pop(get_ai_service, None)
     
     def test_ai_health_check_with_di(self, client, mock_auth):
         """Test AI health check uses dependency injection."""
+        from backend.core.dependencies import get_ai_service
+        from backend.main import app
+        from unittest.mock import AsyncMock
+        
         mock_service = Mock()
         mock_service._ensure_initialized = Mock()
         mock_service._initialized = True
-        mock_service.get_available_templates = Mock(return_value={
+        mock_service.get_available_templates = AsyncMock(return_value={
             'templates': ['template1.prompty', 'template2.prompty'],
             'descriptions': {}
         })
         
-        with patch('backend.core.dependencies.settings') as mock_settings:
-            mock_settings.use_com_backend = True
+        # Use dependency_overrides instead of patching
+        app.dependency_overrides[get_ai_service] = lambda: mock_service
+        
+        try:
+            response = client.get("/api/ai/health")
             
-            with patch('backend.core.dependencies.COMAIService', return_value=mock_service):
-                response = client.get("/api/ai/health")
-                
-                assert response.status_code == 200
-                data = response.json()
-                assert data['status'] == 'healthy'
-                assert data['ai_processor_available'] is True
+            assert response.status_code == 200
+            data = response.json()
+            assert data['status'] == 'healthy'
+            assert data['ai_processor_available'] is True
+        finally:
+            app.dependency_overrides.pop(get_ai_service, None)
 
 
 class TestErrorHandlingWithDI:
@@ -278,21 +287,17 @@ class TestErrorHandlingWithDI:
     
     def test_ai_endpoint_handles_service_initialization_failure(self, client, mock_auth):
         """Test graceful handling when AI service initialization fails."""
-        with patch('backend.core.dependencies.settings') as mock_settings:
-            mock_settings.use_com_backend = True
+        with patch('backend.core.dependencies.AIService', side_effect=Exception("AI not available")):
+            request_data = {
+                'subject': 'Test',
+                'content': 'Test content',
+                'sender': 'test@example.com'
+            }
             
-            with patch('backend.core.dependencies.COMAIService', side_effect=Exception("AI not available")):
-                with patch('backend.core.dependencies.AIService', side_effect=Exception("Fallback failed")):
-                    request_data = {
-                        'subject': 'Test',
-                        'content': 'Test content',
-                        'sender': 'test@example.com'
-                    }
-                    
-                    response = client.post("/api/ai/classify", json=request_data)
-                    
-                    # Should return 503 Service Unavailable
-                    assert response.status_code == 503
+            response = client.post("/api/ai/classify", json=request_data)
+            
+            # Should return 503 Service Unavailable
+            assert response.status_code == 503
 
 
 class TestBackwardCompatibility:

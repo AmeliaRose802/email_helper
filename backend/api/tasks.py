@@ -5,9 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.models.task import (
     Task, TaskCreate, TaskUpdate, TaskListResponse, 
-    BulkTaskUpdate, BulkTaskDelete
+    BulkTaskUpdate, BulkTaskDelete, TaskStatus
 )
-from backend.models.user import UserInDB
 from backend.services.task_service import TaskService, get_task_service
 
 router = APIRouter()
@@ -106,6 +105,8 @@ async def update_task(
         if not result:
             raise HTTPException(status_code=404, detail="Task not found")
         return result
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -123,6 +124,8 @@ async def delete_task(
         if not success:
             raise HTTPException(status_code=404, detail="Task not found")
         return {"message": "Task deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to delete task")
 
@@ -171,6 +174,7 @@ async def update_task_status(
 ):
     """Update task status (for drag-and-drop operations)."""
     try:
+        from backend.models.task import TaskStatus
         updates = TaskUpdate(status=TaskStatus(status))
         result = await task_service.update_task(int(task_id), updates, LOCALHOST_USER_ID)
         if not result:

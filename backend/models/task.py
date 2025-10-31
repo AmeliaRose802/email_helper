@@ -10,7 +10,7 @@ class TaskStatus(str, Enum):
     """Task status enumeration."""
     TODO = "todo"
     PENDING = "pending"
-    IN_PROGRESS = "in-progress" 
+    IN_PROGRESS = "in_progress" 
     REVIEW = "review"
     DONE = "done"
     COMPLETED = "completed"
@@ -29,7 +29,7 @@ class TaskBase(BaseModel):
     """Base task model."""
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
-    status: TaskStatus = TaskStatus.TODO
+    status: TaskStatus = TaskStatus.PENDING
     priority: TaskPriority = TaskPriority.MEDIUM
     category: Optional[str] = None
     due_date: Optional[datetime] = None

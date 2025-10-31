@@ -526,4 +526,38 @@ When running terminal commands:
 3. Use `Start-Sleep` after killing processes to ensure cleanup completes
 4. Check for port conflicts with `Get-NetTCPConnection` before starting servers
 
+### CRITICAL: Avoid Select-Object Line Limits in Terminal Commands
+
+**NEVER use `Select-Object -First N` or `Select-Object -Last N` when running commands in terminals**
+
+❌ **WRONG - Can cause hangs and hide errors:**
+```powershell
+cd backend; python -m pytest tests/ 2>&1 | Select-Object -First 50
+cd backend; python -m pytest tests/ 2>&1 | Select-Object -Last 30
+```
+
+**Problems with line-limited output:**
+- Hides error messages that occur outside the limited range
+- Causes terminal to hang when output is shorter than the limit
+- Makes debugging impossible when path errors occur (e.g., wrong directory)
+- No feedback when commands fail with less output than expected
+
+✅ **CORRECT - Let all output flow naturally:**
+```powershell
+cd backend; python -m pytest tests/ 2>&1
+cd c:\Users\ameliapayne\email_helper\backend; python -m pytest tests/
+```
+
+**If you MUST limit output (very long outputs only):**
+- Use it ONLY after verifying the command works without limits
+- Prefer filtering by content rather than line count
+- Always check exit codes to detect failures
+- Use `-First` sparingly and only for known-verbose commands
+
+**Why this matters:**
+- PowerShell `Select-Object` with line limits can buffer incorrectly with wrong paths
+- Error messages are often at the end (hidden by `-First`) or beginning (hidden by `-Last`)
+- Proper error diagnosis requires seeing full output
+- Terminal hangs waste time and make debugging frustrating
+
 Remember: This project handles sensitive user data (emails). Always prioritize security, privacy, and reliability in your implementations.

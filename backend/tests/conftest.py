@@ -103,19 +103,7 @@ def mock_ai_processor():
     return processor
 
 
-@pytest.fixture
-def mock_azure_config():
-    """Create mock Azure configuration.
-    
-    Returns:
-        Mock: Azure configuration object
-    """
-    config = Mock()
-    config.endpoint = "https://test.openai.azure.com/"
-    config.api_key = "test-api-key"
-    config.deployment_name = "test-deployment"
-    config.api_version = "2024-02-15-preview"
-    return config
+
 
 
 # ============================================================================
@@ -363,18 +351,18 @@ def com_ai_service():
 
 
 @pytest.fixture
-def initialized_com_ai_service(mock_ai_processor, mock_azure_config):
+def initialized_com_ai_service(mock_ai_processor, mock_azure_config_obj):
     """Create an initialized COM AI service with mocked dependencies.
     
     Args:
         mock_ai_processor: Mock AI processor fixture
-        mock_azure_config: Mock Azure config fixture
+        mock_azure_config_obj: Mock Azure config fixture
         
     Returns:
         COMAIService: Initialized service instance
     """
     with patch('backend.services.com_ai_service.AIProcessor', return_value=mock_ai_processor):
-        with patch('backend.services.com_ai_service.get_azure_config', return_value=mock_azure_config):
+        with patch('backend.services.com_ai_service.get_azure_config', return_value=mock_azure_config_obj):
             from backend.services.com_ai_service import COMAIService
             service = COMAIService()
             service._ensure_initialized()
@@ -428,16 +416,169 @@ def patch_email_provider_factory(mock_email_provider, monkeypatch):
         mock_email_provider: The mock provider fixture
         monkeypatch: pytest monkeypatch fixture
     """
+    # Reset the global singletons before patching
+    import backend.services.email_provider as ep_module
+    import backend.core.dependencies as dep_module
+    
+    ep_module._email_provider = None
+    dep_module._email_provider = None
+    dep_module._com_email_provider = None
+    
     # Patch the factory function to return mock provider
     monkeypatch.setattr(
         'backend.services.email_provider.get_email_provider_instance',
         lambda: mock_email_provider
     )
     
+    # Patch the global in email_provider module
+    monkeypatch.setattr(
+        'backend.services.email_provider._email_provider',
+        mock_email_provider
+    )
+    
     # Also patch the dependencies module
     monkeypatch.setattr(
         'backend.core.dependencies.get_email_provider',
         lambda: mock_email_provider
+    )
+    
+    # Patch the singleton in dependencies module
+    monkeypatch.setattr(
+        'backend.core.dependencies._email_provider',
+        mock_email_provider
+    )
+
+
+@pytest.fixture
+def mock_ai_service():
+    """Create a mock AI service for testing.
+    
+    This fixture provides a properly configured mock AIService that can be
+    used in tests without requiring real Azure OpenAI credentials.
+    
+    Returns:
+        Mock: Configured mock AIService instance
+    """
+    from backend.services.ai_service import AIService
+    
+    service = Mock(spec=AIService)
+    service._ensure_initialized = Mock()
+    service.classify_email = AsyncMock(return_value={
+        'category': 'work_relevant',
+        'confidence': 0.85,
+        'reasoning': 'Work-related email',
+        'alternatives': ['optional_action']
+    })
+    service.extract_action_items = AsyncMock(return_value={
+        'action_items': ['Review document', 'Submit feedback'],
+        'action_required': 'Review and submit feedback',
+        'due_date': '2024-01-15',
+        'urgency': 'medium',
+        'confidence': 0.8,
+        'explanation': 'Action required',
+        'relevance': 'High',
+        'links': []
+    })
+    service.generate_summary = AsyncMock(return_value={
+        'summary': 'Email summary',
+        'key_points': ['Point 1', 'Point 2'],
+        'confidence': 0.9
+    })
+    return service
+
+
+@pytest.fixture
+def mock_ai_orchestrator():
+    """Create a mock AIOrchestrator for testing.
+    
+    This fixture provides a properly configured mock AIOrchestrator that
+    can be used in tests requiring AI operations.
+    
+    Returns:
+        Mock: Configured mock AIOrchestrator instance
+    """
+    orchestrator = Mock()
+    orchestrator.classify_email_with_explanation = Mock(return_value={
+        'category': 'work_relevant',
+        'confidence': 0.85,
+        'reasoning': 'Work-related email',
+        'alternatives': []
+    })
+    orchestrator.execute_prompty = Mock(return_value='{"result": "test"}')
+    orchestrator.CONFIDENCE_THRESHOLDS = {
+        'optional_action': 0.8,
+        'work_relevant': 0.8,
+        'required_personal_action': 0.9
+    }
+    return orchestrator
+
+
+@pytest.fixture
+def mock_azure_config_obj():
+    """Create mock Azure configuration object.
+    
+    Returns:
+        Mock: Azure configuration object with required attributes
+    """
+    config = Mock()
+    config.endpoint = "https://test.openai.azure.com/"
+    config.api_key = "test-api-key"
+    config.deployment_name = "test-deployment"
+    config.api_version = "2024-02-15-preview"
+    return config
+
+
+@pytest.fixture(autouse=True)
+def patch_ai_service_factory(mock_ai_service, mock_ai_orchestrator, mock_azure_config_obj, monkeypatch):
+    """Automatically patch AI service factory for all tests.
+    
+    This fixture prevents initialization errors when tests import modules
+    that try to initialize AI services without Azure credentials.
+    
+    Args:
+        mock_ai_service: The mock AI service fixture
+        mock_ai_orchestrator: The mock AI orchestrator fixture
+        mock_azure_config_obj: The mock Azure config fixture
+        monkeypatch: pytest monkeypatch fixture
+    """
+    # Reset the global singletons before patching
+    import backend.core.dependencies as dep_module
+    
+    dep_module._ai_service = None
+    
+    # Patch the dependencies module functions
+    monkeypatch.setattr(
+        'backend.core.dependencies.get_ai_service',
+        lambda: mock_ai_service
+    )
+    
+    monkeypatch.setattr(
+        'backend.core.dependencies.get_com_ai_service',
+        lambda: mock_ai_service
+    )
+    
+    # Patch the singleton in dependencies module
+    monkeypatch.setattr(
+        'backend.core.dependencies._ai_service',
+        mock_ai_service
+    )
+    
+    # Patch the API module's imported reference (critical for FastAPI Depends)
+    monkeypatch.setattr(
+        'backend.api.ai.get_ai_service',
+        lambda: mock_ai_service
+    )
+    
+    # Patch AIOrchestrator class for tests that create AIService directly
+    monkeypatch.setattr(
+        'backend.core.business.ai_orchestrator.AIOrchestrator',
+        lambda *args, **kwargs: mock_ai_orchestrator
+    )
+    
+    # Patch get_azure_config for tests that create AIService directly
+    monkeypatch.setattr(
+        'backend.core.infrastructure.azure_config.get_azure_config',
+        lambda: mock_azure_config_obj
     )
 
 
