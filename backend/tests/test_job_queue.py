@@ -489,5 +489,245 @@ class TestJobQueueEdgeCases:
         assert len(pipeline.email_ids) == 20
 
 
+class TestJobQueueRaceConditions:
+    """Test race conditions in job queue operations."""
+    
+    @pytest.fixture
+    def job_queue(self):
+        """Create a fresh JobQueue instance for each test."""
+        return JobQueue()
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_pipeline_creation_same_emails(self, job_queue):
+        """Test creating multiple pipelines concurrently with same email IDs."""
+        email_ids = ["email_1", "email_2", "email_3"]
+        
+        # Create multiple pipelines concurrently
+        results = await asyncio.gather(
+            job_queue.create_pipeline(email_ids, "user_1"),
+            job_queue.create_pipeline(email_ids, "user_1"),
+            job_queue.create_pipeline(email_ids, "user_1"),
+            return_exceptions=True
+        )
+        
+        # All should succeed with unique pipeline IDs
+        assert all(isinstance(r, str) for r in results)
+        assert len(set(results)) == 3  # All unique IDs
+        
+        # Verify all pipelines are stored
+        for pipeline_id in results:
+            pipeline = await job_queue.get_pipeline(pipeline_id)
+            assert pipeline is not None
+            assert pipeline.email_ids == email_ids
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_job_completion_and_failure(self, job_queue):
+        """Test concurrent completion and failure of same job."""
+        pipeline_id = await job_queue.create_pipeline(["email_1"], "user_1")
+        pipeline = await job_queue.get_pipeline(pipeline_id)
+        job = pipeline.jobs[0]
+        
+        # Try to complete and fail the job concurrently
+        results = await asyncio.gather(
+            job_queue.complete_job(job.id, {"result": "completed"}),
+            job_queue.fail_job(job.id, "Failed"),
+            return_exceptions=True
+        )
+        
+        # Both operations should succeed (last one wins)
+        assert all(r is True for r in results)
+        
+        # Job could be COMPLETED (if complete won), FAILED (if fail won after max retries), 
+        # or QUEUED (if fail won and triggered retry)
+        final_job = await job_queue.get_job(job.id)
+        assert final_job.status in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.QUEUED]
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_pipeline_cancellation(self, job_queue):
+        """Test cancelling same pipeline concurrently."""
+        pipeline_id = await job_queue.create_pipeline(["email_1", "email_2"], "user_1")
+        
+        # Cancel same pipeline multiple times concurrently
+        results = await asyncio.gather(
+            job_queue.cancel_pipeline(pipeline_id),
+            job_queue.cancel_pipeline(pipeline_id),
+            job_queue.cancel_pipeline(pipeline_id),
+            return_exceptions=True
+        )
+        
+        # All should succeed
+        assert all(r is True for r in results)
+        
+        # Pipeline should be cancelled
+        pipeline = await job_queue.get_pipeline(pipeline_id)
+        assert pipeline.status == "cancelled"
+        
+        # All jobs should be cancelled
+        for job in pipeline.jobs:
+            assert job.status == JobStatus.CANCELLED
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_get_next_job(self, job_queue):
+        """Test concurrent get_next_job calls to ensure no duplicate job assignment."""
+        # Create a pipeline with multiple jobs
+        await job_queue.create_pipeline(["email_1", "email_2"], "user_1")
+        
+        # Get multiple jobs concurrently
+        results = await asyncio.gather(
+            job_queue.get_next_job(),
+            job_queue.get_next_job(),
+            job_queue.get_next_job(),
+            return_exceptions=True
+        )
+        
+        # Filter out None results (when queue is empty)
+        jobs = [r for r in results if r is not None]
+        
+        # Each job should be unique (no duplicate assignments)
+        job_ids = [j.id for j in jobs]
+        assert len(job_ids) == len(set(job_ids))
+        
+        # All returned jobs should be in PROCESSING state
+        for job in jobs:
+            assert job.status == JobStatus.PROCESSING
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_job_updates_and_completion(self, job_queue):
+        """Test updating job progress while completing it concurrently."""
+        pipeline_id = await job_queue.create_pipeline(["email_1"], "user_1")
+        pipeline = await job_queue.get_pipeline(pipeline_id)
+        job = pipeline.jobs[0]
+        
+        async def update_multiple_times():
+            for i in range(10):
+                progress = JobProgress("Update", i * 10, f"Update {i}")
+                await job_queue.update_job_progress(job.id, progress)
+                await asyncio.sleep(0.001)  # Small delay to simulate real work
+        
+        # Update progress concurrently with completion
+        results = await asyncio.gather(
+            update_multiple_times(),
+            job_queue.complete_job(job.id, {"result": "done"}),
+            return_exceptions=True
+        )
+        
+        # Check final state - job should be completed
+        final_job = await job_queue.get_job(job.id)
+        assert final_job.status == JobStatus.COMPLETED
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_pipeline_status_checks(self, job_queue):
+        """Test concurrent reads of pipeline status during updates."""
+        pipeline_id = await job_queue.create_pipeline(["email_1"], "user_1")
+        
+        async def update_jobs():
+            pipeline = await job_queue.get_pipeline(pipeline_id)
+            for job in pipeline.jobs:
+                await job_queue.complete_job(job.id, {"result": "done"})
+                await asyncio.sleep(0.001)
+        
+        async def check_status():
+            statuses = []
+            for _ in range(10):
+                pipeline = await job_queue.get_pipeline(pipeline_id)
+                statuses.append(pipeline.status)
+                await asyncio.sleep(0.001)
+            return statuses
+        
+        # Update jobs while checking status concurrently
+        update_task = asyncio.create_task(update_jobs())
+        status_task = asyncio.create_task(check_status())
+        
+        await asyncio.gather(update_task, status_task)
+        statuses = await status_task
+        
+        # Should see transition from running to completed
+        assert "running" in statuses or "completed" in statuses
+        assert statuses[-1] == "completed"  # Final status should be completed
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_callback_registration_and_execution(self, job_queue):
+        """Test registering callbacks while executing them concurrently."""
+        pipeline_id = await job_queue.create_pipeline(["email_1"], "user_1")
+        
+        callback_calls = []
+        
+        async def test_callback(identifier, event_type):
+            callback_calls.append((identifier, event_type))
+        
+        # Register callbacks and trigger events concurrently
+        results = await asyncio.gather(
+            job_queue.register_callback(pipeline_id, test_callback),
+            job_queue.cancel_pipeline(pipeline_id),
+            return_exceptions=True
+        )
+        
+        # Both operations should succeed
+        assert all(r is not False for r in results if r is not None)
+        
+        # Callback should be registered
+        assert pipeline_id in job_queue._job_callbacks
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_retry_and_completion(self, job_queue):
+        """Test concurrent retry and completion of failed job."""
+        pipeline_id = await job_queue.create_pipeline(["email_1"], "user_1")
+        pipeline = await job_queue.get_pipeline(pipeline_id)
+        job = pipeline.jobs[0]
+        
+        # Fail job first to set up retry
+        await job_queue.fail_job(job.id, "First failure")
+        
+        # Try to fail again (retry) and complete concurrently
+        results = await asyncio.gather(
+            job_queue.fail_job(job.id, "Second failure"),
+            job_queue.complete_job(job.id, {"result": "recovered"}),
+            return_exceptions=True
+        )
+        
+        # Both operations should succeed
+        assert all(r is True for r in results)
+        
+        # Job should end up in a definitive state
+        final_job = await job_queue.get_job(job.id)
+        assert final_job.status in [JobStatus.COMPLETED, JobStatus.QUEUED, JobStatus.FAILED]
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_queue_operations_different_priorities(self, job_queue):
+        """Test concurrent enqueue/dequeue with different priorities."""
+        # Add jobs with different priorities concurrently
+        async def add_job(email_id, priority):
+            job = ProcessingJob(
+                id=f"job_{email_id}",
+                type=JobType.EMAIL_ANALYSIS,
+                email_id=email_id,
+                user_id="user_1",
+                status=JobStatus.QUEUED,
+                priority=priority,
+                progress=JobProgress("Test", 0, "Test")
+            )
+            job_queue._jobs[job.id] = job
+            job_queue._queues[priority].append(job.id)
+        
+        # Add jobs concurrently
+        await asyncio.gather(
+            add_job("email_1", JobPriority.URGENT),
+            add_job("email_2", JobPriority.HIGH),
+            add_job("email_3", JobPriority.MEDIUM),
+            add_job("email_4", JobPriority.LOW),
+        )
+        
+        # Get jobs should respect priority order even with concurrent access
+        jobs_retrieved = []
+        for _ in range(4):
+            job = await job_queue.get_next_job()
+            if job:
+                jobs_retrieved.append(job)
+        
+        # Verify priority order (URGENT first, then HIGH, etc.)
+        assert jobs_retrieved[0].priority == JobPriority.URGENT
+        assert jobs_retrieved[1].priority == JobPriority.HIGH
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
