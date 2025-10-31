@@ -966,6 +966,41 @@ button:disabled, a:disabled {
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: var(--radius-sm);
+  display: inline-block;
+}
+
+.stat-card__icon {
+  margin-right: 0.5rem;
+}
+
+.stat-card__loading {
+  padding: 1rem 0;
+}
+
+.stat-card__loading-row {
+  margin-top: 0.5rem;
+}
+
+.stat-card__stat-primary {
+  font-size: 1.5rem;
+}
+
+.stat-card__stat-secondary {
+  font-size: 1rem;
+}
+
+.action-button--electron {
+  pointer-events: auto;
+  z-index: 100;
+  -webkit-app-region: no-drag;
+}
+
+.newsletter-item__summary-para {
+  margin: 12px 0;
+}
+
+.newsletter-item__summary-para--first {
+  margin: 0 0 12px 0;
 }
 
 .progress-bar {
@@ -2531,12 +2566,53 @@ button:disabled, a:disabled {
   min-height: 500px;
 }
 
-.settings-section h2 {
+.settings-section {
+  background: var(--color-card-bg);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--color-border);
+}
+
+.settings-section h2,
+.settings-section h3 {
   font-size: 24px;
   font-weight: 700;
   color: var(--synthwave-cyan);
   margin-bottom: 8px;
+  margin-top: 0;
   text-shadow: 0 0 10px rgba(0, 230, 255, 0.5);
+}
+
+.settings-section__controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.settings-section__label {
+  font-weight: 500;
+}
+
+.settings-section__input {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  width: 100px;
+  font-size: 1rem;
+}
+
+.settings-section__hint {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.settings-section__description {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
 }
 
 .section-description {
@@ -3550,6 +3626,18 @@ button:disabled, a:disabled {
   font-size: 14px;
   color: #333; /* Dark text for better contrast on light background */
   line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.newsletter-item__summary-paragraph {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.6;
+  margin: 12px 0;
+}
+
+.newsletter-item__summary-paragraph--first {
+  margin-top: 0;
   margin-bottom: 12px;
 }
 

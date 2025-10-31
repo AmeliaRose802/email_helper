@@ -159,9 +159,7 @@ const Newsletters: React.FC = () => {
                           if (!trimmedPara) return null;
                           
                           return (
-                            <p key={idx} className={`newsletter-item__summary ${isDone ? 'newsletter-item__summary--done' : ''}`} style={{
-                              margin: idx === 0 ? '0 0 12px 0' : '12px 0'
-                            }}>
+                            <p key={idx} className={`newsletter-item__summary-paragraph ${isDone ? 'newsletter-item__summary--done' : ''} ${idx === 0 ? 'newsletter-item__summary-paragraph--first' : ''}`}>
                               {trimmedPara}
                             </p>
                           );
