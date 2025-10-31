@@ -66,24 +66,37 @@ ONLY STOP: After BLOCK 6 complete OR critical error
 
 **Your execution (NO STOPS):**
 
-1. **Create PRs:**
+1. **Get Tasks to Schedule:**
    ```
-   Use mcp_github_create_pull_request_with_copilot for each:
+   FIRST: Read orchestrator-script.md using beads to extract tasks
    
-   PR 1: Type analysis functions
+   Example bead query:
+   "Extract all BLOCK 1 tasks with their dependencies, agent assignments, 
+   and problem statements from orchestrator-script.md"
+   
+   The bead will return structured task information including:
+   - Task identifiers (Agent 1, Agent 2, etc.)
+   - Problem statements
+   - Dependencies between tasks
+   - File targets
+   - Success criteria
+   ```
+
+2. **Create PRs from Bead Results:**
+   ```
+   Use mcp_github_create_pull_request_with_copilot for each task from bead:
+   
+   For each task returned by bead:
    - owner: AmeliaRose802
    - repo: email_helper
-   - title: "tech-debt: Type analysis functions with WorkItemAnalysis interfaces"
-   - problem_statement: See orchestrator-script.md BLOCK 1 Agent 1
+   - title: Format from bead task data
+   - problem_statement: Extract from bead task data
    
-   PR 2: Type WIQL query handler
-   - Same pattern, see BLOCK 1 Agent 2
-   
-   PR 3: Type AI-powered bulk handlers  
-   - Same pattern, see BLOCK 1 Agent 3
-   
-   PR 4: Type sampling client
-   - Same pattern, see BLOCK 1 Agent 4
+   Example for BLOCK 1:
+   PR 1: Type analysis functions (from bead task 1)
+   PR 2: Type WIQL query handler (from bead task 2)
+   PR 3: Type AI-powered bulk handlers (from bead task 3)
+   PR 4: Type sampling client (from bead task 4)
    ```
 
 2. **Block yourself:**

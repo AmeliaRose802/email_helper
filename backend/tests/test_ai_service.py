@@ -55,12 +55,8 @@ class TestAIService:
             "alternatives": ["team_action"]
         }
         
-        result = await ai_service.classify_email_async(
-            subject="Test subject",
-            content="Test content",
-            sender="test@example.com",
-            context="Test context"
-        )
+        email_text = f"Subject: Test subject\nFrom: test@example.com\n\nTest content"
+        result = await ai_service.classify_email(email_text, context="Test context")
         
         assert result["category"] == "required_personal_action"
         assert result["confidence"] == 0.9
@@ -79,17 +75,14 @@ class TestAIService:
         
         mock_ai_instance.classify_email_with_explanation.side_effect = Exception("AI service unavailable")
         
-        result = await ai_service.classify_email_async(
-            subject="Test subject",
-            content="Test content",
-            sender="test@example.com"
-        )
+        email_text = f"Subject: Test subject\nFrom: test@example.com\n\nTest content"
+        result = await ai_service.classify_email(email_text)
         
         # Should return fallback result with error
         assert result["category"] == "work_relevant"
         assert result["confidence"] == 0.5
         assert "error" in result
-        assert "Classification failed" in result["reasoning"]
+        assert "AI service unavailable" in result["reasoning"]
     
     @patch('backend.services.ai_service.AIOrchestrator')
     @patch('backend.services.ai_service.get_azure_config')
@@ -103,6 +96,7 @@ class TestAIService:
         
         # Mock the prompty execution result
         mock_ai_instance.execute_prompty.return_value = {
+            "action_items": [{"action": "Review quarterly report", "deadline": "2024-01-15", "priority": "high"}],
             "due_date": "2024-01-15",
             "action_required": "Review quarterly report",
             "explanation": "Manager has requested report review",
@@ -259,11 +253,8 @@ class TestAIServiceEdgeCases:
         # Mock the classification result as string
         mock_ai_instance.classify_email_with_explanation.return_value = "required_personal_action"
         
-        result = await ai_service.classify_email_async(
-            subject="Test subject",
-            content="Test content",
-            sender="test@example.com"
-        )
+        email_text = f"Subject: Test subject\nFrom: test@example.com\n\nTest content"
+        result = await ai_service.classify_email(email_text)
         
         assert result["category"] == "required_personal_action"
         assert result["confidence"] == 0.8
