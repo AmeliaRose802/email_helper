@@ -20,7 +20,6 @@ class EmailProcessorWorker:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.is_running = False
-        self._stop_event = asyncio.Event()
         
         # Services are lazily initialized when first accessed
         self._ai_service = None
@@ -51,53 +50,57 @@ class EmailProcessorWorker:
             "message": message
         })
     
+    def _lazy_load_service(self, service_name: str, import_path: str, getter_name: str):
+        """Generic lazy loader for services - no fallback to mocks.
+        
+        Args:
+            service_name: Human-readable service name for error messages
+            import_path: Module path to import from
+            getter_name: Function name to call to get service instance
+            
+        Raises:
+            ImportError: If service cannot be loaded
+        """
+        try:
+            module = __import__(import_path, fromlist=[getter_name])
+            getter = getattr(module, getter_name)
+            return getter()
+        except ImportError as e:
+            self.logger.error(f"{service_name} import failed: {e}")
+            raise ImportError(f"{service_name} required but not available: {e}")
+    
     @property
     def ai_service(self):
         """Lazy-load AI service."""
         if self._ai_service is None:
-            self._ai_service = self._get_ai_service()
+            self._ai_service = self._lazy_load_service(
+                "AI service",
+                "backend.services.ai_service",
+                "get_ai_service"
+            )
         return self._ai_service
     
     @property
     def email_service(self):
         """Lazy-load email service."""
         if self._email_service is None:
-            self._email_service = self._get_email_service()
+            self._email_service = self._lazy_load_service(
+                "Email service",
+                "backend.services.email_provider",
+                "get_email_provider"
+            )
         return self._email_service
     
     @property
     def task_service(self):
         """Lazy-load task service."""
         if self._task_service is None:
-            self._task_service = self._get_task_service()
+            self._task_service = self._lazy_load_service(
+                "Task service",
+                "backend.services.task_service",
+                "get_task_service"
+            )
         return self._task_service
-    
-    def _get_ai_service(self):
-        """Get AI service - no fallback to mock."""
-        try:
-            from backend.services.ai_service import get_ai_service
-            return get_ai_service()
-        except ImportError as e:
-            self.logger.error(f"AI service import failed: {e}")
-            raise ImportError(f"AI service required but not available: {e}")
-    
-    def _get_email_service(self):
-        """Get email service - no fallback to mock."""
-        try:
-            from backend.services.email_provider import get_email_provider
-            return get_email_provider()
-        except ImportError as e:
-            self.logger.error(f"Email service import failed: {e}")
-            raise ImportError(f"Email service required but not available: {e}")
-    
-    def _get_task_service(self):
-        """Get task service - no fallback to mock."""
-        try:
-            from backend.services.task_service import get_task_service
-            return get_task_service()
-        except ImportError as e:
-            self.logger.error(f"Task service import failed: {e}")
-            raise ImportError(f"Task service required but not available: {e}")
     
     async def start(self):
         """Start the background worker."""
@@ -106,8 +109,6 @@ class EmailProcessorWorker:
             return
         
         self.is_running = True
-        self._stop_event.clear()
-        
         self.logger.info("Starting EmailProcessorWorker")
         
         # Start processing loop
@@ -120,7 +121,6 @@ class EmailProcessorWorker:
         
         self.logger.info("Stopping EmailProcessorWorker")
         self.is_running = False
-        self._stop_event.set()
     
     async def _processing_loop(self):
         """Main processing loop."""
@@ -135,10 +135,6 @@ class EmailProcessorWorker:
                 else:
                     # No jobs available, wait a bit
                     await asyncio.sleep(1)
-                
-                # Check for stop event
-                if self._stop_event.is_set():
-                    break
                     
             except Exception as e:
                 self.logger.error(f"Error in processing loop: {e}")
@@ -147,20 +143,23 @@ class EmailProcessorWorker:
         self.logger.info("EmailProcessorWorker stopped")
     
     async def _process_job(self, job):
-        """Process a single job."""
+        """Process a single job with unified error handling."""
         try:
             # Update job status to processing
             await self._update_progress(job.id, job.progress.step, 5, f"Starting {job.type.value}...")
             
-            # Process based on job type
-            if job.type == JobType.EMAIL_ANALYSIS:
-                result = await self._process_email_analysis(job)
-            elif job.type == JobType.TASK_EXTRACTION:
-                result = await self._process_task_extraction(job)
-            elif job.type == JobType.CATEGORIZATION:
-                result = await self._process_categorization(job)
-            else:
+            # Dispatch to appropriate handler
+            handlers = {
+                JobType.EMAIL_ANALYSIS: self._process_email_analysis,
+                JobType.TASK_EXTRACTION: self._process_task_extraction,
+                JobType.CATEGORIZATION: self._process_categorization,
+            }
+            
+            handler = handlers.get(job.type)
+            if not handler:
                 raise ValueError(f"Unknown job type: {job.type}")
+            
+            result = await handler(job)
             
             # Mark job as completed
             await job_queue.complete_job(job.id, result)
