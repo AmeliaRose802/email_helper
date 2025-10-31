@@ -382,6 +382,66 @@ def initialized_com_ai_service(mock_ai_processor, mock_azure_config):
 
 
 # ============================================================================
+# Email Provider Mocking Fixtures
+# ============================================================================
+
+@pytest.fixture
+def mock_email_provider():
+    """Create a mock email provider for testing.
+    
+    This fixture provides a properly configured mock EmailProvider that can be
+    used in tests without requiring a real email backend (COM or Graph API).
+    
+    Returns:
+        Mock: Configured mock EmailProvider instance with EmailProvider spec
+    """
+    from backend.services.email_provider import EmailProvider
+    
+    provider = Mock(spec=EmailProvider)
+    provider.authenticate = Mock(return_value=True)
+    provider.get_emails = Mock(return_value=[])
+    provider.get_email_content = Mock(return_value={
+        'id': 'test-123',
+        'subject': 'Test Email',
+        'body': 'Test body',
+        'sender': 'test@example.com',
+        'received_time': '2025-01-01T10:00:00Z'
+    })
+    provider.get_email_body = Mock(return_value='Test body')
+    provider.get_folders = Mock(return_value=[])
+    provider.mark_as_read = Mock(return_value=True)
+    provider.move_email = Mock(return_value=True)
+    provider.get_conversation_thread = Mock(return_value=[])
+    return provider
+
+
+@pytest.fixture(autouse=True)
+def patch_email_provider_factory(mock_email_provider, monkeypatch):
+    """Automatically patch email provider factory for all tests.
+    
+    This fixture prevents RuntimeError from being raised when tests import
+    modules that try to initialize email providers. It patches both:
+    - backend.services.email_provider.get_email_provider_instance
+    - backend.core.dependencies.get_email_provider
+    
+    Args:
+        mock_email_provider: The mock provider fixture
+        monkeypatch: pytest monkeypatch fixture
+    """
+    # Patch the factory function to return mock provider
+    monkeypatch.setattr(
+        'backend.services.email_provider.get_email_provider_instance',
+        lambda: mock_email_provider
+    )
+    
+    # Also patch the dependencies module
+    monkeypatch.setattr(
+        'backend.core.dependencies.get_email_provider',
+        lambda: mock_email_provider
+    )
+
+
+# ============================================================================
 # Test Utility Fixtures
 # ============================================================================
 

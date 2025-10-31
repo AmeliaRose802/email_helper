@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from backend.services.job_queue import job_queue, ProcessingPipeline, ProcessingJob
 from backend.services.websocket_manager import websocket_manager
-from backend.workers.email_processor import email_processor_worker
+from backend.workers.email_processor import get_email_processor_worker
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,8 @@ async def start_processing(
         pipeline_id = await job_queue.create_pipeline(request.email_ids, user_id)
         
         # Start worker if not running
-        await email_processor_worker.start()
+        worker = get_email_processor_worker()
+        await worker.start()
         
         logger.info(f"Started processing pipeline {pipeline_id} for user {user_id} with {len(request.email_ids)} emails")
         
@@ -135,8 +136,8 @@ async def get_pipeline_jobs(
         if not pipeline:
             raise HTTPException(status_code=404, detail="Pipeline not found")
         
-        # Check user access
-        user_id = str(getattr(current_user, 'id', 'anonymous'))
+        # Use default user since auth is disabled
+        user_id = "default_user"
         if pipeline.user_id != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
         
@@ -209,12 +210,14 @@ async def get_processing_stats():
         active_pipelines = len([p for p in user_pipelines if p.status == "running"])
         completed_pipelines = len([p for p in user_pipelines if p.status == "completed"])
         
+        worker = get_email_processor_worker()
+        
         return {
             "processing_stats": {
                 "total_pipelines": total_pipelines,
                 "active_pipelines": active_pipelines,
                 "completed_pipelines": completed_pipelines,
-                "worker_status": "running" if email_processor_worker.is_running else "stopped"
+                "worker_status": "running" if worker.is_running else "stopped"
             },
             "websocket_stats": websocket_stats
         }

@@ -46,7 +46,7 @@ describe('Route Components', () => {
   it('renders EmailList component with loading state', () => {
     renderWithProviders(<EmailList />);
     // Should show loading initially due to API call
-    expect(screen.getByText('Loading emails...')).toBeInTheDocument();
+    expect(screen.getByText('Loading Emails')).toBeInTheDocument();
   });
 
   it('renders TaskList component with loading state', () => {
@@ -55,8 +55,9 @@ describe('Route Components', () => {
     expect(screen.getByText('Loading tasks...')).toBeInTheDocument();
   });
 
-  it('renders Settings component', () => {
+  it('renders Settings component with loading state', () => {
     renderWithProviders(<Settings />);
-    expect(screen.getByText('Settings')).toBeInTheDocument();
+    // Settings component shows loading state initially due to API call
+    expect(screen.getByText('Loading settings...')).toBeInTheDocument();
   });
 });

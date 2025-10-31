@@ -16,8 +16,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List
 
-from src.utils.date_utils import parse_date_string, format_datetime_for_storage
-from src.utils.json_utils import parse_json_with_fallback, clean_json_response, repair_json_response
+from backend.core.infrastructure.date_utils import parse_date_string, format_datetime_for_storage
+from backend.core.infrastructure.json_utils import parse_json_with_fallback, clean_json_response, repair_json_response
 
 
 # Test data directory

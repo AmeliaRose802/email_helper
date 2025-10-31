@@ -7,17 +7,11 @@ and comprehensive error handling.
 
 import asyncio
 import logging
-import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime
-from pathlib import Path
 
-# Add src to Python path for existing service imports
-
-from backend.services.job_queue import job_queue, JobStatus, JobType, JobProgress
+from backend.services.job_queue import job_queue, JobType, JobProgress
 from backend.services.websocket_manager import websocket_manager
-
-logger = logging.getLogger(__name__)
 
 
 class EmailProcessorWorker:
@@ -28,12 +22,55 @@ class EmailProcessorWorker:
         self.is_running = False
         self._stop_event = asyncio.Event()
         
-        # Import services (with fallbacks for development)
-        self.ai_service = self._get_ai_service()
-        self.email_service = self._get_email_service()
-        self.task_service = self._get_task_service()
+        # Services are lazily initialized when first accessed
+        self._ai_service = None
+        self._email_service = None
+        self._task_service = None
         
         self.logger.info("EmailProcessorWorker initialized")
+    
+    async def _update_progress(self, job_id: str, step: str, percentage: int, message: str):
+        """Update job progress and broadcast to websocket clients.
+        
+        Args:
+            job_id: Job identifier
+            step: Current processing step name
+            percentage: Progress percentage (0-100)
+            message: Human-readable progress message
+        """
+        await job_queue.update_job_progress(job_id, JobProgress(
+            step=step,
+            percentage=percentage,
+            message=message,
+            started_at=datetime.utcnow().isoformat() if percentage == 5 else None
+        ))
+        
+        await websocket_manager.broadcast_job_status(job_id, {
+            "status": "processing",
+            "progress": percentage,
+            "message": message
+        })
+    
+    @property
+    def ai_service(self):
+        """Lazy-load AI service."""
+        if self._ai_service is None:
+            self._ai_service = self._get_ai_service()
+        return self._ai_service
+    
+    @property
+    def email_service(self):
+        """Lazy-load email service."""
+        if self._email_service is None:
+            self._email_service = self._get_email_service()
+        return self._email_service
+    
+    @property
+    def task_service(self):
+        """Lazy-load task service."""
+        if self._task_service is None:
+            self._task_service = self._get_task_service()
+        return self._task_service
     
     def _get_ai_service(self):
         """Get AI service - no fallback to mock."""
@@ -112,20 +149,8 @@ class EmailProcessorWorker:
     async def _process_job(self, job):
         """Process a single job."""
         try:
-            # Update job status
-            await job_queue.update_job_progress(job.id, JobProgress(
-                step=job.progress.step,
-                percentage=5,
-                message=f"Starting {job.type.value}...",
-                started_at=datetime.utcnow().isoformat()
-            ))
-            
-            # Broadcast job start
-            await websocket_manager.broadcast_job_status(job.id, {
-                "status": "processing",
-                "progress": 5,
-                "message": f"Starting {job.type.value}..."
-            })
+            # Update job status to processing
+            await self._update_progress(job.id, job.progress.step, 5, f"Starting {job.type.value}...")
             
             # Process based on job type
             if job.type == JobType.EMAIL_ANALYSIS:
@@ -165,31 +190,19 @@ class EmailProcessorWorker:
         email_id = job.email_id
         
         # Step 1: Get email data
-        await job_queue.update_job_progress(job.id, JobProgress(
-            step="AI Analysis",
-            percentage=20,
-            message="Retrieving email data..."
-        ))
+        await self._update_progress(job.id, "AI Analysis", 20, "Retrieving email data...")
         
         email_data = await self.email_service.get_email_content(email_id)
         if not email_data:
             raise ValueError(f"Email {email_id} not found")
         
         # Step 2: Perform AI analysis
-        await job_queue.update_job_progress(job.id, JobProgress(
-            step="AI Analysis",
-            percentage=50,
-            message="Analyzing email content with AI..."
-        ))
+        await self._update_progress(job.id, "AI Analysis", 50, "Analyzing email content with AI...")
         
         analysis_result = await self.ai_service.generate_summary(email_data)
         
         # Step 3: Store results
-        await job_queue.update_job_progress(job.id, JobProgress(
-            step="AI Analysis",
-            percentage=90,
-            message="Storing analysis results..."
-        ))
+        await self._update_progress(job.id, "AI Analysis", 90, "Storing analysis results...")
         
         # Store analysis (mock implementation)
         stored_result = {
@@ -205,31 +218,19 @@ class EmailProcessorWorker:
         email_id = job.email_id
         
         # Step 1: Get email and analysis data
-        await job_queue.update_job_progress(job.id, JobProgress(
-            step="Task Extraction",
-            percentage=20,
-            message="Retrieving email data..."
-        ))
+        await self._update_progress(job.id, "Task Extraction", 20, "Retrieving email data...")
         
         email_data = await self.email_service.get_email_content(email_id)
         if not email_data:
             raise ValueError(f"Email {email_id} not found")
         
         # Step 2: Extract tasks
-        await job_queue.update_job_progress(job.id, JobProgress(
-            step="Task Extraction",
-            percentage=60,
-            message="Extracting actionable tasks..."
-        ))
+        await self._update_progress(job.id, "Task Extraction", 60, "Extracting actionable tasks...")
         
         tasks = await self.ai_service.extract_action_items(email_data)
         
         # Step 3: Create tasks in system
-        await job_queue.update_job_progress(job.id, JobProgress(
-            step="Task Extraction",
-            percentage=85,
-            message="Creating tasks in system..."
-        ))
+        await self._update_progress(job.id, "Task Extraction", 85, "Creating tasks in system...")
         
         created_tasks = []
         for task_data in tasks:
@@ -252,31 +253,19 @@ class EmailProcessorWorker:
         email_id = job.email_id
         
         # Step 1: Get email data
-        await job_queue.update_job_progress(job.id, JobProgress(
-            step="Categorization",
-            percentage=30,
-            message="Retrieving email data..."
-        ))
+        await self._update_progress(job.id, "Categorization", 30, "Retrieving email data...")
         
         email_data = await self.email_service.get_email_content(email_id)
         if not email_data:
             raise ValueError(f"Email {email_id} not found")
         
         # Step 2: Determine category
-        await job_queue.update_job_progress(job.id, JobProgress(
-            step="Categorization",
-            percentage=70,
-            message="Determining email category..."
-        ))
+        await self._update_progress(job.id, "Categorization", 70, "Determining email category...")
         
         category_result = await self.ai_service.classify_email(email_data)
         
         # Step 3: Update email category
-        await job_queue.update_job_progress(job.id, JobProgress(
-            step="Categorization",
-            percentage=90,
-            message="Updating email category..."
-        ))
+        await self._update_progress(job.id, "Categorization", 90, "Updating email category...")
         
         await self.email_service.update_email_category(email_id, category_result)
         
@@ -304,11 +293,3 @@ def get_email_processor_worker() -> EmailProcessorWorker:
     return _email_processor_worker
 
 
-# Backward compatibility: property that acts like the old global instance
-class _WorkerProxy:
-    """Proxy object that provides backward compatibility for direct access."""
-    def __getattr__(self, name):
-        return getattr(get_email_processor_worker(), name)
-
-
-email_processor_worker = _WorkerProxy()

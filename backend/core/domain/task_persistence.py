@@ -1,116 +1,71 @@
 #!/usr/bin/env python3
-"""Task Persistence for Email Helper - Task Storage and Lifecycle Management.
+"""Task Persistence for Email Helper - Unified Task Management Interface.
 
-This module provides comprehensive task persistence functionality, managing
-the storage, retrieval, and lifecycle of tasks across email processing
-sessions. It ensures outstanding tasks remain visible until completed.
+This module provides a unified interface for task persistence functionality,
+delegating to specialized modules for specific operations.
 
-The TaskPersistence class handles:
-- Persistent storage of outstanding tasks across sessions
-- Task completion tracking and state management
-- Email-to-task association management using EntryIDs
-- Task deduplication and merging logic
-- JSON-based storage with backup and recovery
-- Task lifecycle management from creation to completion
+Architecture:
+- TaskStorage: Low-level file I/O and data persistence
+- TaskLifecycle: Task completion, expiration, and resolution tracking  
+- TaskDeduplication: Task merging and ID generation
+- TaskQueries: Task retrieval, filtering, and statistics
 
-Key Features:
-- Cross-session task persistence in JSON format
-- Automatic task deduplication based on content similarity
-- Email association tracking using Outlook EntryIDs
-- Bulk task operations for efficient processing
-- Task completion with email movement integration
-- Comprehensive task metadata preservation
-
-This module integrates with the Outlook manager and GUI components
-to provide seamless task management functionality.
+This facade pattern maintains backward compatibility while providing
+a cleaner, more maintainable internal structure.
 """
 
-import json
-import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Any
+
+from .task_storage import TaskStorage
+from .task_lifecycle import TaskLifecycle
+from .task_deduplication import TaskDeduplication
+from .task_queries import TaskQueries
 
 
 class TaskPersistence:
-    """Task persistence manager for cross-session task storage and lifecycle management.
+    """Task persistence facade providing unified task management interface.
     
-    This class provides comprehensive task persistence functionality, ensuring
-    that outstanding tasks remain visible and trackable across email processing
-    sessions until they are explicitly completed by the user.
-    
-    The persistence manager handles:
-    - JSON-based task storage with automatic backup
-    - Task deduplication and intelligent merging
-    - Email-to-task association using Outlook EntryIDs
-    - Task lifecycle from creation through completion
-    - Bulk task operations for efficient processing
-    - Cross-session state management
-    
-    Attributes:
-        storage_dir (str): Directory path for task storage files
-        tasks_file (str): Path to outstanding tasks JSON file
-        completed_file (str): Path to completed tasks JSON file
-        
-    Example:
-        >>> persistence = TaskPersistence()
-        >>> persistence.save_outstanding_tasks(summary_sections)
-        >>> outstanding = persistence.load_outstanding_tasks()
-        >>> print(f"Found {len(outstanding['required_actions'])} outstanding tasks")
+    This class maintains backward compatibility while delegating to specialized
+    modules for improved maintainability and testability.
     """
     
     def __init__(self, storage_dir: str = None):
         """Initialize task persistence with storage directory.
         
         Args:
-            storage_dir (str, optional): Directory for task storage. 
-                Defaults to 'runtime_data/tasks' relative to project root.
+            storage_dir: Directory for task storage files.
         """
-        if storage_dir is None:
-            # Default to runtime_data/tasks
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            project_root = os.path.dirname(current_dir)
-            storage_dir = os.path.join(project_root, 'runtime_data', 'tasks')
+        self.storage = TaskStorage(storage_dir)
+        self.lifecycle = TaskLifecycle(self.storage)
+        self.deduplication = TaskDeduplication()
+        self.queries = TaskQueries(self.storage, self.lifecycle)
         
-        self.storage_dir = storage_dir
-        self.tasks_file = os.path.join(storage_dir, 'outstanding_tasks.json')
-        self.completed_file = os.path.join(storage_dir, 'completed_tasks.json')
-        
-        # Ensure storage directory exists
-        os.makedirs(storage_dir, exist_ok=True)
+        # Expose storage paths for backward compatibility
+        self.storage_dir = self.storage.storage_dir
+        self.tasks_file = self.storage.tasks_file
+        self.completed_file = self.storage.completed_file
     
     def save_outstanding_tasks(self, summary_sections: Dict[str, List[Dict]], batch_timestamp: str = None) -> None:
-        """Save outstanding tasks from current batch, merging with existing ones"""
+        """Save outstanding tasks from current batch, merging with existing ones."""
         if batch_timestamp is None:
             batch_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # Load existing tasks
         existing_tasks = self.load_outstanding_tasks()
         
-        # Process current batch tasks - including FYI and newsletter items for persistence
         current_tasks = {
-            'required_actions': [],
-            'team_actions': [],
-            'completed_team_actions': [],
-            'optional_actions': [],
-            'job_listings': [],
-            'optional_events': [],
-            'fyi_notices': [],
-            'newsletters': []
+            'required_actions': [], 'team_actions': [], 'completed_team_actions': [],
+            'optional_actions': [], 'job_listings': [], 'optional_events': [],
+            'fyi_notices': [], 'newsletters': []
         }
         
-        # Extract all tasks from summary sections, including FYI and newsletters for persistence
-        for section_key in ['required_actions', 'team_actions', 'completed_team_actions', 'optional_actions', 'job_listings', 'optional_events', 'fyi_notices', 'newsletters']:
+        for section_key in current_tasks.keys():
             if section_key in summary_sections:
                 for task in summary_sections[section_key]:
-                    # Add batch metadata
                     task_with_metadata = task.copy()
                     
-                    # Use existing task_id if present, otherwise generate one
                     existing_task_id = task.get('task_id')
-                    if existing_task_id:
-                        generated_task_id = existing_task_id
-                    else:
-                        generated_task_id = self._generate_task_id(task)
+                    generated_task_id = existing_task_id if existing_task_id else self.deduplication.generate_task_id(task)
                     
                     task_with_metadata.update({
                         'batch_timestamp': batch_timestamp,
@@ -120,161 +75,73 @@ class TaskPersistence:
                         'batch_count': 1
                     })
                     
-                    # Convert _entry_id (singular) to _entry_ids (plural list) for email associations
                     if '_entry_id' in task_with_metadata and task_with_metadata['_entry_id']:
                         entry_id = task_with_metadata['_entry_id']
                         task_with_metadata['_entry_ids'] = [entry_id]
-                        # Remove the singular version to avoid confusion
                         del task_with_metadata['_entry_id']
                     elif '_entry_ids' not in task_with_metadata:
-                        # Ensure _entry_ids field exists even if empty
                         task_with_metadata['_entry_ids'] = []
                     
                     current_tasks[section_key].append(task_with_metadata)
         
-        # Merge with existing tasks (avoid duplicates, update batch counts)
-        merged_tasks = self._merge_task_lists(existing_tasks, current_tasks, batch_timestamp)
+        merged_tasks = self.deduplication.merge_task_lists(existing_tasks, current_tasks, batch_timestamp)
+        self.storage.save_outstanding_tasks_data(merged_tasks, batch_timestamp)
         
-        # Save merged tasks
-        self._save_tasks_to_file(self.tasks_file, {
-            'last_updated': batch_timestamp,
-            'tasks': merged_tasks
-        })
-        
-        print(f"💾 Saved {self._count_total_tasks(merged_tasks)} outstanding tasks to persistent storage")
-    
-    def _is_event_expired(self, event: Dict) -> bool:
-        """Check if an optional event has passed its date"""
-        try:
-            event_date_str = event.get('date', '')
-            if not event_date_str:
-                return False  # No date means we can't determine expiration
-            
-            # Handle various date formats
-            # Try YYYY-MM-DD format first
-            try:
-                event_date = datetime.strptime(event_date_str, '%Y-%m-%d')
-            except ValueError:
-                # Try other common formats
-                try:
-                    event_date = datetime.strptime(event_date_str, '%m/%d/%Y')
-                except ValueError:
-                    # If we can't parse it, don't expire it
-                    return False
-            
-            # Event is expired if the date has passed
-            current_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            return event_date < current_date
-            
-        except Exception as e:
-            print(f"Warning: Could not check expiration for event: {e}")
-            return False
+        print(f"💾 Saved {self.queries._count_total_tasks(merged_tasks)} outstanding tasks to persistent storage")
     
     def load_outstanding_tasks(self, auto_clean_expired=True) -> Dict[str, List[Dict]]:
-        """Load outstanding tasks from persistent storage
+        """Load outstanding tasks from persistent storage with optional cleaning."""
+        tasks = self.storage.load_outstanding_tasks_raw()
         
-        Args:
-            auto_clean_expired: If True, automatically remove expired optional events
-        """
-        if not os.path.exists(self.tasks_file):
-            return {
-                'required_actions': [],
-                'team_actions': [],
-                'completed_team_actions': [],
-                'optional_actions': [],
-                'job_listings': [],
-                'optional_events': [],
-                'fyi_notices': [],
-                'newsletters': []
-            }
+        if not auto_clean_expired:
+            return tasks
         
-        try:
-            with open(self.tasks_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                tasks = data.get('tasks', {
-                    'required_actions': [],
-                    'team_actions': [],
-                    'completed_team_actions': [],
-                    'optional_actions': [],
-                    'job_listings': [],
-                    'optional_events': [],
-                    'fyi_notices': [],
-                    'newsletters': []
-                })
+        cleaned_tasks = {}
+        expired_events_count = 0
+        auto_completed_actions_count = 0
+        
+        for section_key, task_list in tasks.items():
+            cleaned_tasks[section_key] = []
+            if not isinstance(task_list, list):
+                print(f"Warning: {section_key} is not a list, skipping")
+                continue
+            
+            for task in task_list:
+                if not isinstance(task, dict) or 'task_id' not in task:
+                    if isinstance(task, dict):
+                        print(f"Warning: Task missing task_id: {task}")
+                    else:
+                        print(f"Warning: Invalid task format (not a dict): {task}")
+                    continue
                 
-                # Ensure all sections exist (for backward compatibility)
-                for section in ['required_actions', 'team_actions', 'completed_team_actions', 'optional_actions', 'job_listings', 'optional_events', 'fyi_notices', 'newsletters']:
-                    if section not in tasks:
-                        tasks[section] = []
+                if section_key == 'optional_events' and self.lifecycle.is_event_expired(task):
+                    expired_events_count += 1
+                    print(f"🗑️ Auto-removing expired event: {task.get('subject', 'Unknown')}")
+                    continue
                 
-                # Validate and clean task data
-                cleaned_tasks = {}
-                expired_events_count = 0
-                auto_completed_actions_count = 0
+                if section_key == 'team_actions' and task.get('completion_status') == 'completed':
+                    auto_completed_actions_count += 1
+                    print(f"✅ Auto-moving completed team action: {task.get('subject', 'Unknown')}")
+                    if 'completed_team_actions' not in cleaned_tasks:
+                        cleaned_tasks['completed_team_actions'] = []
+                    cleaned_tasks['completed_team_actions'].append(task)
+                    continue
                 
-                for section_key, task_list in tasks.items():
-                    cleaned_tasks[section_key] = []
-                    if not isinstance(task_list, list):
-                        print(f"Warning: {section_key} is not a list, skipping")
-                        continue
-                    
-                    for task in task_list:
-                        if isinstance(task, dict):
-                            # Ensure required fields exist
-                            if 'task_id' not in task:
-                                print(f"Warning: Task missing task_id: {task}")
-                                continue
-                            
-                            # Auto-filter expired optional events
-                            if auto_clean_expired and section_key == 'optional_events':
-                                if self._is_event_expired(task):
-                                    expired_events_count += 1
-                                    print(f"🗑️ Auto-removing expired event: {task.get('subject', 'Unknown')}")
-                                    continue  # Skip adding this expired event
-                            
-                            # Auto-move completed team actions to completed section
-                            if auto_clean_expired and section_key == 'team_actions':
-                                if task.get('completion_status') == 'completed':
-                                    auto_completed_actions_count += 1
-                                    print(f"✅ Auto-moving completed team action: {task.get('subject', 'Unknown')}")
-                                    # Ensure completed_team_actions section exists
-                                    if 'completed_team_actions' not in cleaned_tasks:
-                                        cleaned_tasks['completed_team_actions'] = []
-                                    cleaned_tasks['completed_team_actions'].append(task)
-                                    continue  # Skip adding to regular team_actions
-                            
-                            # Ensure sender field exists (fallback to email_sender if needed)
-                            if 'sender' not in task and 'email_sender' in task:
-                                task['sender'] = task['email_sender']
-                            elif 'sender' not in task:
-                                task['sender'] = 'Unknown'
-                            cleaned_tasks[section_key].append(task)
-                        else:
-                            print(f"Warning: Invalid task format (not a dict): {task}")
+                if 'sender' not in task and 'email_sender' in task:
+                    task['sender'] = task['email_sender']
+                elif 'sender' not in task:
+                    task['sender'] = 'Unknown'
                 
-                # If we cleaned up expired/completed items, save the updated tasks
-                if auto_clean_expired and (expired_events_count > 0 or auto_completed_actions_count > 0):
-                    if expired_events_count > 0:
-                        print(f"✅ Removed {expired_events_count} expired optional events")
-                    if auto_completed_actions_count > 0:
-                        print(f"✅ Moved {auto_completed_actions_count} completed team actions to completed section")
-                    self._save_tasks_to_file(self.tasks_file, {
-                        'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'tasks': cleaned_tasks
-                    })
-                
-                return cleaned_tasks
-                
-        except Exception as e:
-            print(f"⚠️ Error loading outstanding tasks: {e}")
-            return {
-                'required_actions': [],
-                'team_actions': [],
-                'completed_team_actions': [],
-                'optional_actions': [],
-                'job_listings': [],
-                'optional_events': []
-            }
+                cleaned_tasks[section_key].append(task)
+        
+        if expired_events_count > 0 or auto_completed_actions_count > 0:
+            if expired_events_count > 0:
+                print(f"✅ Removed {expired_events_count} expired optional events")
+            if auto_completed_actions_count > 0:
+                print(f"✅ Moved {auto_completed_actions_count} completed team actions to completed section")
+            self.storage.save_outstanding_tasks_data(cleaned_tasks)
+        
+        return cleaned_tasks
     
     def mark_tasks_completed(self, completed_task_ids: List[str], completion_timestamp: str = None) -> None:
         """Mark specific tasks as completed and move them to completed tasks file"""

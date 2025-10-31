@@ -1,6 +1,6 @@
 """Email endpoints for FastAPI Email Helper API."""
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Callable
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Body, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -9,6 +9,7 @@ import asyncio
 import logging
 from datetime import datetime
 import time
+from functools import wraps
 
 from backend.services.email_provider import EmailProvider
 from backend.core.dependencies import get_email_provider, get_ai_service
@@ -16,6 +17,25 @@ from backend.models.email import Email, EmailBatch, EmailBatchResult
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def handle_errors(default_message: str = "Operation failed"):
+    """Decorator to handle common error patterns in endpoints."""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"{func.__name__} failed: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"{default_message}: {str(e)}"
+                )
+        return wrapper
+    return decorator
 
 
 class EmailListResponse(BaseModel):
@@ -535,6 +555,7 @@ async def prefetch_emails(
 
 
 @router.get("/emails/{email_id}", response_model=Dict[str, Any])
+@handle_errors("Failed to retrieve email")
 async def get_email(
     email_id: str,
     provider: EmailProvider = Depends(get_email_provider)
@@ -552,31 +573,23 @@ async def get_email(
     import time
     start_time = time.time()
     
-    try:
-        email = await provider.get_email_content(email_id)
-        
-        elapsed = time.time() - start_time
-        if elapsed > 1.0:  # Log if slower than 1 second
-            print(f"⚠️ Slow email fetch: {email_id} took {elapsed:.2f}s")
-        
-        if not email:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Email with ID '{email_id}' not found"
-            )
-        
-        return email
-        
-    except HTTPException:
-        raise
-    except Exception as e:
+    email = await provider.get_email_content(email_id)
+    
+    elapsed = time.time() - start_time
+    if elapsed > 1.0:  # Log if slower than 1 second
+        print(f"⚠️ Slow email fetch: {email_id} took {elapsed:.2f}s")
+    
+    if not email:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve email: {str(e)}"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Email with ID '{email_id}' not found"
         )
+    
+    return email
 
 
 @router.put("/emails/{email_id}/read", response_model=EmailOperationResponse)
+@handle_errors("Failed to update email read status")
 async def update_email_read_status(
     email_id: str,
     read: bool = Query(True, description="Read status to set"),
@@ -592,37 +605,22 @@ async def update_email_read_status(
     Returns:
         Operation result
     """
-    try:
-        if read:
-            success = provider.mark_as_read(email_id)
-            message = "Email marked as read successfully" if success else "Failed to mark email as read"
-        else:
-            success = provider.mark_as_unread(email_id) if hasattr(provider, 'mark_as_unread') else False
-            message = "Email marked as unread successfully" if success else "Failed to mark email as unread"
-        
-        if success:
-            return EmailOperationResponse(
-                success=True,
-                message=message,
-                email_id=email_id
-            )
-        else:
-            return EmailOperationResponse(
-                success=False,
-                message=message,
-                email_id=email_id
-            )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update email read status: {str(e)}"
-        )
+    if read:
+        success = provider.mark_as_read(email_id)
+        message = "Email marked as read successfully" if success else "Failed to mark email as read"
+    else:
+        success = provider.mark_as_unread(email_id) if hasattr(provider, 'mark_as_unread') else False
+        message = "Email marked as unread successfully" if success else "Failed to mark email as unread"
+    
+    return EmailOperationResponse(
+        success=success,
+        message=message,
+        email_id=email_id
+    )
 
 
 @router.post("/emails/{email_id}/mark-read", response_model=EmailOperationResponse)
+@handle_errors("Failed to mark email as read")
 async def mark_email_as_read(
     email_id: str,
     provider: EmailProvider = Depends(get_email_provider)
@@ -637,32 +635,17 @@ async def mark_email_as_read(
     Returns:
         Operation result
     """
-    try:
-        success = provider.mark_as_read(email_id)
-        
-        if success:
-            return EmailOperationResponse(
-                success=True,
-                message="Email marked as read successfully",
-                email_id=email_id
-            )
-        else:
-            return EmailOperationResponse(
-                success=False,
-                message="Failed to mark email as read",
-                email_id=email_id
-            )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to mark email as read: {str(e)}"
-        )
+    success = provider.mark_as_read(email_id)
+    
+    return EmailOperationResponse(
+        success=success,
+        message="Email marked as read successfully" if success else "Failed to mark email as read",
+        email_id=email_id
+    )
 
 
 @router.post("/emails/{email_id}/move", response_model=EmailOperationResponse)
+@handle_errors("Failed to move email")
 async def move_email(
     email_id: str,
     destination_folder: str = Query(..., description="Destination folder name"),
@@ -679,32 +662,17 @@ async def move_email(
     Returns:
         Operation result
     """
-    try:
-        success = provider.move_email(email_id, destination_folder)
-        
-        if success:
-            return EmailOperationResponse(
-                success=True,
-                message=f"Email moved to '{destination_folder}' successfully",
-                email_id=email_id
-            )
-        else:
-            return EmailOperationResponse(
-                success=False,
-                message=f"Failed to move email to '{destination_folder}'",
-                email_id=email_id
-            )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to move email: {str(e)}"
-        )
+    success = provider.move_email(email_id, destination_folder)
+    
+    return EmailOperationResponse(
+        success=success,
+        message=f"Email moved to '{destination_folder}' successfully" if success else f"Failed to move email to '{destination_folder}'",
+        email_id=email_id
+    )
 
 
 @router.get("/folders", response_model=EmailFolderResponse)
+@handle_errors("Failed to retrieve folders")
 async def get_folders(
     provider: EmailProvider = Depends(get_email_provider)
 ):
@@ -717,24 +685,16 @@ async def get_folders(
     Returns:
         List of available folders with metadata
     """
-    try:
-        folders = provider.get_folders()
-        
-        return EmailFolderResponse(
-            folders=folders,
-            total=len(folders)
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve folders: {str(e)}"
-        )
+    folders = provider.get_folders()
+    
+    return EmailFolderResponse(
+        folders=folders,
+        total=len(folders)
+    )
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
+@handle_errors("Failed to retrieve conversation")
 async def get_conversation_thread(
     conversation_id: str,
     provider: EmailProvider = Depends(get_email_provider)
@@ -749,22 +709,13 @@ async def get_conversation_thread(
     Returns:
         All emails in the conversation thread
     """
-    try:
-        emails = provider.get_conversation_thread(conversation_id)
-        
-        return ConversationResponse(
-            conversation_id=conversation_id,
-            emails=emails,
-            total=len(emails)
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve conversation: {str(e)}"
-        )
+    emails = provider.get_conversation_thread(conversation_id)
+    
+    return ConversationResponse(
+        conversation_id=conversation_id,
+        emails=emails,
+        total=len(emails)
+    )
 
 
 @router.put("/emails/{email_id}/classification", response_model=EmailOperationResponse)

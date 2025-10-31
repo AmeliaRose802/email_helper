@@ -18,7 +18,7 @@ import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from src.task_persistence import TaskPersistence
+from backend.core.domain.task_persistence import TaskPersistence
 
 
 @pytest.fixture

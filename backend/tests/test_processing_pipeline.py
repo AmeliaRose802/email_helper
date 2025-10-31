@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from backend.api.processing import router
 from backend.services.job_queue import job_queue, JobStatus, JobType, JobPriority
 from backend.services.websocket_manager import websocket_manager
-from backend.workers.email_processor import email_processor_worker
+from backend.workers.email_processor import get_email_processor_worker
 
 
 @pytest.fixture
@@ -285,20 +285,22 @@ class TestEmailProcessorWorker:
     
     def test_worker_initialization(self):
         """Test worker initialization."""
-        assert email_processor_worker is not None
-        assert hasattr(email_processor_worker, 'start')
-        assert hasattr(email_processor_worker, 'stop')
+        worker = get_email_processor_worker()
+        assert worker is not None
+        assert hasattr(worker, 'start')
+        assert hasattr(worker, 'stop')
     
     @pytest.mark.asyncio
     async def test_worker_start_stop(self):
         """Test worker start and stop."""
+        worker = get_email_processor_worker()
         # Start worker
-        await email_processor_worker.start()
-        assert email_processor_worker.is_running is True
+        await worker.start()
+        assert worker.is_running is True
         
         # Stop worker
-        await email_processor_worker.stop()
-        assert email_processor_worker.is_running is False
+        await worker.stop()
+        assert worker.is_running is False
 
 
 class TestIntegration:

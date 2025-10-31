@@ -3925,6 +3925,11 @@ button:disabled, a:disabled {
   line-height: 1.5;
 }
 
+/* Category Badge Wrapper */
+.email-detail-category-wrapper {
+  margin-bottom: 20px;
+}
+
 /* Meta Information Rows */
 .email-detail-meta-row {
   display: flex;

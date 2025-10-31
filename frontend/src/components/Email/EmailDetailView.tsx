@@ -74,25 +74,18 @@ export const EmailDetailView: React.FC<EmailDetailViewProps> = ({
 
   if (isLoading) {
     return (
-      <div style={{ 
-        padding: '40px', 
-        textAlign: 'center',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '16px'
-      }}>
+      <div className="email-detail-loading">
         <div className="loading-spinner" />
-        <div style={{ color: '#666', fontSize: '14px' }}>Loading email...</div>
+        <div>Loading email...</div>
       </div>
     );
   }
 
   if (error || !email) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#dc3545' }}>
-        <h2>Error Loading Email</h2>
-        <p>{error ? 'Failed to load email' : 'Email not found'}</p>
+      <div className="email-detail-error">
+        <h2 className="email-detail-error__title">Error Loading Email</h2>
+        <p className="email-detail-error__message">{error ? 'Failed to load email' : 'Email not found'}</p>
         {onClose && (
           <button onClick={onClose} className="synthwave-button">
             Close
@@ -102,43 +95,15 @@ export const EmailDetailView: React.FC<EmailDetailViewProps> = ({
     );
   }
 
-  const containerStyle: React.CSSProperties = {
-    maxWidth: '100%',
-    height: '100%',
-    overflowY: 'auto',
-    padding: '24px',
-    backgroundColor: '#fff',
-  };
-
   return (
-    <div style={containerStyle}>
+    <div className="email-detail-container">
       {/* AI Summary - prominent display at top */}
       {email.one_line_summary && (
-        <div style={{
-          padding: '20px 24px',
-          background: 'linear-gradient(135deg, #e7f3ff 0%, #f0f8ff 100%)',
-          borderLeft: '5px solid #007acc',
-          marginBottom: '24px',
-          borderRadius: '12px',
-          fontSize: '15px',
-          lineHeight: '1.7',
-          boxShadow: '0 4px 12px rgba(0, 122, 204, 0.15)',
-        }}>
-          <div style={{ 
-            color: '#007acc', 
-            fontSize: '12px', 
-            fontWeight: '700',
-            textTransform: 'uppercase', 
-            letterSpacing: '1px',
-            marginBottom: '10px'
-          }}>
-            💡 AI Summary
+        <div className="email-detail-ai-summary">
+          <div className="email-detail-ai-summary__label">
+            <span className="email-detail-ai-summary__icon">💡</span> AI Summary
           </div>
-          <div style={{ 
-            color: '#1a1a1a', 
-            fontSize: '16px',
-            fontWeight: '500'
-          }}>
+          <div className="email-detail-ai-summary__text">
             {email.one_line_summary}
           </div>
         </div>
@@ -146,7 +111,7 @@ export const EmailDetailView: React.FC<EmailDetailViewProps> = ({
 
       {/* AI Category Badge */}
       {email.ai_category && (
-        <div style={{ marginBottom: '20px' }}>
+        <div className="email-detail-category-wrapper">
           <CategoryBadge 
             category={email.ai_category} 
             confidence={email.ai_confidence}
@@ -157,12 +122,6 @@ export const EmailDetailView: React.FC<EmailDetailViewProps> = ({
       {/* Email Body - renders HTML content directly */}
       <div
         className="email-detail-content"
-        style={{
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-          lineHeight: '1.65',
-          fontSize: '15px'
-        }}
         dangerouslySetInnerHTML={{ __html: prepareEmailHTML(email.body || '') }}
       />
     </div>
