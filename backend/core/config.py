@@ -12,6 +12,16 @@ except ImportError:
     get_azure_config_instance = None
 
 
+def _is_com_available() -> bool:
+    """Check if COM email provider is available on this system."""
+    try:
+        import pythoncom
+        from adapters.outlook_email_adapter import OutlookEmailAdapter
+        return True
+    except ImportError:
+        return False
+
+
 class Settings(BaseSettings):
     """FastAPI application settings."""
     
@@ -45,8 +55,8 @@ class Settings(BaseSettings):
     azure_openai_deployment: str = "gpt-4o"
     azure_openai_api_version: str = "2024-02-01"
     
-    # COM Adapter (Windows + Outlook)
-    use_com_backend: bool = True
+    # COM Adapter (Windows + Outlook) - Auto-detect availability
+    use_com_backend: bool = Field(default_factory=_is_com_available)
     com_connection_timeout: int = 30
     com_retry_attempts: int = 3
     email_provider: Optional[str] = None

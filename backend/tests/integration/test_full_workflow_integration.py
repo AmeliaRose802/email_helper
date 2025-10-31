@@ -11,6 +11,35 @@ import json
 
 
 @pytest.fixture
+def mock_ai_orchestrator():
+    """Create a mock AIOrchestrator for testing."""
+    orchestrator = MagicMock()
+    orchestrator.execute_prompty = Mock()
+    orchestrator.classify_email_with_explanation = Mock(return_value={
+        'category': 'work_relevant',
+        'confidence': 0.8,
+        'explanation': 'Email classified',
+        'alternatives': []
+    })
+    orchestrator.CONFIDENCE_THRESHOLDS = {
+        'required_personal_action': 0.9,
+        'optional_event': 0.85,
+        'optional_fyi': 0.85
+    }
+    return orchestrator
+
+
+@pytest.fixture
+def mock_azure_config_obj():
+    """Create mock Azure configuration."""
+    config = MagicMock()
+    config.endpoint = "https://test.openai.azure.com"
+    config.api_key = "test-key"
+    config.deployment_name = "test-deployment"
+    return config
+
+
+@pytest.fixture
 def mock_complete_email_provider():
     """Create a comprehensive mock email provider."""
     provider = MagicMock()
@@ -145,40 +174,38 @@ class TestCompleteEmailProcessingWorkflow:
         
         mock_ai_orchestrator.classify_email_with_explanation = Mock(side_effect=classify_side_effect)
         
-        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
-                from backend.services.ai_service import AIService
-                ai_service = AIService()
-                ai_service._ensure_initialized()
-                
-                # Authenticate and retrieve emails
-                mock_complete_email_provider.authenticate({})
-                emails = mock_complete_email_provider.get_emails("Inbox", count=5)
-                
-                assert len(emails) == 3
-                
-                # Classify each email
-                classified_emails = []
-                for email in emails:
-                    email_text = f"Subject: {email['subject']}\nFrom: {email['sender']}\n\n{email['body']}"
-                    classification = await ai_service.classify_email(email_text)
-                    
-                    classified_emails.append({
-                        'email_id': email['id'],
-                        'subject': email['subject'],
-                        'category': classification['category'],
-                        'confidence': classification['confidence'],
-                        'original_email': email
-                    })
-                
-                # Verify all emails were classified
-                assert len(classified_emails) == 3
-                assert classified_emails[0]['category'] == 'required_personal_action'
-                assert classified_emails[1]['category'] == 'optional_event'
-                assert classified_emails[2]['category'] == 'optional_fyi'
-                
-                # Verify confidence levels
-                assert all(email['confidence'] > 0.8 for email in classified_emails)
+        # Use dependency injection instead of patching
+        from backend.services.ai_service import AIService
+        ai_service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
+        
+        # Authenticate and retrieve emails
+        mock_complete_email_provider.authenticate({})
+        emails = mock_complete_email_provider.get_emails("Inbox", count=5)
+        
+        assert len(emails) == 3
+        
+        # Classify each email
+        classified_emails = []
+        for email in emails:
+            email_text = f"Subject: {email['subject']}\nFrom: {email['sender']}\n\n{email['body']}"
+            classification = await ai_service.classify_email(email_text)
+            
+            classified_emails.append({
+                'email_id': email['id'],
+                'subject': email['subject'],
+                'category': classification['category'],
+                'confidence': classification['confidence'],
+                'original_email': email
+            })
+        
+        # Verify all emails were classified
+        assert len(classified_emails) == 3
+        assert classified_emails[0]['category'] == 'required_personal_action'
+        assert classified_emails[1]['category'] == 'optional_event'
+        assert classified_emails[2]['category'] == 'optional_fyi'
+        
+        # Verify confidence levels
+        assert all(email['confidence'] > 0.8 for email in classified_emails)
     
     @pytest.mark.asyncio
     async def test_email_retrieval_to_action_extraction_pipeline(
@@ -233,87 +260,79 @@ class TestCompleteEmailProcessingWorkflow:
         
         mock_ai_orchestrator.execute_prompty = Mock(side_effect=action_side_effect)
         
-        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
-                from backend.services.ai_service import AIService
-                ai_service = AIService()
-                ai_service._ensure_initialized()
-                
-                # Get emails
-                emails = mock_complete_email_provider.get_emails("Inbox", count=5)
-                
-                # Extract action items from each
-                emails_with_actions = []
-                for email in emails:
-                    email_text = f"Subject: {email['subject']}\n\n{email['body']}"
-                    actions = await ai_service.extract_action_items(email_text)
-                    
-                    emails_with_actions.append({
-                        'email_id': email['id'],
-                        'subject': email['subject'],
-                        'action_items': actions['action_items'],
-                        'action_required': actions['action_required'],
-                        'confidence': actions['confidence']
-                    })
-                
-                # Verify results
-                assert len(emails_with_actions) == 3
-                
-                # First email has action items
-                assert len(emails_with_actions[0]['action_items']) == 1
-                assert 'Submit project report' in emails_with_actions[0]['action_items'][0]['action']
-                
-                # Second email has action items
-                assert len(emails_with_actions[1]['action_items']) == 1
-                assert 'meeting' in emails_with_actions[1]['action_items'][0]['action'].lower()
-                
-                # Third email has no action items
-                assert len(emails_with_actions[2]['action_items']) == 0
+        # Use dependency injection
+        from backend.services.ai_service import AIService
+        ai_service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
+        
+        # Get emails
+        emails = mock_complete_email_provider.get_emails("Inbox", count=5)
+        
+        # Extract action items from each
+        emails_with_actions = []
+        for email in emails:
+            email_text = f"Subject: {email['subject']}\n\n{email['body']}"
+            actions = await ai_service.extract_action_items(email_text)
+            
+            emails_with_actions.append({
+                'email_id': email['id'],
+                'subject': email['subject'],
+                'action_items': actions['action_items'],
+                'action_required': actions['action_required'],
+                'confidence': actions['confidence']
+            })
+        
+        # Verify results
+        assert len(emails_with_actions) == 3
+        
+        # First email has action items
+        assert len(emails_with_actions[0]['action_items']) == 1
+        assert 'Submit project report' in emails_with_actions[0]['action_items'][0]['action']
+        
+        # Second email has action items
+        assert len(emails_with_actions[1]['action_items']) == 1
+        assert 'meeting' in emails_with_actions[1]['action_items'][0]['action'].lower()
+        
+        # Third email has no action items
+        assert len(emails_with_actions[2]['action_items']) == 0
     
     @pytest.mark.asyncio
     async def test_email_retrieval_to_summarization_pipeline(
-        self, mock_complete_email_provider
+        self, mock_complete_email_provider, mock_ai_orchestrator, mock_azure_config_obj
     ):
         """Test workflow: retrieve emails → generate summaries."""
-        # Setup AI service
-        with patch('backend.core.business.ai_orchestrator.AIOrchestrator') as mock_ai_class:
-            with patch('backend.core.infrastructure.azure_config.get_azure_config'):
-                mock_ai = MagicMock()
-                
-                # Return summaries
-                summaries = [
-                    "Manager requests urgent project report submission by Friday deadline",
-                    "Team standup meeting scheduled for tomorrow at 10am",
-                    "IT department announces system maintenance this weekend"
-                ]
-                mock_ai.execute_prompty.side_effect = summaries
-                mock_ai_class.return_value = mock_ai
-                
-                from backend.services.ai_service import AIService
-                ai_service = AIService()
-                ai_service._ensure_initialized()
-                
-                # Get emails
-                emails = mock_complete_email_provider.get_emails("Inbox", count=5)
-                
-                # Generate summaries
-                summarized_emails = []
-                for email in emails:
-                    email_text = f"Subject: {email['subject']}\n\n{email['body']}"
-                    summary_result = await ai_service.generate_summary(email_text)
-                    
-                    summarized_emails.append({
-                        'email_id': email['id'],
-                        'subject': email['subject'],
-                        'summary': summary_result['summary'],
-                        'confidence': summary_result['confidence']
-                    })
-                
-                # Verify summaries
-                assert len(summarized_emails) == 3
-                assert 'project report' in summarized_emails[0]['summary'].lower()
-                assert 'meeting' in summarized_emails[1]['summary'].lower()
-                assert 'system' in summarized_emails[2]['summary'].lower()
+        # Setup AI orchestrator with summaries
+        summaries = [
+            "Manager requests urgent project report submission by Friday deadline",
+            "Team standup meeting scheduled for tomorrow at 10am",
+            "IT department announces system maintenance this weekend"
+        ]
+        mock_ai_orchestrator.execute_prompty.side_effect = summaries
+        
+        # Use dependency injection
+        from backend.services.ai_service import AIService
+        ai_service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
+        
+        # Get emails
+        emails = mock_complete_email_provider.get_emails("Inbox", count=5)
+        
+        # Generate summaries
+        summarized_emails = []
+        for email in emails:
+            email_text = f"Subject: {email['subject']}\n\n{email['body']}"
+            summary_result = await ai_service.generate_summary(email_text)
+            
+            summarized_emails.append({
+                'email_id': email['id'],
+                'subject': email['subject'],
+                'summary': summary_result['summary'],
+                'confidence': summary_result['confidence']
+            })
+        
+        # Verify summaries
+        assert len(summarized_emails) == 3
+        assert 'project report' in summarized_emails[0]['summary'].lower()
+        assert 'meeting' in summarized_emails[1]['summary'].lower()
+        assert 'system' in summarized_emails[2]['summary'].lower()
     
     @pytest.mark.asyncio
     async def test_complete_email_processing_pipeline(
@@ -350,40 +369,38 @@ class TestCompleteEmailProcessingWorkflow:
         })
         mock_ai_orchestrator.execute_prompty = Mock(side_effect=execute_prompty_side_effect)
         
-        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
-                from backend.services.ai_service import AIService
-                ai_service = AIService()
-                ai_service._ensure_initialized()
-                
-                # Get first email
-                emails = mock_complete_email_provider.get_emails("Inbox", count=1)
-                email = emails[0]
-                
-                # Process through complete pipeline
-                email_text = f"Subject: {email['subject']}\n\n{email['body']}"
-                
-                # Step 1: Classify
-                classification = await ai_service.classify_email(email_text)
-                
-                # Step 2: Extract actions
-                actions = await ai_service.extract_action_items(email_text)
-                
-                # Step 3: Summarize
-                summary = await ai_service.generate_summary(email_text)
-                
-                # Combine results
-                processed_email = {
-                    **email,
-                    'classification': classification,
-                    'action_items': actions['action_items'],
-                    'summary': summary['summary']
-                }
-                
-                # Verify complete processing
-                assert processed_email['classification']['category'] == 'required_personal_action'
-                assert len(processed_email['action_items']) == 1
-                assert 'project report' in processed_email['summary'].lower()
+        # Use dependency injection
+        from backend.services.ai_service import AIService
+        ai_service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
+        
+        # Get first email
+        emails = mock_complete_email_provider.get_emails("Inbox", count=1)
+        email = emails[0]
+        
+        # Process through complete pipeline
+        email_text = f"Subject: {email['subject']}\n\n{email['body']}"
+        
+        # Step 1: Classify
+        classification = await ai_service.classify_email(email_text)
+        
+        # Step 2: Extract actions
+        actions = await ai_service.extract_action_items(email_text)
+        
+        # Step 3: Summarize
+        summary = await ai_service.generate_summary(email_text)
+        
+        # Combine results
+        processed_email = {
+            **email,
+            'classification': classification,
+            'action_items': actions['action_items'],
+            'summary': summary['summary']
+        }
+        
+        # Verify complete processing
+        assert processed_email['classification']['category'] == 'required_personal_action'
+        assert len(processed_email['action_items']) == 1
+        assert 'project report' in processed_email['summary'].lower()
 
 
 @pytest.mark.integration
@@ -419,18 +436,15 @@ class TestWorkflowErrorHandling:
         # Simulate AI error
         mock_ai_orchestrator.classify_email_with_explanation = Mock(side_effect=Exception("AI service unavailable"))
         
-        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
-                from backend.services.ai_service import AIService
-                
-                ai_service = AIService()
-                ai_service._ensure_initialized()
-                
-                # Should return fallback classification
-                result = await ai_service.classify_email("Test email")
-                
-                assert 'category' in result
-                assert 'error' in result
+        # Use dependency injection
+        from backend.services.ai_service import AIService
+        ai_service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
+        
+        # Should return fallback classification
+        result = await ai_service.classify_email("Test email")
+        
+        assert 'category' in result
+        assert 'error' in result
     
     @pytest.mark.asyncio
     async def test_partial_workflow_failure_recovery(
@@ -457,29 +471,26 @@ class TestWorkflowErrorHandling:
         })
         mock_ai_orchestrator.execute_prompty = Mock(side_effect=execute_prompty_side_effect)
         
-        with patch('backend.core.business.ai_orchestrator.AIOrchestrator', return_value=mock_ai_orchestrator):
-            with patch('backend.core.infrastructure.azure_config.get_azure_config', return_value=mock_azure_config_obj):
-                from backend.services.ai_service import AIService
-                
-                ai_service = AIService()
-                ai_service._ensure_initialized()
-                
-                # Get email
-                emails = mock_complete_email_provider.get_emails("Inbox", count=1)
-                email = emails[0]
-                email_text = f"Subject: {email['subject']}\n\n{email['body']}"
-                
-                # Classification should succeed
-                classification = await ai_service.classify_email(email_text)
-                assert classification['category'] == 'required_personal_action'
-                
-                # Action extraction should fail gracefully
-                actions = await ai_service.extract_action_items(email_text)
-                assert 'error' in actions
-                
-                # Summary should succeed
-                summary = await ai_service.generate_summary(email_text)
-                assert 'summary' in summary
+        # Use dependency injection
+        from backend.services.ai_service import AIService
+        ai_service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
+        
+        # Get email
+        emails = mock_complete_email_provider.get_emails("Inbox", count=1)
+        email = emails[0]
+        email_text = f"Subject: {email['subject']}\n\n{email['body']}"
+        
+        # Classification should succeed
+        classification = await ai_service.classify_email(email_text)
+        assert classification['category'] == 'required_personal_action'
+        
+        # Action extraction should fail gracefully
+        actions = await ai_service.extract_action_items(email_text)
+        assert 'error' in actions
+        
+        # Summary should succeed
+        summary = await ai_service.generate_summary(email_text)
+        assert 'summary' in summary
 
 
 @pytest.mark.integration

@@ -46,7 +46,7 @@ def normalize_data_for_storage(data: List[Dict[str, Any]]) -> List[Dict[str, Any
     return processed_entries
 
 
-def load_csv_or_empty(file_path: str, dtype=str) -> pd.DataFrame:
+def load_csv_or_empty(file_path: str, dtype: Any = str) -> pd.DataFrame:
     """Load CSV file or return empty DataFrame.
     
     Args:

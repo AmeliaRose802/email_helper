@@ -24,23 +24,24 @@ graceful fallback behavior for invalid or missing date information.
 """
 
 from datetime import datetime
+from typing import Optional, Any
 
 
-def format_datetime_for_storage(dt):
+def format_datetime_for_storage(dt: Any) -> str:
     """Format datetime object for CSV storage"""
     if hasattr(dt, 'strftime'):
         return dt.strftime('%Y-%m-%d %H:%M:%S')
     return str(dt)
 
 
-def format_date_for_display(dt):
+def format_date_for_display(dt: Any) -> str:
     """Format datetime for display"""
     if hasattr(dt, 'strftime'):
         return dt.strftime('%Y-%m-%d %H:%M')
     return str(dt)
 
 
-def parse_date_string(date_str):
+def parse_date_string(date_str: str) -> Optional[datetime]:
     """Parse various date string formats"""
     if not date_str or date_str == "No specific deadline":
         return None
@@ -66,11 +67,11 @@ def parse_date_string(date_str):
     return None
 
 
-def get_timestamp():
+def get_timestamp() -> str:
     """Get current timestamp string"""
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
-def get_run_id():
+def get_run_id() -> str:
     """Generate a run ID timestamp"""
     return datetime.now().strftime("%Y%m%d_%H%M%S")

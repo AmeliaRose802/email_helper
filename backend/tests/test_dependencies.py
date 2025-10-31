@@ -1,6 +1,7 @@
 """Tests for dependency injection functions."""
 
 import pytest
+import sys
 from unittest.mock import Mock, patch, MagicMock
 from fastapi import HTTPException
 
@@ -25,7 +26,8 @@ class TestCOMEmailProviderDependency:
         mock_provider = Mock()
         mock_provider.authenticate.return_value = True
         
-        with patch('backend.services.com_email_provider.COMEmailProvider', return_value=mock_provider):
+        # Patch where it's used, not where it's defined
+        with patch('backend.core.dependencies.COMEmailProvider', return_value=mock_provider):
             provider = get_com_email_provider()
             
             assert provider is not None
@@ -37,7 +39,7 @@ class TestCOMEmailProviderDependency:
         mock_provider = Mock()
         mock_provider.authenticate.return_value = True
         
-        with patch('backend.services.com_email_provider.COMEmailProvider', return_value=mock_provider):
+        with patch('backend.core.dependencies.COMEmailProvider', return_value=mock_provider):
             provider1 = get_com_email_provider()
             provider2 = get_com_email_provider()
             
@@ -68,7 +70,7 @@ class TestCOMEmailProviderDependency:
         mock_provider = Mock()
         mock_provider.authenticate.return_value = False
         
-        with patch('backend.services.com_email_provider.COMEmailProvider', return_value=mock_provider):
+        with patch('backend.core.dependencies.COMEmailProvider', return_value=mock_provider):
             with pytest.raises(HTTPException) as exc_info:
                 get_com_email_provider()
             
@@ -77,7 +79,7 @@ class TestCOMEmailProviderDependency:
     
     def test_get_com_email_provider_initialization_error(self):
         """Test COM email provider when initialization fails."""
-        with patch('backend.services.com_email_provider.COMEmailProvider', side_effect=Exception("Outlook not running")):
+        with patch('backend.core.dependencies.COMEmailProvider', side_effect=Exception("Outlook not running")):
             with pytest.raises(HTTPException) as exc_info:
                 get_com_email_provider()
             
@@ -119,15 +121,7 @@ class TestCOMAIServiceDependency:
     
     def test_get_com_ai_service_import_error(self):
         """Test COM AI service when import fails."""
-        import sys
-        original_import = __builtins__['__import__']
-        
-        def mock_import(name, *args, **kwargs):
-            if 'com_ai_service' in name:
-                raise ImportError("AI dependencies missing")
-            return original_import(name, *args, **kwargs)
-        
-        with patch('builtins.__import__', side_effect=mock_import):
+        with patch('backend.services.com_ai_service.COMAIService', side_effect=ImportError("AI dependencies missing")):
             with pytest.raises(HTTPException) as exc_info:
                 get_com_ai_service()
             
@@ -162,7 +156,7 @@ class TestEmailProviderDependency:
         with patch('backend.core.dependencies.settings') as mock_settings:
             mock_settings.use_com_backend = True
             
-            with patch('backend.services.com_email_provider.COMEmailProvider', return_value=mock_provider):
+            with patch('backend.core.dependencies.COMEmailProvider', return_value=mock_provider):
                 provider = get_email_provider()
                 
                 assert provider == mock_provider
@@ -174,16 +168,9 @@ class TestEmailProviderDependency:
         with patch('backend.core.dependencies.settings') as mock_settings:
             mock_settings.use_com_backend = True
             
-            import sys
-            original_import = __builtins__['__import__']
-            
-            def mock_import(name, *args, **kwargs):
-                if 'com_email_provider' in name:
-                    raise ImportError("COM not available")
-                return original_import(name, *args, **kwargs)
-            
-            with patch('builtins.__import__', side_effect=mock_import):
-                with patch('backend.services.email_provider.get_email_provider_instance', return_value=mock_standard_provider):
+            # Make COM provider raise ImportError
+            with patch('backend.core.dependencies.COMEmailProvider', side_effect=ImportError("COM not available")):
+                with patch('backend.core.dependencies.get_email_provider_instance', return_value=mock_standard_provider):
                     provider = get_email_provider()
                     
                     assert provider == mock_standard_provider
@@ -195,7 +182,7 @@ class TestEmailProviderDependency:
         with patch('backend.core.dependencies.settings') as mock_settings:
             mock_settings.use_com_backend = False
             
-            with patch('backend.services.email_provider.get_email_provider_instance', return_value=mock_standard_provider):
+            with patch('backend.core.dependencies.get_email_provider_instance', return_value=mock_standard_provider):
                 provider = get_email_provider()
                 
                 assert provider == mock_standard_provider
@@ -207,7 +194,7 @@ class TestEmailProviderDependency:
         with patch('backend.core.dependencies.settings') as mock_settings:
             mock_settings.use_com_backend = False
             
-            with patch('backend.services.email_provider.get_email_provider_instance', return_value=mock_provider):
+            with patch('backend.core.dependencies.get_email_provider_instance', return_value=mock_provider):
                 provider1 = get_email_provider()
                 provider2 = get_email_provider()
                 
@@ -229,7 +216,7 @@ class TestAIServiceDependency:
         with patch('backend.core.dependencies.settings') as mock_settings:
             mock_settings.use_com_backend = True
             
-            with patch('backend.services.com_ai_service.COMAIService', return_value=mock_service):
+            with patch('backend.core.dependencies.get_com_ai_service', return_value=mock_service):
                 service = get_ai_service()
                 
                 assert service == mock_service
@@ -241,19 +228,21 @@ class TestAIServiceDependency:
         with patch('backend.core.dependencies.settings') as mock_settings:
             mock_settings.use_com_backend = True
             
-            import sys
-            original_import = __builtins__['__import__']
-            
-            def mock_import(name, *args, **kwargs):
-                if 'com_ai_service' in name:
-                    raise ImportError("COM AI not available")
-                return original_import(name, *args, **kwargs)
-            
-            with patch('builtins.__import__', side_effect=mock_import):
-                with patch('backend.services.ai_service.AIService', return_value=mock_standard_service):
+            # Make COM AI service raise HTTPException (as it does in get_com_ai_service)
+            with patch('backend.core.dependencies.get_com_ai_service', side_effect=HTTPException(
+                status_code=503, 
+                detail="COM AI not available"
+            )):
+                # Patch the module so the import statement gets our mock
+                import backend.services.ai_service as ai_service_module
+                original_AIService = ai_service_module.AIService
+                try:
+                    ai_service_module.AIService = Mock(return_value=mock_standard_service)
                     service = get_ai_service()
                     
                     assert service == mock_standard_service
+                finally:
+                    ai_service_module.AIService = original_AIService
     
     def test_get_ai_service_standard_when_com_not_configured(self):
         """Test that standard AI service is used when COM not configured."""

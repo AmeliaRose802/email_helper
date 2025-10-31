@@ -81,10 +81,11 @@ async def root():
 
 
 # Include routers
-from backend.api import emails, ai, tasks, processing
+from backend.api import emails, ai, tasks, processing, email_analysis
 from backend.api import settings as settings_api
 
 app.include_router(emails.router, prefix="/api", tags=["emails"])
+app.include_router(email_analysis.router, prefix="/api", tags=["email-analysis"])
 app.include_router(ai.router, prefix="/api", tags=["ai"])
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 app.include_router(processing.router, prefix="/api", tags=["processing"])

@@ -4,13 +4,13 @@
 import json
 import os
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 
 class TaskStorage:
     """Handles low-level storage operations for task data."""
     
-    def __init__(self, storage_dir: str = None):
+    def __init__(self, storage_dir: Optional[str] = None):
         """Initialize task storage with directory path.
         
         Args:
@@ -66,7 +66,7 @@ class TaskStorage:
             print(f"⚠️ Error loading completed tasks: {e}")
             return []
     
-    def save_outstanding_tasks_data(self, tasks: Dict[str, List[Dict]], timestamp: str = None) -> None:
+    def save_outstanding_tasks_data(self, tasks: Dict[str, List[Dict]], timestamp: Optional[str] = None) -> None:
         """Save outstanding tasks data to file."""
         if timestamp is None:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

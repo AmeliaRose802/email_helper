@@ -21,14 +21,15 @@ to maximize successful JSON parsing while maintaining data integrity.
 
 import json
 import re
+from typing import Any, Dict, Optional
 
 
-def clean_json_response(json_str):
+def clean_json_response(json_str: str) -> str:
     """Clean JSON response from AI by removing markdown markers"""
     return re.sub(r'^```json\n?|^```\n?|```$', '', json_str.strip()).strip()
 
 
-def repair_json_response(json_str):
+def repair_json_response(json_str: str) -> Optional[str]:
     """Attempt to repair common JSON parsing issues"""
     # Remove any trailing incomplete content after last complete structure
     json_str = json_str.strip()
@@ -68,7 +69,7 @@ def repair_json_response(json_str):
     return repaired_json
 
 
-def parse_json_with_fallback(json_str, fallback_data=None):
+def parse_json_with_fallback(json_str: str, fallback_data: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """Parse JSON string with repair attempt and fallback"""
     cleaned = clean_json_response(json_str)
     

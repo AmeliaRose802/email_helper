@@ -492,12 +492,14 @@ def mock_ai_orchestrator():
     """Create a mock AIOrchestrator for testing.
     
     This fixture provides a properly configured mock AIOrchestrator that
-    can be used in tests requiring AI operations.
+    can be used in tests requiring AI operations. This is NOT auto-used,
+    allowing tests to customize the mock as needed.
     
     Returns:
         Mock: Configured mock AIOrchestrator instance
     """
     orchestrator = Mock()
+    # Default to work_relevant but tests can override this
     orchestrator.classify_email_with_explanation = Mock(return_value={
         'category': 'work_relevant',
         'confidence': 0.85,
@@ -529,15 +531,18 @@ def mock_azure_config_obj():
 
 
 @pytest.fixture(autouse=True)
-def patch_ai_service_factory(mock_ai_service, mock_ai_orchestrator, mock_azure_config_obj, monkeypatch):
+def patch_ai_service_factory(mock_ai_service, mock_azure_config_obj, monkeypatch):
     """Automatically patch AI service factory for all tests.
     
     This fixture prevents initialization errors when tests import modules
     that try to initialize AI services without Azure credentials.
     
+    NOTE: This fixture does NOT auto-patch AIOrchestrator. Tests that need
+    to customize AI orchestrator behavior should explicitly patch it in their
+    test or use the mock_ai_orchestrator fixture with their own context managers.
+    
     Args:
         mock_ai_service: The mock AI service fixture
-        mock_ai_orchestrator: The mock AI orchestrator fixture
         mock_azure_config_obj: The mock Azure config fixture
         monkeypatch: pytest monkeypatch fixture
     """
@@ -569,17 +574,14 @@ def patch_ai_service_factory(mock_ai_service, mock_ai_orchestrator, mock_azure_c
         lambda: mock_ai_service
     )
     
-    # Patch AIOrchestrator class for tests that create AIService directly
-    monkeypatch.setattr(
-        'backend.core.business.ai_orchestrator.AIOrchestrator',
-        lambda *args, **kwargs: mock_ai_orchestrator
-    )
-    
     # Patch get_azure_config for tests that create AIService directly
     monkeypatch.setattr(
         'backend.core.infrastructure.azure_config.get_azure_config',
         lambda: mock_azure_config_obj
     )
+    
+    # NOTE: We do NOT patch AIOrchestrator here. Tests should explicitly
+    # patch it when needed, allowing them to customize the mock behavior.
 
 
 # ============================================================================

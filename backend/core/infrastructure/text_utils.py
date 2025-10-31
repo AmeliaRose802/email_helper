@@ -24,21 +24,21 @@ text integrity while applying necessary transformations.
 import re
 
 
-def clean_markdown_formatting(text):
+def clean_markdown_formatting(text: str) -> str:
     """Remove markdown formatting from text"""
     return re.sub(r'^#+\s*|^\*+\s*|^-\s*|\*\*(.*?)\*\*|\*(.*?)\*', r'\1\2', text)
 
 
-def clean_ai_response(text):
+def clean_ai_response(text: str) -> str:
     """Clean AI response by removing markdown asterisks"""
     return text.strip().replace('**', '').replace('*', '')
 
 
-def truncate_with_ellipsis(text, max_length):
+def truncate_with_ellipsis(text: str, max_length: int) -> str:
     """Truncate text with ellipsis if too long"""
     return text[:max_length] + "..." if len(text) > max_length else text
 
 
-def add_bullet_if_needed(text):
+def add_bullet_if_needed(text: str) -> str:
     """Add bullet point if text doesn't start with one"""
     return f"• {text}" if not text.startswith('•') else text

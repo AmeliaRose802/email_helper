@@ -177,30 +177,46 @@ _email_provider: Optional[EmailProvider] = None
 def get_email_provider_instance() -> EmailProvider:
     """Get or create email provider instance.
     
+    CRITICAL: NEVER returns mock providers in production.
     Only COM provider (Windows + Outlook) is supported.
-    Set use_com_backend=True in settings to enable.
+    
+    Set use_com_backend=True in settings to use Outlook COM on Windows.
     """
     global _email_provider
     
     if _email_provider is None:
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # Check for COM provider preference (localhost with Outlook)
         if getattr(settings, 'use_com_backend', False):
             try:
                 from backend.services.com_email_provider import COMEmailProvider
+                logger.info("Attempting to initialize COM email provider")
                 _email_provider = COMEmailProvider()
                 # Auto-authenticate COM provider on startup
                 _email_provider.authenticate({})
+                logger.info("COM email provider initialized successfully")
+                return _email_provider
             except ImportError as e:
-                # Fall back to other providers if COM not available
-                import logging
-                logging.warning(f"COM provider not available: {e}. Falling back to alternative provider.")
+                logger.error(f"COM provider not available: {e}")
+                raise RuntimeError(
+                    "COM Email Provider requires pywin32 and OutlookEmailAdapter. "
+                    "This is only available on Windows. Install pywin32 with: pip install pywin32"
+                ) from e
+            except Exception as e:
+                logger.error(f"COM provider initialization failed: {e}")
+                raise RuntimeError(f"Failed to initialize COM email provider: {e}") from e
         
-        # Require properly configured email provider - NO MOCKS IN PRODUCTION
-        if _email_provider is None:
-            raise RuntimeError(
-                "No email provider configured. Please configure COM Adapter:\n"
-                "Set use_com_backend=True in settings"
-            )
+        # NO FALLBACK - fail explicitly if COM not configured
+        raise RuntimeError(
+            "No email provider configured. Email Helper requires Outlook COM interface.\n"
+            "Please ensure:\n"
+            "1. You are running on Windows\n"
+            "2. Microsoft Outlook is installed\n"
+            "3. pywin32 is installed: pip install pywin32\n"
+            "4. Set use_com_backend=True in backend/core/config.py"
+        )
     
     return _email_provider
 

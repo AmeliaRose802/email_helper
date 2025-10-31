@@ -10,7 +10,6 @@ from pathlib import Path
 
 # Add project paths to Python path
 project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root / "src"))
 sys.path.insert(0, str(project_root / "backend"))
 
 # Configure environment

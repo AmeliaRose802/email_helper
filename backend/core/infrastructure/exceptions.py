@@ -77,7 +77,7 @@ class AIError(EmailHelperError):
 class AIServiceUnavailableError(AIError):
     """Raised when AI service is unavailable or not responding."""
     
-    def __init__(self, message: str = "AI service unavailable", **kwargs):
+    def __init__(self, message: str = "AI service unavailable", **kwargs: Any):
         super().__init__(message, recoverable=True, **kwargs)
     
     def _default_user_message(self) -> str:
@@ -94,7 +94,7 @@ class AIQuotaExceededError(AIError):
 class AIResponseError(AIError):
     """Raised when AI response is malformed or invalid."""
     
-    def __init__(self, message: str = "Invalid AI response", **kwargs):
+    def __init__(self, message: str = "Invalid AI response", **kwargs: Any):
         super().__init__(message, recoverable=True, **kwargs)
     
     def _default_user_message(self) -> str:
@@ -104,7 +104,7 @@ class AIResponseError(AIError):
 class AITimeoutError(AIError):
     """Raised when AI service request times out."""
     
-    def __init__(self, message: str = "AI request timeout", **kwargs):
+    def __init__(self, message: str = "AI request timeout", **kwargs: Any):
         super().__init__(message, recoverable=True, **kwargs)
     
     def _default_user_message(self) -> str:

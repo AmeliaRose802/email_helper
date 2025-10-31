@@ -6,10 +6,12 @@ Accuracy Report - Display detailed accuracy tracking report
 import sys
 import os
 
-# Add the src directory to the Python path
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
+# Add parent directory to Python path to import from backend
+script_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(script_dir)
+sys.path.insert(0, parent_dir)
 
-from accuracy_tracker import AccuracyTracker
+from backend.core.infrastructure.analytics.accuracy_tracker import AccuracyTracker
 
 
 def main():
@@ -17,9 +19,10 @@ def main():
     print("📊 AI EMAIL CLASSIFICATION ACCURACY REPORT")
     print("=" * 60)
     
-    # Set up paths
+    # Set up paths - runtime_data is in project root
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    runtime_data_dir = os.path.join(script_dir, 'runtime_data')
+    project_root = os.path.dirname(script_dir)
+    runtime_data_dir = os.path.join(project_root, 'runtime_data')
     
     # Initialize accuracy tracker
     accuracy_tracker = AccuracyTracker(runtime_data_dir)

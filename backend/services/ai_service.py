@@ -21,11 +21,16 @@ class AIService:
     for FastAPI endpoint integration.
     """
     
-    def __init__(self):
-        """Initialize AI service with AIOrchestrator."""
-        self.ai_orchestrator = None
-        self.azure_config = None
-        self._initialized = False
+    def __init__(self, ai_orchestrator: Optional[AIOrchestrator] = None, azure_config: Optional[Any] = None):
+        """Initialize AI service with AIOrchestrator.
+        
+        Args:
+            ai_orchestrator: Optional pre-configured AIOrchestrator (for dependency injection)
+            azure_config: Optional Azure configuration (for dependency injection)
+        """
+        self.ai_orchestrator = ai_orchestrator
+        self.azure_config = azure_config
+        self._initialized = ai_orchestrator is not None and azure_config is not None
     
     async def _run_sync(self, func, *args):
         """Run synchronous function in executor to avoid blocking event loop.
@@ -172,9 +177,18 @@ class AIService:
         result = self.ai_orchestrator.execute_prompty('summerize_action_item.prompty', inputs)
         parsed = self._parse_ai_result(result)
         
+        # Extract action_items list from parsed result
+        action_items = parsed.get("action_items", [])
+        if not isinstance(action_items, list):
+            # If action_items isn't a list, try to construct from action_required
+            action_required = parsed.get("action_required", "Review email")
+            action_items = []
+            if action_required and action_required != "No action required":
+                action_items = [{"action": action_required, "deadline": parsed.get("due_date"), "priority": "medium"}]
+        
         action = parsed.get("action_required", "Review email")
         return {
-            "action_items": [action] if action else [],
+            "action_items": action_items,
             "urgency": "medium",
             "deadline": parsed.get("due_date"),
             "confidence": 0.8,
@@ -225,6 +239,43 @@ class AIService:
             "key_points": key_points,
             "confidence": 0.8 if is_good else 0.5
         }
+    
+    async def detect_duplicates(
+        self,
+        emails: List[Dict[str, Any]]
+    ) -> List[str]:
+        """Detect duplicate emails using AI.
+        
+        Args:
+            emails: List of email dictionaries to check for duplicates
+            
+        Returns:
+            List of email IDs that are duplicates
+        """
+        self._ensure_initialized()
+        try:
+            return await self._run_sync(self._detect_duplicates_sync, emails)
+        except Exception as e:
+            return []
+    
+    def _detect_duplicates_sync(self, emails: List[Dict[str, Any]]) -> List[str]:
+        """Synchronous duplicate detection for thread pool execution."""
+        email_data_list = [self._convert_email_for_orchestrator(email) for email in emails]
+        
+        inputs = {"emails": email_data_list}
+        result = self.ai_orchestrator.execute_prompty('email_duplicate_detection.prompty', inputs)
+        
+        if isinstance(result, str):
+            try:
+                parsed = json.loads(result)
+                return parsed.get("duplicate_ids", [])
+            except json.JSONDecodeError:
+                return []
+        elif isinstance(result, dict):
+            return result.get("duplicate_ids", [])
+        elif isinstance(result, list):
+            return result
+        return []
     
     async def analyze_holistically(
         self,

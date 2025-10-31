@@ -4,7 +4,7 @@
 import os
 import json
 from datetime import datetime, timedelta
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 
 class TaskQueries:
@@ -20,7 +20,7 @@ class TaskQueries:
         self.storage = storage
         self.lifecycle = lifecycle
     
-    def get_entry_ids_for_tasks(self, task_ids: List[str], outstanding_tasks: Dict = None) -> List[str]:
+    def get_entry_ids_for_tasks(self, task_ids: List[str], outstanding_tasks: Optional[Dict] = None) -> List[str]:
         """Get all email EntryIDs associated with the specified task IDs."""
         if outstanding_tasks is None:
             outstanding_tasks = self.storage.load_outstanding_tasks_raw()
@@ -34,7 +34,7 @@ class TaskQueries:
         
         return list(set(entry_ids))
     
-    def get_task_statistics(self, outstanding_tasks: Dict = None) -> Dict[str, Any]:
+    def get_task_statistics(self, outstanding_tasks: Optional[Dict] = None) -> Dict[str, Any]:
         """Get statistics about tasks."""
         if outstanding_tasks is None:
             outstanding_tasks = self.storage.load_outstanding_tasks_raw()
@@ -71,7 +71,7 @@ class TaskQueries:
             }
         }
     
-    def get_resolution_history(self, days_back: int = 30, resolution_type: str = None, 
+    def get_resolution_history(self, days_back: int = 30, resolution_type: Optional[str] = None, 
                                include_stats: bool = True) -> Dict[str, Any]:
         """Retrieve task resolution history for analysis and reporting."""
         try:
@@ -130,7 +130,7 @@ class TaskQueries:
                 'error': str(e)
             }
     
-    def clear_fyi_items(self, outstanding_tasks: Dict = None) -> int:
+    def clear_fyi_items(self, outstanding_tasks: Optional[Dict] = None) -> int:
         """Clear all FYI items from persistent storage."""
         if outstanding_tasks is None:
             outstanding_tasks = self.storage.load_outstanding_tasks_raw()
@@ -145,7 +145,7 @@ class TaskQueries:
         
         return cleared_count
     
-    def clear_newsletter_items(self, outstanding_tasks: Dict = None) -> int:
+    def clear_newsletter_items(self, outstanding_tasks: Optional[Dict] = None) -> int:
         """Clear all newsletter items from persistent storage."""
         if outstanding_tasks is None:
             outstanding_tasks = self.storage.load_outstanding_tasks_raw()
@@ -160,7 +160,7 @@ class TaskQueries:
         
         return cleared_count
     
-    def clear_optional_events(self, outstanding_tasks: Dict = None) -> int:
+    def clear_optional_events(self, outstanding_tasks: Optional[Dict] = None) -> int:
         """Clear all optional event items from persistent storage."""
         if outstanding_tasks is None:
             outstanding_tasks = self.storage.load_outstanding_tasks_raw()
@@ -175,7 +175,7 @@ class TaskQueries:
         
         return cleared_count
     
-    def clear_both_fyi_and_newsletters(self, outstanding_tasks: Dict = None) -> tuple:
+    def clear_both_fyi_and_newsletters(self, outstanding_tasks: Optional[Dict] = None) -> tuple:
         """Clear both FYI and newsletter items from persistent storage."""
         if outstanding_tasks is None:
             outstanding_tasks = self.storage.load_outstanding_tasks_raw()

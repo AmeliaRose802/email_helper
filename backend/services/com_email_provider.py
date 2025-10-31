@@ -43,6 +43,32 @@ except ImportError:
     OutlookEmailAdapter = None
 
 
+def requires_com(func):
+    """Decorator to handle COM initialization and adapter connection for methods."""
+    from functools import wraps
+    
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # Initialize COM on this thread (required for multi-threaded servers)
+        if PYTHONCOM_AVAILABLE:
+            try:
+                pythoncom.CoInitialize()
+            except:
+                pass  # Already initialized on this thread
+        
+        # Reconnect adapter to ensure COM objects are on this thread
+        if not self.adapter.connect():
+            self.logger.warning("Adapter connection failed, retrying...")
+            import time
+            time.sleep(0.2)
+            if not self.adapter.connect():
+                raise RuntimeError("Failed to connect to Outlook after retry")
+        
+        return func(self, *args, **kwargs)
+    
+    return wrapper
+
+
 # Category mappings from Python version (outlook_manager.py)
 INBOX_CATEGORIES = {
     'required_personal_action': 'Required Actions (Me)',
@@ -169,54 +195,18 @@ class COMEmailProvider(EmailProvider):
                 detail=helpful_msg
             )
     
+    @requires_com
     def get_emails(
         self, 
         folder_name: str = "Inbox", 
         count: int = 50, 
         offset: int = 0
     ) -> List[Dict[str, Any]]:
-        """Retrieve emails from the specified folder with pagination.
-        
-        Args:
-            folder_name: Name of the Outlook folder to retrieve from
-            count: Maximum number of emails to retrieve (default: 50)
-            offset: Number of emails to skip for pagination (default: 0)
-        
-        Returns:
-            List of email dictionaries with standardized fields:
-            - id: Unique email identifier (EntryID)
-            - subject: Email subject line
-            - sender: Sender email address
-            - recipient: Primary recipient address
-            - body: Email body text preview
-            - received_time: ISO format timestamp
-            - is_read: Read status boolean
-            - categories: List of assigned categories
-            - conversation_id: Thread identifier
-        
-        Raises:
-            HTTPException: If adapter not connected or retrieval fails
-        """
+        """Retrieve emails from the specified folder with pagination."""
         try:
-            # Initialize COM on this thread (required for multi-threaded servers)
-            if PYTHONCOM_AVAILABLE:
-                try:
-                    pythoncom.CoInitialize()
-                except:
-                    pass  # Already initialized on this thread
-            
             self.logger.debug(
                 f"Retrieving emails from {folder_name}: count={count}, offset={offset}"
             )
-            
-            # Reconnect adapter to ensure COM objects are on this thread
-            if not self.adapter.connect():
-                self.logger.warning("Adapter connection failed, retrying...")
-                # Retry once
-                import time
-                time.sleep(0.2)
-                if not self.adapter.connect():
-                    raise RuntimeError("Failed to connect to Outlook after retry")
             
             emails = self.adapter.get_emails(
                 folder_name=folder_name,
@@ -228,7 +218,6 @@ class COMEmailProvider(EmailProvider):
             return emails
             
         except RuntimeError as e:
-            # Adapter raises RuntimeError when not connected
             self.logger.error(f"Connection error: {e}")
             self.authenticated = False
             raise HTTPException(status_code=401, detail=str(e))
@@ -239,37 +228,17 @@ class COMEmailProvider(EmailProvider):
                 detail=f"Failed to retrieve emails: {str(e)}"
             )
     
+    @requires_com
     def get_email_by_id(self, email_id: str) -> Optional[Dict[str, Any]]:
-        """Get a single email by its ID.
-        
-        Args:
-            email_id: Email EntryID from Outlook
-        
-        Returns:
-            Email dictionary if found, None otherwise
-        
-        Raises:
-            HTTPException: If adapter not connected or retrieval fails
-        """
+        """Get a single email by its ID."""
         try:
-            # Initialize COM on this thread
-            if PYTHONCOM_AVAILABLE:
-                try:
-                    pythoncom.CoInitialize()
-                except:
-                    pass
-            
             self.logger.debug(f"Retrieving email by ID: {email_id}")
-            
-            # Reconnect to ensure COM objects are on this thread
-            self.adapter.connect()
             
             # Use adapter's get_email_by_id if available, otherwise search
             if hasattr(self.adapter, 'get_email_by_id'):
                 email = self.adapter.get_email_by_id(email_id)
             else:
                 # Fallback: search through recent emails
-                # This is inefficient but works as a fallback
                 all_emails = self.adapter.get_emails(folder_name="Inbox", count=500)
                 email = next((e for e in all_emails if e.get('id') == email_id), None)
             
@@ -324,22 +293,11 @@ class COMEmailProvider(EmailProvider):
                 detail=f"Failed to retrieve email content: {str(e)}"
             )
     
+    @requires_com
     def _get_email_content_sync(self, email_id: str) -> Dict[str, Any]:
         """Synchronous helper to get email content (runs in thread pool)."""
-        # Initialize COM on this thread
-        if PYTHONCOM_AVAILABLE:
-            try:
-                pythoncom.CoInitialize()
-            except:
-                pass
-        
         self.logger.debug(f"Retrieving email content for ID: {email_id}")
         
-        # Reconnect to ensure COM objects are on this thread
-        self.adapter.connect()
-        
-        # Use the adapter's get_email_by_id method - it already handles all the metadata extraction correctly!
-        # This is the SAME method used by get_emails() which works perfectly
         email_dict = self.adapter.get_email_by_id(email_id)
         
         if not email_dict:
@@ -348,13 +306,12 @@ class COMEmailProvider(EmailProvider):
                 detail=f"Email with ID '{email_id}' not found"
             )
         
-        # Get full body content (adapter truncates it for list view)
+        # Get full body content
         try:
             full_body = self.adapter.get_email_body(email_id)
             email_dict['body'] = full_body or email_dict.get('body', '')
         except Exception as e:
             self.logger.warning(f"Could not retrieve full body for {email_id}: {e}")
-            # Keep the truncated body from email_dict
         
         # Map importance format if needed
         if 'importance' not in email_dict or not email_dict['importance']:
@@ -362,30 +319,12 @@ class COMEmailProvider(EmailProvider):
         
         return email_dict
     
+    @requires_com
     def get_folders(self) -> List[Dict[str, str]]:
-        """List available email folders.
-        
-        Returns:
-            List of folder dictionaries with id, name, and type
-        
-        Raises:
-            HTTPException: If adapter not connected or listing fails
-        """
+        """List available email folders."""
         try:
-            # Initialize COM on this thread
-            if PYTHONCOM_AVAILABLE:
-                try:
-                    pythoncom.CoInitialize()
-                except:
-                    pass
-            
             self.logger.debug("Retrieving folder list")
-            
-            # Reconnect to ensure COM objects are on this thread
-            self.adapter.connect()
-            
             folders = self.adapter.get_folders()
-            
             self.logger.info(f"Retrieved {len(folders)} folders")
             return folders
             
