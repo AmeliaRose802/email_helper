@@ -77,8 +77,8 @@ export default defineConfig({
   // Web server configuration - Start both backend and frontend automatically
   webServer: [
     {
-      // Backend server (FastAPI on port 8000)
-      command: 'python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000',
+      // Backend server (Go API on port 8000)
+      command: 'pwsh.exe -NoProfile -Command "cd c:/Users/ameliapayne/email_helper/backend-go; go run cmd/api/main.go"',
       url: 'http://localhost:8000/health',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000, // 2 minutes to start

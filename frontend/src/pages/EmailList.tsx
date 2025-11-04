@@ -1,14 +1,16 @@
 // Complete email list interface with AI categorization
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useGetEmailsQuery, useBulkApplyToOutlookMutation, useSyncEmailsToDatabaseMutation, useExtractTasksFromEmailsMutation } from '@/services/emailApi';
+import { useGetEmailsQuery, useBulkApplyToOutlookMutation, useSyncEmailsToDatabaseMutation, useExtractTasksFromEmailsMutation, emailApi } from '@/services/emailApi';
 import { useClassifyEmailMutation } from '@/services/aiApi';
 import { EmailItem } from '@/components/Email/EmailItem';
 import { EmailActions } from '@/components/Email/EmailActions';
 import { ProgressBar } from '@/components/Email/ProgressBar';
 import { EmailDetailView } from '@/components/Email/EmailDetailView';
 import type { Email } from '@/types/email';
+import { useDispatch } from 'react-redux';
 
 const EmailList: React.FC = () => {
+  const dispatch = useDispatch();
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null); // For split view
   const [sortBy, setSortBy] = useState<'date' | 'sender' | 'subject'>('date');
@@ -18,7 +20,6 @@ const EmailList: React.FC = () => {
   const [syncEmailsToDatabase] = useSyncEmailsToDatabaseMutation();
   const [extractTasksFromEmails] = useExtractTasksFromEmailsMutation();
   const [isApplyingToOutlook, setIsApplyingToOutlook] = useState(false);
-  const [isExtractingTasks, setIsExtractingTasks] = useState(false);
   
   // Initialize refs from sessionStorage to persist across page reloads
   const classifiedEmailsRef = React.useRef<Map<string, Email>>(new Map());
@@ -68,6 +69,22 @@ const EmailList: React.FC = () => {
       totalEmails: emailData?.total || 0
     });
   }, [isLoading, error, emailData]);
+
+  // Pre-populate RTK Query cache with email details for instant loading
+  // This eliminates the delay when clicking on emails
+  useEffect(() => {
+    if (emailData?.emails) {
+      console.log('[EmailList] Pre-populating cache with', emailData.emails.length, 'email details');
+      emailData.emails.forEach((email) => {
+        // Upsert email data into the getEmailById cache
+        // Cast to any to avoid TypeScript thunk action type issues
+        dispatch(
+          emailApi.util.upsertQueryData('getEmailById', email.id, email) as any
+        );
+      });
+      console.log('[EmailList] ✅ Cache pre-populated - emails will load instantly on click');
+    }
+  }, [emailData, dispatch]);
 
   // Persist classification state to sessionStorage
   useEffect(() => {
@@ -124,18 +141,18 @@ const EmailList: React.FC = () => {
       .map(([conversationId, emails]) => ({
         conversationId,
         emails: emails.sort((a, b) => {
-          const aDate = new Date(a.received_time || a.date || 0);
-          const bDate = new Date(b.received_time || b.date || 0);
+          const aDate = new Date(a.received_time || 0);
+          const bDate = new Date(b.received_time || 0);
           return bDate.getTime() - aDate.getTime();
         }),
         latestDate: emails.reduce((latest, email) => {
-          const emailDate = new Date(email.received_time || email.date || 0);
+          const emailDate = new Date(email.received_time || 0);
           return emailDate > latest ? emailDate : latest;
         }, new Date(0)),
         // Representative email is the most recent one
         representativeEmail: emails.sort((a, b) => {
-          const aDate = new Date(a.received_time || a.date || 0);
-          const bDate = new Date(b.received_time || b.date || 0);
+          const aDate = new Date(a.received_time || 0);
+          const bDate = new Date(b.received_time || 0);
           return bDate.getTime() - aDate.getTime();
         })[0]
       }))
@@ -223,11 +240,10 @@ const EmailList: React.FC = () => {
       setClassifyingIds(prev => new Set(prev).add(repEmail.id));
 
       try {
-        // Use standardized field name with backward compatibility
         const result = await classifyEmail({
           subject: repEmail.subject,
           sender: repEmail.sender,
-          content: repEmail.content || repEmail.body || '',
+          content: repEmail.content || '',
         }).unwrap();
 
         // Apply classification to all emails in the conversation
@@ -546,52 +562,6 @@ const EmailList: React.FC = () => {
     }
   };
 
-  // Handle extract tasks from classified emails
-  // @ts-expect-error - Function defined for future use
-  const handleExtractTasks = async () => {
-    if (!currentData?.emails) return;
-    
-    // Get all classified emails
-    const classifiedEmails = Array.from(classifiedEmailsRef.current.values());
-    
-    if (classifiedEmails.length === 0) {
-      alert('No classified emails found. Please wait for AI classification to complete.');
-      return;
-    }
-    
-    if (!window.confirm(`Extract tasks from ${classifiedEmails.length} classified emails?\n\nThis will create tasks for action items, newsletters, FYI items, and more.`)) {
-      return;
-    }
-    
-    setIsExtractingTasks(true);
-    
-    try {
-      // First, sync classified emails to database
-      console.log('Syncing emails to database...');
-      const syncResult = await syncEmailsToDatabase({
-        emails: classifiedEmails
-      }).unwrap();
-      
-      console.log('Sync result:', syncResult);
-      
-      // Then extract tasks
-      console.log('Extracting tasks from emails...');
-      const extractResult = await extractTasksFromEmails({
-        email_ids: classifiedEmails.map(e => e.id)
-      }).unwrap();
-      
-      console.log('Extract result:', extractResult);
-      
-      alert(`✅ Success!\n\n📧 Synced ${syncResult.synced_count} emails to database\n📋 Started task extraction for ${extractResult.email_count} emails\n\nTasks are being created in the background. Check the Tasks page in a moment.`);
-      
-    } catch (error) {
-      console.error('Task extraction failed:', error);
-      alert('❌ Failed to extract tasks. Please try again or check the console for details.');
-    } finally {
-      setIsExtractingTasks(false);
-    }
-  };
-
   // Handle sort change
   const handleSortChange = useCallback((newSortBy: 'date' | 'sender' | 'subject') => {
     if (sortBy === newSortBy) {
@@ -624,9 +594,8 @@ const EmailList: React.FC = () => {
       
       switch (sortBy) {
         case 'date':
-          // Use standardized field name with backward compatibility
-          const aDate = new Date(a.received_time || a.date || 0).getTime();
-          const bDate = new Date(b.received_time || b.date || 0).getTime();
+          const aDate = new Date(a.received_time || 0).getTime();
+          const bDate = new Date(b.received_time || 0).getTime();
           comparison = aDate - bDate;
           break;
         case 'sender':
@@ -744,50 +713,55 @@ const EmailList: React.FC = () => {
               return;
             }
 
-            // Run both operations
+            // Briefly disable button to prevent double-clicks
             setIsApplyingToOutlook(true);
-            setIsExtractingTasks(true);
-
-            try {
-              // 1. Apply to Outlook
-              const applyResult = await bulkApplyToOutlook({
-                emailIds: currentPageEmailIds,
-                applyToOutlook: true,
-              }).unwrap();
-
-              console.log('✅ Applied to Outlook:', applyResult);
-
-              // 2. Sync to database - only current page emails
-              const currentPageClassifiedEmails = currentPageEmails.filter(email => 
-                currentPageEmailIds.includes(email.id)
-              );
-              const syncResult = await syncEmailsToDatabase({
-                emails: currentPageClassifiedEmails
-              }).unwrap();
-
-              console.log('✅ Synced to database:', syncResult);
-
-              // 3. Extract tasks
-              const extractResult = await extractTasksFromEmails({
-                email_ids: currentPageEmailIds
-              }).unwrap();
-
-              console.log('✅ Extracting tasks:', extractResult);
-
-              alert(`✅ Success!\n\n📁 Moved ${applyResult.successful} emails to Outlook folders\n💾 Synced ${syncResult.synced_count} emails to database\n📋 Extracting tasks from ${extractResult.email_count} emails\n\nCheck the Tasks page in a moment!`);
-
-              refetch();
-            } catch (error) {
-              console.error('Error processing emails:', error);
-              alert('❌ Some operations failed. Check console for details.');
-            } finally {
+            
+            // Re-enable button after 500ms to allow concurrent batch processing
+            setTimeout(() => {
               setIsApplyingToOutlook(false);
-              setIsExtractingTasks(false);
-            }
+            }, 500);
+
+            // Run all operations in background (don't await)
+            (async () => {
+              try {
+                // 1. Apply to Outlook
+                const applyResult = await bulkApplyToOutlook({
+                  emailIds: currentPageEmailIds,
+                  applyToOutlook: true,
+                }).unwrap();
+
+                console.log('✅ Applied to Outlook:', applyResult);
+
+                // 2. Sync to database - only current page emails
+                const currentPageClassifiedEmails = currentPageEmails.filter(email => 
+                  currentPageEmailIds.includes(email.id)
+                );
+                const syncResult = await syncEmailsToDatabase({
+                  emails: currentPageClassifiedEmails
+                }).unwrap();
+
+                console.log('✅ Synced to database:', syncResult);
+
+                // 3. Extract tasks
+                const extractResult = await extractTasksFromEmails({
+                  email_ids: currentPageEmailIds
+                }).unwrap();
+
+                console.log('✅ Extracting tasks:', extractResult);
+
+                // Show success notification (non-blocking)
+                console.log(`✅ Background processing complete!\n\n📁 Moved ${applyResult.successful} emails to Outlook folders\n💾 Synced ${syncResult.synced_count} emails to database\n📋 Extracted tasks from ${extractResult.email_count} emails`);
+
+                refetch();
+              } catch (error) {
+                console.error('Error processing emails:', error);
+                // Log error but don't block UI
+                console.error('❌ Some operations failed:', error);
+              }
+            })();
           }}
           disabled={
             isApplyingToOutlook || 
-            isExtractingTasks || 
             isClassifying || 
             currentPageEmails.filter(e => e.ai_category).length === 0
           }
@@ -797,11 +771,11 @@ const EmailList: React.FC = () => {
               ? 'Please wait for classification to complete'
               : currentPageEmails.filter(e => e.ai_category).length === 0
               ? 'No classified emails on current page'
-              : 'Apply classifications to Outlook AND extract tasks for current page only!'
+              : 'Apply classifications to Outlook AND extract tasks (runs in background)!'
           }
         >
           <span className="email-list-checkmark">✅</span>
-          {isApplyingToOutlook || isExtractingTasks ? 'Processing...' : `Approve ${currentPageEmails.filter(e => e.ai_category).length} Email${currentPageEmails.filter(e => e.ai_category).length !== 1 ? 's' : ''}`}
+          {isApplyingToOutlook ? 'Starting...' : `Approve ${currentPageEmails.filter(e => e.ai_category).length} Email${currentPageEmails.filter(e => e.ai_category).length !== 1 ? 's' : ''}`}
         </button>
       </div>
 

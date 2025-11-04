@@ -367,7 +367,7 @@ func BatchProcessEmails(c *gin.Context) {
 		}
 
 		// Classify email using AI
-		classification, err := emailService.ClassifyEmail(ctx, email.Subject, email.Sender, email.Body, "")
+		classification, err := emailService.ClassifyEmail(ctx, email.Subject, email.Sender, email.Content, "")
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("Email %s: failed to classify: %v", emailID, err))
 			errorCount++
@@ -433,7 +433,7 @@ func ExtractTasks(c *gin.Context) {
 		}
 
 		// Extract action items using AI
-		actionItems, err := emailService.ExtractActionItems(ctx, email.Body, "")
+		actionItems, err := emailService.ExtractActionItems(ctx, email.Content, "")
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("Email %s: failed to extract tasks: %v", emailID, err))
 			errorCount++

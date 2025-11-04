@@ -527,7 +527,7 @@ describe('taskUtils', () => {
     it('truncates long subject to 100 characters', () => {
       const longSubject = 'A'.repeat(150);
       const result = createTaskFromEmail('email123', longSubject);
-      expect(result.title).toHaveLength(104); // 100 + '...'
+      expect(result.title).toHaveLength(103); // 100 + '...' (rendered as Unicode ellipsis '…', 1 char)
       expect(result.title.endsWith('...')).toBe(true);
     });
 
@@ -539,7 +539,7 @@ describe('taskUtils', () => {
     it('truncates long body to 500 characters', () => {
       const longBody = 'B'.repeat(600);
       const result = createTaskFromEmail('email123', 'Subject', longBody);
-      expect(result.description).toHaveLength(504); // 500 + '...'
+      expect(result.description).toHaveLength(503); // 500 + '...' (rendered as Unicode ellipsis '…', 1 char)
       expect(result.description!.endsWith('...')).toBe(true);
     });
 

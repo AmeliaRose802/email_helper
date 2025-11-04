@@ -21,7 +21,7 @@ inputs:
     type: string
   date:
     type: string
-  body:
+  Content:
     type: string
 outputs:
   summary:
@@ -53,7 +53,7 @@ user:
 Subject: {{subject}}
 From: {{sender}}
 Date: {{date}}
-Body:
-{{body}}
+Content:
+{{content}}
 
 Return only the single bullet point summary.

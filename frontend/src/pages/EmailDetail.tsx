@@ -172,9 +172,8 @@ const EmailDetail: React.FC = () => {
         
         <div className="email-detail-meta-row">
           <div>
-            {/* Use standardized field name with backward compatibility */}
-            <strong>Date:</strong> {email.received_time || email.date
-              ? new Date(email.received_time || email.date || '').toLocaleString('en-US', { 
+            <strong>Date:</strong> {email.received_time
+              ? new Date(email.received_time).toLocaleString('en-US', { 
                   weekday: 'short', 
                   year: 'numeric', 
                   month: 'short', 
@@ -306,9 +305,9 @@ const EmailDetail: React.FC = () => {
           <div 
             dangerouslySetInnerHTML={{ __html: email.html_body }}
           />
-        ) : (email.content || email.body) ? (
+        ) : email.content ? (
           <div 
-            dangerouslySetInnerHTML={{ __html: formatPlainTextEmail(email.content || email.body || '') }}
+            dangerouslySetInnerHTML={{ __html: formatPlainTextEmail(email.content) }}
           />
         ) : (
           <div className="email-detail-no-content">

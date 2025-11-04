@@ -107,7 +107,7 @@ func (suite *EmailServiceTestSuite) TestGetEmails_DatabaseSource() {
 		ID:       "db-1",
 		Subject:  "Database Email 1",
 		Sender:   "db-sender@test.com",
-		Date:     time.Now(),
+		ReceivedTime: time.Now(),
 		Category: "Action Required",
 	}
 	err := database.SaveEmail(email1)
@@ -127,14 +127,14 @@ func (suite *EmailServiceTestSuite) TestGetEmails_WithCategoryFilter() {
 		ID:       "cat-1",
 		Subject:  "Action Email",
 		Sender:   "sender@test.com",
-		Date:     time.Now(),
+		ReceivedTime: time.Now(),
 		Category: "Action Required",
 	}
 	email2 := &models.Email{
 		ID:       "cat-2",
 		Subject:  "FYI Email",
 		Sender:   "sender@test.com",
-		Date:     time.Now(),
+		ReceivedTime: time.Now(),
 		Category: "FYI",
 	}
 	database.SaveEmail(email1)
@@ -187,7 +187,7 @@ func (suite *EmailServiceTestSuite) TestGetEmailByID_DatabaseSource() {
 		ID:      "db-123",
 		Subject: "Database Email",
 		Sender:  "db@test.com",
-		Date:    time.Now(),
+		ReceivedTime: time.Now(),
 	}
 	database.SaveEmail(testEmail)
 	
@@ -213,13 +213,13 @@ func (suite *EmailServiceTestSuite) TestSearchEmails() {
 		ID:      "search-1",
 		Subject: "Meeting tomorrow",
 		Sender:  "boss@test.com",
-		Date:    time.Now(),
+		ReceivedTime: time.Now(),
 	}
 	email2 := &models.Email{
 		ID:      "search-2",
 		Subject: "Project update",
 		Sender:  "coworker@test.com",
-		Date:    time.Now(),
+		ReceivedTime: time.Now(),
 	}
 	database.SaveEmail(email1)
 	database.SaveEmail(email2)
@@ -279,7 +279,7 @@ func (suite *EmailServiceTestSuite) TestUpdateClassification_DatabaseOnly() {
 		ID:      "update-123",
 		Subject: "Test Email",
 		Sender:  "test@test.com",
-		Date:    time.Now(),
+		ReceivedTime: time.Now(),
 	}
 	database.SaveEmail(email)
 	
@@ -300,7 +300,7 @@ func (suite *EmailServiceTestSuite) TestUpdateClassification_WithOutlookSync() {
 		ID:      "update-sync-123",
 		Subject: "Test Email",
 		Sender:  "test@test.com",
-		Date:    time.Now(),
+		ReceivedTime: time.Now(),
 	}
 	database.SaveEmail(email)
 	
@@ -318,14 +318,14 @@ func (suite *EmailServiceTestSuite) TestBulkApplyToOutlook_Success() {
 		ID:       "bulk-1",
 		Subject:  "Email 1",
 		Sender:   "sender@test.com",
-		Date:     time.Now(),
+		ReceivedTime: time.Now(),
 		Category: "FYI",
 	}
 	email2 := &models.Email{
 		ID:       "bulk-2",
 		Subject:  "Email 2",
 		Sender:   "sender@test.com",
-		Date:     time.Now(),
+		ReceivedTime: time.Now(),
 		Category: "Action Required",
 	}
 	database.SaveEmail(email1)
@@ -349,7 +349,7 @@ func (suite *EmailServiceTestSuite) TestBulkApplyToOutlook_PartialFailure() {
 		ID:       "bulk-fail-1",
 		Subject:  "Email 1",
 		Sender:   "sender@test.com",
-		Date:     time.Now(),
+		ReceivedTime: time.Now(),
 		Category: "FYI",
 	}
 	database.SaveEmail(email)
@@ -382,8 +382,8 @@ func (suite *EmailServiceTestSuite) TestBulkApplyToOutlook_NoComBackend() {
 // Test SyncToDatabase
 func (suite *EmailServiceTestSuite) TestSyncToDatabase() {
 	emails := []*models.Email{
-		{ID: "sync-1", Subject: "Sync Email 1", Sender: "s1@test.com", Date: time.Now()},
-		{ID: "sync-2", Subject: "Sync Email 2", Sender: "s2@test.com", Date: time.Now()},
+		{ID: "sync-1", Subject: "Sync Email 1", Sender: "s1@test.com", ReceivedTime: time.Now()},
+		{ID: "sync-2", Subject: "Sync Email 2", Sender: "s2@test.com", ReceivedTime: time.Now()},
 	}
 	
 	err := suite.service.SyncToDatabase(emails)
@@ -450,14 +450,14 @@ func (suite *EmailServiceTestSuite) TestGetConversation_DatabaseSource() {
 		ID:             "conv-db-1",
 		Subject:        "Meeting",
 		Sender:         "sender@test.com",
-		Date:           time.Now(),
+		ReceivedTime: time.Now(),
 		ConversationID: "conv-db-123",
 	}
 	email2 := &models.Email{
 		ID:             "conv-db-2",
 		Subject:        "RE: Meeting",
 		Sender:         "reply@test.com",
-		Date:           time.Now(),
+		ReceivedTime: time.Now(),
 		ConversationID: "conv-db-123",
 	}
 	database.SaveEmail(email1)
@@ -476,14 +476,14 @@ func (suite *EmailServiceTestSuite) TestGetStats() {
 		ID:       "stats-1",
 		Subject:  "Email 1",
 		Sender:   "sender1@test.com",
-		Date:     time.Now(),
+		ReceivedTime: time.Now(),
 		Category: "Action Required",
 	}
 	email2 := &models.Email{
 		ID:       "stats-2",
 		Subject:  "Email 2",
 		Sender:   "sender2@test.com",
-		Date:     time.Now(),
+		ReceivedTime: time.Now(),
 		Category: "FYI",
 	}
 	database.SaveEmail(email1)

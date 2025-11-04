@@ -120,10 +120,9 @@ export const EmailDetailView: React.FC<EmailDetailViewProps> = ({
       )}
 
       {/* Email Body - renders HTML content directly */}
-      {/* Use standardized field name with backward compatibility */}
       <div
         className="email-detail-content"
-        dangerouslySetInnerHTML={{ __html: prepareEmailHTML(email.content || email.body || '') }}
+        dangerouslySetInnerHTML={{ __html: prepareEmailHTML(email.content || '') }}
       />
     </div>
   );

@@ -8,10 +8,8 @@ type Email struct {
 	Subject          string    `json:"subject"`
 	Sender           string    `json:"sender"`
 	Recipient        string    `json:"recipient,omitempty"`
-	Body             string    `json:"body"`
-	Content          string    `json:"content,omitempty"`
-	ReceivedTime     time.Time `json:"received_time,omitempty"`
-	Date             time.Time `json:"date"`
+	Content          string    `json:"content"`
+	ReceivedTime     time.Time `json:"received_time"`
 	IsRead           bool      `json:"is_read"`
 	HasAttachments   bool      `json:"has_attachments"`
 	Importance       string    `json:"importance"`
@@ -115,11 +113,11 @@ type EmailBatchResult struct {
 
 // EmailProcessingResult individual email processing result
 type EmailProcessingResult struct {
-	EmailID     string        `json:"email_id"`
-	Category    string        `json:"category"`
-	Confidence  float64       `json:"confidence"`
-	Reasoning   string        `json:"reasoning"`
-	ActionItems []string      `json:"action_items"`
-	Priority    string        `json:"priority"`
-	Error       string        `json:"error,omitempty"`
+	EmailID     string   `json:"email_id"`
+	AICategory  string   `json:"ai_category"`
+	Confidence  float64  `json:"confidence"`
+	Reasoning   string   `json:"reasoning"`
+	ActionItems []string `json:"action_items"`
+	Priority    string   `json:"priority"`
+	Error       string   `json:"error,omitempty"`
 }

@@ -128,14 +128,15 @@ export const EmailItem: React.FC<EmailItemProps> = ({
       onClick={handleClick}
     >
       {/* Selection checkbox */}
-      <input
-        type="checkbox"
-        checked={isSelected}
-        onChange={() => {}}
-        onClick={handleCheckboxClick}
-        title="Select email"
-        className="email-item__checkbox"
-      />
+      <div onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onSelect()}
+          title="Select email"
+          className="email-item__checkbox"
+        />
+      </div>
       
       {/* Email content */}
       <div className="email-item-content">
@@ -145,8 +146,7 @@ export const EmailItem: React.FC<EmailItemProps> = ({
             {email.sender || 'Unknown Sender'}
           </div>
           <div className="email-item-timestamp">
-            {/* Use standardized field name with backward compatibility */}
-            {formatEmailDate(email.received_time || email.date || '')}
+            {formatEmailDate(email.received_time || '')}
           </div>
         </div>
         
@@ -161,9 +161,9 @@ export const EmailItem: React.FC<EmailItemProps> = ({
             💡 {email.one_line_summary}
           </div>
         ) : (
-          /* Fallback to body preview if no AI summary - use standardized field name */
+          /* Fallback to body preview if no AI summary */
           <div className="email-item-preview">
-            {(email.content || email.body) ? getEmailPreview(email.content || email.body || '', 120) : '(No content)'}
+            {email.content ? getEmailPreview(email.content, 120) : '(No content)'}
           </div>
         )}
         

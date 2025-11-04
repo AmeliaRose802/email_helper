@@ -143,6 +143,40 @@ jobs:
         shell: pwsh
         continue-on-error: true
   
+  frontend-lint:
+    name: Frontend Code Quality
+    runs-on: windows-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+        shell: pwsh
+      
+      - name: Run ESLint
+        run: |
+          cd frontend
+          npm run lint
+        shell: pwsh
+      
+      - name: Check TypeScript compilation
+        run: |
+          cd frontend
+          npx tsc --noEmit
+        shell: pwsh
+  
   dependency-security:
     name: Security Scan
     runs-on: windows-latest
@@ -172,7 +206,7 @@ jobs:
   
   validation-summary:
     name: Validation Summary
-    needs: [test, code-quality, dependency-security]
+    needs: [test, code-quality, frontend-lint, dependency-security]
     runs-on: windows-latest
     if: always()
     
@@ -181,15 +215,23 @@ jobs:
         run: |
           $testStatus = "${{ needs.test.result }}"
           $qualityStatus = "${{ needs.code-quality.result }}"
+          $frontendLintStatus = "${{ needs.frontend-lint.result }}"
           $securityStatus = "${{ needs.dependency-security.result }}"
           
           Write-Host "Test Status: $testStatus"
           Write-Host "Code Quality Status: $qualityStatus"
+          Write-Host "Frontend Lint Status: $frontendLintStatus"
           Write-Host "Security Status: $securityStatus"
           
           # Fail if essential tests failed
           if ($testStatus -ne "success") {
             Write-Host "::error::Essential tests failed. Merge validation failed."
+            exit 1
+          }
+          
+          # Fail if frontend linting failed (inline styles, TypeScript errors)
+          if ($frontendLintStatus -ne "success") {
+            Write-Host "::error::Frontend linting failed. Fix ESLint and TypeScript errors."
             exit 1
           }
           

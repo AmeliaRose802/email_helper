@@ -19,7 +19,7 @@ inputs:
     type: string
   sender:
     type: string
-  body:
+  Content:
     type: string
   current_date:
     type: string
@@ -56,6 +56,6 @@ user:
 **Email Details:**
 Subject: {{subject}}
 Sender: {{sender}}
-Content Preview: {{body}}
+Content Preview: {{content}}
 
 Assess why this event/email is relevant or not relevant for the user. **First check if the event date has passed.**

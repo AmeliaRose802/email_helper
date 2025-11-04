@@ -18,10 +18,10 @@ func SaveEmail(email *models.Email) error {
 
 	query := `
 		INSERT OR REPLACE INTO emails (
-			id, user_id, subject, sender, recipient, content, body, date, received_date,
+			id, user_id, subject, sender, recipient, content, received_date,
 			category, ai_category, confidence, ai_confidence, ai_reasoning, one_line_summary,
 			conversation_id, processed_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = db.Exec(query,
@@ -31,8 +31,6 @@ func SaveEmail(email *models.Email) error {
 		email.Sender,
 		email.Recipient,
 		email.Content,
-		email.Body,
-		email.Date,
 		email.ReceivedTime,
 		email.Category,
 		email.AICategory,
@@ -55,7 +53,7 @@ func GetEmailByID(id string) (*models.Email, error) {
 	}
 
 	query := `
-		SELECT id, subject, sender, recipient, content, body, date, received_date,
+		SELECT id, subject, sender, recipient, content, received_date,
 		       category, ai_category, ai_confidence, ai_reasoning, one_line_summary, conversation_id
 		FROM emails
 		WHERE id = ?
@@ -68,8 +66,6 @@ func GetEmailByID(id string) (*models.Email, error) {
 		&email.Sender,
 		&email.Recipient,
 		&email.Content,
-		&email.Body,
-		&email.Date,
 		&email.ReceivedTime,
 		&email.Category,
 		&email.AICategory,
@@ -115,11 +111,11 @@ func GetEmails(limit, offset int, category string) ([]*models.Email, int, error)
 
 	// Get emails
 	query := fmt.Sprintf(`
-		SELECT id, subject, sender, recipient, content, body, date, received_date,
+		SELECT id, subject, sender, recipient, content, received_date,
 		       category, ai_category, ai_confidence, ai_reasoning, one_line_summary, conversation_id
 		FROM emails
 		%s
-		ORDER BY date DESC
+		ORDER BY received_date DESC
 		LIMIT ? OFFSET ?
 	`, whereClause)
 
@@ -139,8 +135,6 @@ func GetEmails(limit, offset int, category string) ([]*models.Email, int, error)
 			&email.Sender,
 			&email.Recipient,
 			&email.Content,
-			&email.Body,
-			&email.Date,
 			&email.ReceivedTime,
 			&email.Category,
 			&email.AICategory,
@@ -176,26 +170,26 @@ func SearchEmails(query string, page, perPage int) ([]*models.Email, int, error)
 		SELECT COUNT(*)
 		FROM emails
 		WHERE user_id = 1
-		  AND (subject LIKE ? OR sender LIKE ? OR content LIKE ? OR body LIKE ?)
+		  AND (subject LIKE ? OR sender LIKE ? OR content LIKE ?)
 	`
 	var total int
-	err = db.QueryRow(countQuery, searchPattern, searchPattern, searchPattern, searchPattern).Scan(&total)
+	err = db.QueryRow(countQuery, searchPattern, searchPattern, searchPattern).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// Get emails
 	searchQuery := `
-		SELECT id, subject, sender, recipient, content, body, date, received_date,
+		SELECT id, subject, sender, recipient, content, received_date,
 		       category, ai_category, ai_confidence, ai_reasoning, one_line_summary, conversation_id
 		FROM emails
 		WHERE user_id = 1
-		  AND (subject LIKE ? OR sender LIKE ? OR content LIKE ? OR body LIKE ?)
-		ORDER BY date DESC
+		  AND (subject LIKE ? OR sender LIKE ? OR content LIKE ?)
+		ORDER BY received_date DESC
 		LIMIT ? OFFSET ?
 	`
 
-	rows, err := db.Query(searchQuery, searchPattern, searchPattern, searchPattern, searchPattern, perPage, offset)
+	rows, err := db.Query(searchQuery, searchPattern, searchPattern, searchPattern, perPage, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -210,8 +204,6 @@ func SearchEmails(query string, page, perPage int) ([]*models.Email, int, error)
 			&email.Sender,
 			&email.Recipient,
 			&email.Content,
-			&email.Body,
-			&email.Date,
 			&email.ReceivedTime,
 			&email.Category,
 			&email.AICategory,
@@ -253,11 +245,11 @@ func GetConversationEmails(conversationID string) ([]*models.Email, error) {
 	}
 
 	query := `
-		SELECT id, subject, sender, recipient, content, body, date, received_date,
+		SELECT id, subject, sender, recipient, content, received_date,
 		       category, ai_category, ai_confidence, ai_reasoning, one_line_summary, conversation_id
 		FROM emails
 		WHERE conversation_id = ?
-		ORDER BY date ASC
+		ORDER BY received_date ASC
 	`
 
 	rows, err := db.Query(query, conversationID)
@@ -275,8 +267,6 @@ func GetConversationEmails(conversationID string) ([]*models.Email, error) {
 			&email.Sender,
 			&email.Recipient,
 			&email.Content,
-			&email.Body,
-			&email.Date,
 			&email.ReceivedTime,
 			&email.Category,
 			&email.AICategory,

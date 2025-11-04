@@ -363,10 +363,8 @@ func TestParseEmailLogic(t *testing.T) {
 		_ = email.ID
 		_ = email.Subject
 		_ = email.Sender
-		_ = email.Body
 		_ = email.Content
 		_ = email.ReceivedTime
-		_ = email.Date
 		_ = email.IsRead
 		_ = email.HasAttachments
 		_ = email.Importance
@@ -487,7 +485,7 @@ func TestNullPropertyHandling(t *testing.T) {
 		assert.Empty(t, email.ID)
 		assert.Empty(t, email.Subject)
 		assert.Empty(t, email.Sender)
-		assert.Empty(t, email.Body)
+		assert.Empty(t, email.Content)
 		assert.Empty(t, email.Content)
 		assert.False(t, email.IsRead)
 		assert.False(t, email.HasAttachments)
@@ -502,7 +500,7 @@ func TestNullPropertyHandling(t *testing.T) {
 		
 		assert.Equal(t, "Test Subject", email.Subject)
 		assert.Equal(t, "test@test.com", email.Sender)
-		assert.Empty(t, email.Body) // Not set
+		assert.Empty(t, email.Content) // Not set
 		assert.Empty(t, email.ID)   // Not set
 	})
 

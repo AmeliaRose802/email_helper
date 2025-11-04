@@ -23,7 +23,7 @@ inputs:
     type: string
   date:
     type: string
-  body:
+  Content:
     type: string
   thread_context:
     type: string
@@ -75,7 +75,7 @@ Analyze this email thread to determine if the team action is already resolved.
 Subject: {{subject}}
 From: {{sender}}
 Date: {{date}}
-Body: {{body}}
+Content: {{content}}
 
 **Thread Context:**
 {{thread_context}}

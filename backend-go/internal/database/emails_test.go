@@ -42,8 +42,6 @@ func createTestEmail(id string) *models.Email {
 		Sender:         "sender@test.com",
 		Recipient:      "recipient@test.com",
 		Content:        "Test content for email " + id,
-		Body:           "Test body for email " + id,
-		Date:           now,
 		ReceivedTime:   now,
 		Category:       "work",
 		AICategory:     "required_personal_action",
@@ -93,10 +91,10 @@ func TestSaveEmail(t *testing.T) {
 
 	t.Run("SaveEmailWithNullFields", func(t *testing.T) {
 		email := &models.Email{
-			ID:      "email-003",
-			Subject: "Minimal Email",
-			Sender:  "sender@test.com",
-			Date:    time.Now(),
+			ID:           "email-003",
+			Subject:      "Minimal Email",
+			Sender:       "sender@test.com",
+			ReceivedTime: time.Now(),
 		}
 		err := SaveEmail(email)
 		assert.NoError(t, err)
@@ -195,12 +193,12 @@ func TestGetEmails(t *testing.T) {
 	t.Run("GetEmailsOrderedByDate", func(t *testing.T) {
 		// Create emails with different dates
 		oldEmail := createTestEmail("email-old")
-		oldEmail.Date = time.Now().Add(-24 * time.Hour)
+		oldEmail.ReceivedTime = time.Now().Add(-24 * time.Hour)
 		err := SaveEmail(oldEmail)
 		require.NoError(t, err)
 
 		newEmail := createTestEmail("email-new")
-		newEmail.Date = time.Now()
+		newEmail.ReceivedTime = time.Now()
 		err = SaveEmail(newEmail)
 		require.NoError(t, err)
 
@@ -229,7 +227,7 @@ func TestSearchEmails(t *testing.T) {
 	require.NoError(t, err)
 
 	email3 := createTestEmail("search-003")
-	email3.Body = "Please review the quarterly report"
+	email3.Content = "Please review the quarterly report"
 	err = SaveEmail(email3)
 	require.NoError(t, err)
 
@@ -257,12 +255,12 @@ func TestSearchEmails(t *testing.T) {
 		assert.Contains(t, results[0].Content, "highlights")
 	})
 
-	t.Run("SearchByBody", func(t *testing.T) {
+	t.Run("SearchByContent", func(t *testing.T) {
 		results, total, err := SearchEmails("quarterly", 1, 10)
 		require.NoError(t, err)
 		assert.Equal(t, 1, total)
 		assert.Len(t, results, 1)
-		assert.Contains(t, results[0].Body, "quarterly")
+		assert.Contains(t, results[0].Content, "quarterly")
 	})
 
 	t.Run("SearchWithMultipleResults", func(t *testing.T) {
@@ -351,7 +349,7 @@ func TestGetConversationEmails(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		email := createTestEmail("conv-email-" + string(rune('1'+i)))
 		email.ConversationID = "conv-thread-456"
-		email.Date = now.Add(time.Duration(i) * time.Hour)
+		email.ReceivedTime = now.Add(time.Duration(i) * time.Hour)
 		err := SaveEmail(email)
 		require.NoError(t, err)
 	}

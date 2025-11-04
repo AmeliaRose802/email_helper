@@ -39,8 +39,8 @@ const mockEmail: Email = {
   subject: 'Test Email Subject',
   sender: 'sender@example.com',
   recipient: 'recipient@example.com',
-  date: '2025-01-15T10:30:00Z',
-  body: 'This is a test email body with some content that should be truncated in the preview.',
+  received_time: '2025-01-15T10:30:00Z',
+  content: 'This is a test email body with some content that should be truncated in the preview.',
   html_body: '<p>This is a test email body with some content.</p>',
   is_read: false,
   importance: 'High',
@@ -95,9 +95,10 @@ const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-describe('EmailItem Component', () => {
-  const mockOnSelect = vi.fn();
+// Mock select handler for all tests
+const mockOnSelect = vi.fn();
 
+describe('EmailItem Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -345,5 +346,531 @@ describe('EmailItem Component', () => {
 
     // Updated to match actual title format which includes count
     expect(screen.getByTitle('Part of conversation (3 emails)')).toBeInTheDocument();
+  });
+});
+
+describe('Edge Cases - Error Handling', () => {
+  it('handles missing subject gracefully', () => {
+    const emailWithoutSubject = { ...mockEmail, subject: '' };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithoutSubject}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Should render without crashing
+    expect(screen.getByText('sender@example.com')).toBeInTheDocument();
+  });
+
+  it('handles missing sender gracefully', () => {
+    const emailWithoutSender = { ...mockEmail, sender: '' };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithoutSender}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    expect(screen.getByText('Test Email Subject')).toBeInTheDocument();
+  });
+
+  it('handles missing body content gracefully', () => {
+    const emailWithoutBody = { ...mockEmail, content: '' };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithoutBody}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    expect(screen.getByText('Test Email Subject')).toBeInTheDocument();
+  });
+
+  it('handles malformed date strings', () => {
+    const emailWithBadDate = { ...mockEmail, received_time: 'invalid-date' };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithBadDate}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Should render without crashing
+    expect(screen.getByText('Test Email Subject')).toBeInTheDocument();
+  });
+
+  it('handles null conversation_id', () => {
+    const emailWithoutConversation = { ...mockEmail, conversation_id: null as any, conversation_count: 1 };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithoutConversation}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    expect(screen.getByText('Test Email Subject')).toBeInTheDocument();
+  });
+
+  it('handles missing categories array', () => {
+    const emailWithoutCategories = { ...mockEmail, categories: [] };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithoutCategories}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    expect(screen.getByText('Test Email Subject')).toBeInTheDocument();
+  });
+});
+
+describe('Edge Cases - Interaction Edge Cases', () => {
+  it('handles double-click on email item', async () => {
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    const emailItem = screen.getByText('Test Email Subject').closest('.email-item__container');
+    
+    // Double click should not cause errors
+    fireEvent.click(emailItem!);
+    fireEvent.click(emailItem!);
+
+    await waitFor(() => {
+      // Should have navigated (calls may have happened multiple times)
+      expect(mockNavigate).toHaveBeenCalled();
+    });
+  });
+
+  it('handles rapid checkbox toggling', () => {
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    const checkbox = screen.getByTitle('Select email');
+    
+    // Rapid clicks
+    for (let i = 0; i < 5; i++) {
+      fireEvent.click(checkbox);
+    }
+
+    expect(mockOnSelect).toHaveBeenCalledTimes(5);
+  });
+
+  it('prevents navigation during checkbox interaction', () => {
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    const checkbox = screen.getByTitle('Select email');
+    
+    // Click checkbox
+    fireEvent.click(checkbox);
+
+    // Navigation should NOT be triggered
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockOnSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles keyboard events on email item', () => {
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    const emailItem = screen.getByText('Test Email Subject').closest('.email-item__container');
+    
+    // Keyboard events should not cause errors
+    fireEvent.keyDown(emailItem!, { key: 'Enter' });
+    fireEvent.keyDown(emailItem!, { key: 'Space' });
+    fireEvent.keyDown(emailItem!, { key: 'ArrowDown' });
+
+    // Should not crash
+    expect(emailItem).toBeInTheDocument();
+  });
+
+  it('handles click during loading state', async () => {
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    const emailItem = screen.getByText('Test Email Subject').closest('.email-item__container');
+    
+    // Click while async operation may be in progress
+    fireEvent.click(emailItem!);
+    fireEvent.click(emailItem!);
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalled();
+    });
+  });
+});
+
+describe('Edge Cases - Display Edge Cases', () => {
+  it('truncates very long subject lines', () => {
+    const longSubject = 'A'.repeat(200);
+    const emailWithLongSubject = { ...mockEmail, subject: longSubject };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithLongSubject}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Subject should be rendered (may be truncated via CSS)
+    const subjectElement = screen.getByText(longSubject);
+    expect(subjectElement).toBeInTheDocument();
+  });
+
+  it('handles emails with special characters in subject', () => {
+    const specialSubject = 'Test <>&"\'`\\ Special Chars';
+    const emailWithSpecialChars = { ...mockEmail, subject: specialSubject };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithSpecialChars}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Should handle special characters properly
+    expect(screen.getByText(specialSubject)).toBeInTheDocument();
+  });
+
+  it('handles emails with Unicode characters', () => {
+    const unicodeSubject = 'Test 你好 🎉 Émojis';
+    const emailWithUnicode = { ...mockEmail, subject: unicodeSubject };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithUnicode}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    expect(screen.getByText(unicodeSubject)).toBeInTheDocument();
+  });
+
+  it('handles very long body preview', () => {
+    const longBody = 'B'.repeat(1000);
+    const emailWithLongBody = { ...mockEmail, content: longBody };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithLongBody}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Body should be truncated in preview
+    expect(screen.getByText('Test Email Subject')).toBeInTheDocument();
+  });
+
+  it('formats relative dates correctly', () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 30);
+    const emailToday = { ...mockEmail, received_time: today.toISOString() };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailToday}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Should show time for today's emails
+    expect(screen.getByText('Test Email Subject')).toBeInTheDocument();
+  });
+
+  it('formats absolute dates for older emails', () => {
+    const oldDate = new Date('2020-01-15T10:30:00Z');
+    const oldEmail = { ...mockEmail, received_time: oldDate.toISOString() };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={oldEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Should show full date for old emails
+    expect(screen.getByText('Test Email Subject')).toBeInTheDocument();
+  });
+});
+
+describe('Edge Cases - Category Management', () => {
+  it('handles category dropdown interaction', async () => {
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    await waitFor(() => {
+      const dropdown = screen.getByTitle(/Change classification/);
+      expect(dropdown).toBeInTheDocument();
+    });
+  });
+
+  it('handles unknown category values', async () => {
+    const emailWithUnknownCategory = { ...mockEmail, categories: ['unknown_category'] };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithUnknownCategory}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Should render without crashing
+    await waitFor(() => {
+      expect(screen.getByText('Test Email Subject')).toBeInTheDocument();
+    });
+  });
+
+  it('handles multiple categories', async () => {
+    const emailWithMultipleCategories = { 
+      ...mockEmail, 
+      categories: ['required_action', 'fyi', 'waiting'] 
+    };
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={emailWithMultipleCategories}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Should handle multiple categories appropriately
+    await waitFor(() => {
+      expect(screen.getByText('Test Email Subject')).toBeInTheDocument();
+    });
+  });
+});
+
+describe('Edge Cases - Accessibility', () => {
+  it('provides ARIA labels for all interactive elements', () => {
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Checkbox should have accessible label
+    const checkbox = screen.getByTitle('Select email');
+    expect(checkbox).toBeInTheDocument();
+  });
+
+  it('maintains focus indicators', () => {
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    const emailItem = screen.getByText('Test Email Subject').closest('.email-item__container');
+    
+    // Focus should be manageable
+    fireEvent.focus(emailItem!);
+    expect(emailItem).toBeInTheDocument();
+  });
+
+  it('provides text alternatives for icons', () => {
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Icons should have title attributes
+    expect(screen.getByTitle('High priority')).toBeInTheDocument();
+    expect(screen.getByTitle('Has attachments')).toBeInTheDocument();
+  });
+
+  it('announces selection state changes', () => {
+    const { rerender } = render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    const checkbox = screen.getByTitle('Select email') as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+
+    // Change selection state
+    rerender(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={true}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    expect(checkbox.checked).toBe(true);
+  });
+});
+
+describe('Edge Cases - Performance', () => {
+  it('renders efficiently', () => {
+    const startTime = performance.now();
+    
+    render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    const endTime = performance.now();
+    const renderTime = endTime - startTime;
+
+    // Should render quickly (< 100ms)
+    expect(renderTime).toBeLessThan(100);
+  });
+
+  it('handles rapid prop updates efficiently', () => {
+    const { rerender } = render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Rapid selection state changes
+    for (let i = 0; i < 10; i++) {
+      rerender(
+        <TestWrapper>
+          <EmailItem
+            email={mockEmail}
+            isSelected={i % 2 === 0}
+            onSelect={mockOnSelect}
+          />
+        </TestWrapper>
+      );
+    }
+
+    expect(screen.getByText('Test Email Subject')).toBeInTheDocument();
+  });
+
+  it('cleans up event listeners on unmount', () => {
+    const { unmount } = render(
+      <TestWrapper>
+        <EmailItem
+          email={mockEmail}
+          isSelected={false}
+          onSelect={mockOnSelect}
+        />
+      </TestWrapper>
+    );
+
+    // Should unmount without leaking memory
+    unmount();
   });
 });

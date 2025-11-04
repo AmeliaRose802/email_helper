@@ -23,7 +23,7 @@ inputs:
     type: string
   date:
     type: string
-  body:
+  Content:
     type: string
   current_date:
     type: string
@@ -81,6 +81,6 @@ Analyze this email for expired optional deadlines.
 Subject: {{subject}}
 From: {{sender}}
 Date: {{date}}
-Body: {{body}}
+Content: {{content}}
 
 Return ONLY the JSON object with the required schema.

@@ -15,10 +15,8 @@ func TestEmailSerialization(t *testing.T) {
 		Subject:        "Test Subject",
 		Sender:         "sender@test.com",
 		Recipient:      "recipient@test.com",
-		Body:           "Test body",
 		Content:        "Test content",
 		ReceivedTime:   time.Now(),
-		Date:           time.Now(),
 		IsRead:         false,
 		HasAttachments: true,
 		Importance:     "High",
@@ -104,7 +102,7 @@ func TestEmailBatchResult(t *testing.T) {
 		Results: []EmailProcessingResult{
 			{
 				EmailID:    "email-1",
-				Category:   "fyi",
+				AICategory: "fyi",
 				Confidence: 0.92,
 				Reasoning:  "Informational only",
 				Priority:   "low",

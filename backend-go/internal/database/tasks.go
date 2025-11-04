@@ -71,20 +71,27 @@ func GetTaskByID(id int) (*models.Task, error) {
 	`
 
 	task := &models.Task{}
+	var description sql.NullString
+	var category sql.NullString
+	var emailID sql.NullString
+	var oneLineSummary sql.NullString
+	var dueDate sql.NullTime
+	var completedAt sql.NullTime
+	
 	err = db.QueryRow(query, id).Scan(
 		&task.ID,
 		&task.UserID,
 		&task.Title,
-		&task.Description,
+		&description,
 		&task.Status,
 		&task.Priority,
-		&task.Category,
-		&task.EmailID,
-		&task.OneLineSummary,
-		&task.DueDate,
+		&category,
+		&emailID,
+		&oneLineSummary,
+		&dueDate,
 		&task.CreatedAt,
 		&task.UpdatedAt,
-		&task.CompletedAt,
+		&completedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -92,6 +99,22 @@ func GetTaskByID(id int) (*models.Task, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	// Map nullable fields
+	task.Description = description.String
+	task.Category = category.String
+	if emailID.Valid {
+		task.EmailID = &emailID.String
+	}
+	if oneLineSummary.Valid {
+		task.OneLineSummary = &oneLineSummary.String
+	}
+	if dueDate.Valid {
+		task.DueDate = &dueDate.Time
+	}
+	if completedAt.Valid {
+		task.CompletedAt = &completedAt.Time
 	}
 
 	return task, nil
@@ -154,24 +177,48 @@ func GetTasks(page, limit int, status, priority, search string) ([]*models.Task,
 	var tasks []*models.Task
 	for rows.Next() {
 		task := &models.Task{}
+		var description sql.NullString
+		var category sql.NullString
+		var emailID sql.NullString
+		var oneLineSummary sql.NullString
+		var dueDate sql.NullTime
+		var completedAt sql.NullTime
+		
 		err := rows.Scan(
 			&task.ID,
 			&task.UserID,
 			&task.Title,
-			&task.Description,
+			&description,
 			&task.Status,
 			&task.Priority,
-			&task.Category,
-			&task.EmailID,
-			&task.OneLineSummary,
-			&task.DueDate,
+			&category,
+			&emailID,
+			&oneLineSummary,
+			&dueDate,
 			&task.CreatedAt,
 			&task.UpdatedAt,
-			&task.CompletedAt,
+			&completedAt,
 		)
 		if err != nil {
 			return nil, 0, err
 		}
+		
+		// Map nullable fields
+		task.Description = description.String
+		task.Category = category.String
+		if emailID.Valid {
+			task.EmailID = &emailID.String
+		}
+		if oneLineSummary.Valid {
+			task.OneLineSummary = &oneLineSummary.String
+		}
+		if dueDate.Valid {
+			task.DueDate = &dueDate.Time
+		}
+		if completedAt.Valid {
+			task.CompletedAt = &completedAt.Time
+		}
+		
 		tasks = append(tasks, task)
 	}
 
@@ -505,24 +552,48 @@ func GetTasksByEmailID(emailID string) ([]*models.Task, error) {
 	var tasks []*models.Task
 	for rows.Next() {
 		task := &models.Task{}
+		var description sql.NullString
+		var category sql.NullString
+		var emailID sql.NullString
+		var oneLineSummary sql.NullString
+		var dueDate sql.NullTime
+		var completedAt sql.NullTime
+		
 		err := rows.Scan(
 			&task.ID,
 			&task.UserID,
 			&task.Title,
-			&task.Description,
+			&description,
 			&task.Status,
 			&task.Priority,
-			&task.Category,
-			&task.EmailID,
-			&task.OneLineSummary,
-			&task.DueDate,
+			&category,
+			&emailID,
+			&oneLineSummary,
+			&dueDate,
 			&task.CreatedAt,
 			&task.UpdatedAt,
-			&task.CompletedAt,
+			&completedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
+		
+		// Map nullable fields
+		task.Description = description.String
+		task.Category = category.String
+		if emailID.Valid {
+			task.EmailID = &emailID.String
+		}
+		if oneLineSummary.Valid {
+			task.OneLineSummary = &oneLineSummary.String
+		}
+		if dueDate.Valid {
+			task.DueDate = &dueDate.Time
+		}
+		if completedAt.Valid {
+			task.CompletedAt = &completedAt.Time
+		}
+		
 		tasks = append(tasks, task)
 	}
 

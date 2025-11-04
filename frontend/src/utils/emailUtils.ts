@@ -131,8 +131,7 @@ export const filterEmails = (emails: Email[], filters: EmailFilter): Email[] => 
     
     // Filter by date range
     if (filters.date_from || filters.date_to) {
-      // Use standardized field name with backward compatibility fallback
-      const emailDateStr = email.received_time || email.date;
+      const emailDateStr = email.received_time;
       if (!emailDateStr) return false;
       
       const emailDate = new Date(emailDateStr);
@@ -156,9 +155,8 @@ export const sortEmails = (emails: Email[], sortBy: 'date' | 'sender' | 'subject
     
     switch (sortBy) {
       case 'date':
-        // Use standardized field name with backward compatibility fallback
-        const aDateStr = a.received_time || a.date || '';
-        const bDateStr = b.received_time || b.date || '';
+        const aDateStr = a.received_time || '';
+        const bDateStr = b.received_time || '';
         comparison = new Date(aDateStr).getTime() - new Date(bDateStr).getTime();
         break;
       case 'sender':
@@ -174,11 +172,12 @@ export const sortEmails = (emails: Email[], sortBy: 'date' | 'sender' | 'subject
 };
 
 export const getEmailSearchScore = (email: Email, query: string): number => {
-  if (!query.trim()) {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery) {
     return 0;
   }
   
-  const normalizedQuery = query.toLowerCase();
+  const normalizedQuery = trimmedQuery.toLowerCase();
   let score = 0;
   
   // Subject match (highest weight)
@@ -191,8 +190,8 @@ export const getEmailSearchScore = (email: Email, query: string): number => {
     score += 5;
   }
   
-  // Body match - use standardized field name with backward compatibility
-  const emailBody = email.content || email.body || '';
+  // Body match
+  const emailBody = email.content || '';
   if (emailBody.toLowerCase().includes(normalizedQuery)) {
     score += 3;
   }

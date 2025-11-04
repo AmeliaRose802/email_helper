@@ -168,8 +168,25 @@ func (p *Provider) getFolder(folderName string) (*ole.IDispatch, error) {
 	folders := oleutil.MustGetProperty(parent, "Folders").ToIDispatch()
 	defer folders.Release()
 
-	// Try to get folder by name
-	folder := oleutil.MustGetProperty(folders, "Item", folderName).ToIDispatch()
+	// Try to get folder by name with panic recovery
+	var folder *ole.IDispatch
+	var err error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("folder '%s' not found: %v", folderName, r)
+			}
+		}()
+		folder = oleutil.MustGetProperty(folders, "Item", folderName).ToIDispatch()
+	}()
+	
+	if err != nil {
+		return nil, err
+	}
+	if folder == nil {
+		return nil, fmt.Errorf("folder '%s' not found", folderName)
+	}
+	
 	p.folders[folderName] = folder
 
 	return folder, nil
@@ -279,13 +296,11 @@ func (p *Provider) parseEmail(item *ole.IDispatch) *models.Email {
 
 	if prop := oleutil.MustGetProperty(item, "Body"); prop.Value() != nil {
 		body := prop.ToString()
-		email.Body = body
 		email.Content = body
 	}
 
 	if prop := oleutil.MustGetProperty(item, "ReceivedTime"); prop.Value() != nil {
 		email.ReceivedTime = prop.Value().(time.Time)
-		email.Date = email.ReceivedTime
 	}
 
 	if prop := oleutil.MustGetProperty(item, "UnRead"); prop.Value() != nil {
@@ -554,16 +569,19 @@ func (p *Provider) GetConversationEmails(conversationID string) ([]*models.Email
 
 // Category mappings - MUST match Python backend exactly
 var InboxCategories = map[string]string{
-	"required_personal_action": "Work Relevant",
-	"team_action":              "Work Relevant",
-	"fyi":                      "FYI",
-	"newsletter":               "Newsletters",
+	"required_personal_action": "Required Actions (Me)",
+	"optional_action":          "Optional Actions",
+	"job_listing":              "Job Listings",
+	"work_relevant":            "Work Relevant",
 }
 
 var NonInboxCategories = map[string]string{
-	"optional_event": "Optional Events",
-	"job_listing":    "Job Listings",
-	"spam_to_delete": "Spam",
+	"team_action":          "Team Actions",
+	"optional_event":       "Optional Events",
+	"fyi":                  "FYI",
+	"newsletter":           "Newsletters",
+	"general_information":  "Summarized",
+	"spam_to_delete":       "ai_deleted",
 }
 
 // GetCategoryMappings returns all category to folder mappings
@@ -603,18 +621,25 @@ func (p *Provider) ApplyClassification(entryID, category string) error {
 		return err
 	}
 
+	log.Printf("[ApplyClassification] Processing email: entryID=%s category=%s", entryID[:30], category)
+
 	// Determine action based on category
 	if folderName, isInbox := InboxCategories[category]; isInbox {
 		// Stays in inbox, just set category
+		log.Printf("[ApplyClassification] Email stays in Inbox, setting category to: %s", folderName)
 		return p.setCategory(entryID, folderName)
 	} else if folderName, isNonInbox := NonInboxCategories[category]; isNonInbox {
 		// Move to folder
+		log.Printf("[ApplyClassification] Moving email to folder: %s", folderName)
 		if err := p.moveToFolder(entryID, folderName); err != nil {
+			log.Printf("[ApplyClassification] ❌ Failed to move email: %v", err)
 			return err
 		}
+		log.Printf("[ApplyClassification] ✅ Successfully moved email to: %s", folderName)
 		return p.setCategory(entryID, folderName)
 	}
 
+	log.Printf("[ApplyClassification] ❌ Unknown category: %s", category)
 	return fmt.Errorf("unknown category: %s", category)
 }
 
@@ -670,9 +695,25 @@ func (p *Provider) moveToFolder(entryID, destinationFolder string) error {
 
 	targetFolder, err := p.getFolder(destinationFolder)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get target folder '%s': %w", destinationFolder, err)
 	}
 
-	oleutil.MustCallMethod(item, "Move", targetFolder)
+	// Protect against panic during move operation
+	var moveErr error
+	log.Printf("[moveToFolder] Attempting to move email to folder: %s", destinationFolder)
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				moveErr = fmt.Errorf("failed to move email to folder '%s': %v", destinationFolder, r)
+				log.Printf("[moveToFolder] ❌ Move panic: %v", r)
+			}
+		}()
+		oleutil.MustCallMethod(item, "Move", targetFolder)
+		log.Printf("[moveToFolder] ✅ Move operation completed successfully")
+	}()
+	
+	if moveErr != nil {
+		return moveErr
+	}
 	return nil
 }

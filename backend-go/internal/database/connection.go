@@ -65,6 +65,12 @@ func InitDB(dbPath string) error {
 			return
 		}
 
+		// Run migrations
+		if err := runMigrations(); err != nil {
+			initErr = fmt.Errorf("failed to run migrations: %w", err)
+			return
+		}
+
 		log.Printf("Database initialized successfully: %s", dbPath)
 	})
 
@@ -105,8 +111,6 @@ func initializeSchema() error {
 			sender TEXT,
 			recipient TEXT,
 			content TEXT,
-			body TEXT,
-			date TIMESTAMP,
 			received_date TIMESTAMP,
 			category TEXT,
 			ai_category TEXT,
@@ -127,7 +131,7 @@ func initializeSchema() error {
 	indexes := []string{
 		"CREATE INDEX IF NOT EXISTS idx_emails_user_id ON emails(user_id)",
 		"CREATE INDEX IF NOT EXISTS idx_emails_ai_category ON emails(ai_category)",
-		"CREATE INDEX IF NOT EXISTS idx_emails_date ON emails(date DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_emails_received_date ON emails(received_date DESC)",
 		"CREATE INDEX IF NOT EXISTS idx_emails_conversation_id ON emails(conversation_id)",
 	}
 
@@ -202,6 +206,53 @@ func initializeSchema() error {
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit schema: %w", err)
+	}
+
+	return nil
+}
+
+// runMigrations applies any pending database migrations
+func runMigrations() error {
+	// Migration: Add one_line_summary to tasks table if it doesn't exist
+	// This is needed for databases created before this field was added
+	var columnExists bool
+	err := db.QueryRow(`
+		SELECT COUNT(*) > 0 
+		FROM pragma_table_info('tasks') 
+		WHERE name = 'one_line_summary'
+	`).Scan(&columnExists)
+	
+	if err != nil {
+		return fmt.Errorf("failed to check for one_line_summary column: %w", err)
+	}
+
+	if !columnExists {
+		log.Println("Running migration: Adding one_line_summary column to tasks table")
+		_, err := db.Exec("ALTER TABLE tasks ADD COLUMN one_line_summary TEXT")
+		if err != nil {
+			return fmt.Errorf("failed to add one_line_summary column: %w", err)
+		}
+		log.Println("Migration completed: one_line_summary column added")
+	}
+
+	// Migration: Add completed_at to tasks table if it doesn't exist
+	err = db.QueryRow(`
+		SELECT COUNT(*) > 0 
+		FROM pragma_table_info('tasks') 
+		WHERE name = 'completed_at'
+	`).Scan(&columnExists)
+	
+	if err != nil {
+		return fmt.Errorf("failed to check for completed_at column: %w", err)
+	}
+
+	if !columnExists {
+		log.Println("Running migration: Adding completed_at column to tasks table")
+		_, err := db.Exec("ALTER TABLE tasks ADD COLUMN completed_at TIMESTAMP")
+		if err != nil {
+			return fmt.Errorf("failed to add completed_at column: %w", err)
+		}
+		log.Println("Migration completed: completed_at column added")
 	}
 
 	return nil

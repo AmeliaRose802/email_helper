@@ -106,7 +106,7 @@ func (c *Client) ClassifyEmail(ctx context.Context, subject, sender, content, us
 			"subject":          subject,
 			"sender":           sender,
 			"date":             time.Now().Format(time.RFC1123),
-			"body":             content,
+			"content":          content,
 		}
 
 		var err error
@@ -209,7 +209,7 @@ func (c *Client) ExtractActionItems(ctx context.Context, emailContent, userConte
 			"subject":  subject,
 			"sender":   sender,
 			"date":     time.Now().Format(time.RFC1123),
-			"body":     body,
+			"content":  body,
 		}
 
 		var err error
@@ -312,7 +312,7 @@ func (c *Client) Summarize(ctx context.Context, emailContent string, summaryType
 			"subject":  subject,
 			"sender":   sender,
 			"date":     time.Now().Format(time.RFC1123),
-			"body":     body,
+			"content":  body,
 		}
 
 		var err error

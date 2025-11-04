@@ -21,7 +21,7 @@ inputs:
     type: string
   date:
     type: string
-  body:
+  Content:
     type: string
 outputs:
   summary:
@@ -71,8 +71,8 @@ user:
 Subject: {{subject}}
 From: {{sender}}
 Date: {{date}}
-Body:
-{{body}}
+Content:
+{{content}}
 
 Summarize ONLY the job-relevant content from this newsletter into one paragraph following the rules above.
 If there is no relevant content, return "No content relevant to your role."

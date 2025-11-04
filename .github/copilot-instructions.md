@@ -8,21 +8,24 @@ This is an intelligent email management system that helps users process, categor
 
 ### Core Modules
 
-- `backend/main.py` - FastAPI backend entry point
-- `frontend/` - React frontend application
+- `backend-go/` - Go backend (main API server)
+  - `cmd/api/` - Application entry point
+  - `internal/handlers/` - HTTP request handlers
+  - `internal/services/` - Business logic (AI processing, email analysis)
+  - `internal/adapters/` - External integrations (Outlook, Azure OpenAI)
+  - `internal/repository/` - Database operations
+  - `pkg/models/` - Data models and types
+- `frontend/` - React TypeScript frontend application
 - `electron/` - Electron desktop wrapper
-- `src/ai_processor.py` - AI analysis and processing logic (used by backend)
-- `src/task_persistence.py` - Task management and persistence (used by backend)
-- `src/azure_config.py` - Azure OpenAI configuration
 
 ### Data Flow
 
-1. Electron app loads React frontend and starts FastAPI backend
-2. Backend connects to Outlook via COM interface
-3. Backend analyzes and categorizes emails using AI (src/ai_processor.py)
+1. Electron app loads React frontend and starts Go backend server
+2. Backend connects to Outlook via Windows COM interface (CGO)
+3. Backend analyzes and categorizes emails using Azure OpenAI
 4. Backend stores results in SQLite database
 5. Frontend presents results through React UI
-6. Tasks persisted via src/task_persistence.py
+6. All processing happens through RESTful API endpoints
 
 ## Coding Standards
 
@@ -40,14 +43,17 @@ This is an intelligent email management system that helps users process, categor
 
 **Why:** Mocks hide real problems, make debugging impossible, and create false confidence that features work when they don't. Production code must fail visibly when dependencies are missing.
 
-### Python Style
+### Go Style
 
-- Follow PEP 8 conventions
-- Use type hints where appropriate
-- Include comprehensive docstrings for all functions and classes
-- Use descriptive variable and function names
-- Prefer composition over inheritance
+- Follow standard Go conventions and `gofmt` formatting
+- Use meaningful package names and organize code by domain
+- Include comprehensive godoc comments for exported functions, types, and packages
+- Use descriptive variable and function names (camelCase for unexported, PascalCase for exported)
+- Prefer composition over inheritance (use interfaces and embedding)
+- Handle errors explicitly - never ignore error returns
 - **NEVER use mock implementations** outside of test code - fail fast with clear errors instead
+- Use table-driven tests for comprehensive test coverage
+- Keep functions focused and testable
 
 ### Frontend Style (React/TypeScript)
 
@@ -69,11 +75,11 @@ This is an intelligent email management system that helps users process, categor
 ### Testing
 
 - **ACTUALLY RUN YOUR TESTS** - Don't just write tests, execute them to verify they pass
-- Write unit tests for new functionality in the `test/` directory
-- Follow existing test patterns and naming conventions
-- Include both positive and negative test cases
-- Mock external dependencies (Outlook, AI services)
-- **Run the test suite before submitting code** - Use `npm test` to run all tests
+- Write unit tests for new functionality following Go testing conventions
+- Follow existing test patterns and naming conventions (`*_test.go` files)
+- Include both positive and negative test cases (table-driven tests recommended)
+- Mock external dependencies (Outlook, AI services) using interfaces
+- **Run the test suite before submitting code** - Use `npm test` or `go test ./...`
 - **Verify edge cases and error conditions** - Test failure scenarios, invalid inputs, and boundary conditions
 - **Test with real data when possible** - Use sample emails and realistic data scenarios
 - **Integration testing is critical** - Test how components work together, not just in isolation
@@ -90,8 +96,7 @@ npm test
 ```
 
 **Test suites available:**
-- `npm run test:backend` - Backend Python tests (pytest backend/tests/)
-- `npm run test:src` - Src Python tests (pytest test/)
+- `npm run test:backend` - Backend Go tests (go test ./... in backend-go/)
 - `npm run test:frontend` - Frontend unit tests (vitest)
 - `npm run test:e2e` - Frontend E2E tests (Playwright)
 - `npm run test:coverage` - All tests with coverage reports
@@ -103,10 +108,14 @@ npm test
 
 # Skip specific suites for faster development
 .\run-all-tests.ps1 -SkipE2E
-.\run-all-tests.ps1 -SkipBackend -SkipE2E
 
 # Verbose output for debugging
 .\run-all-tests.ps1 -Verbose
+
+# Run Go tests directly
+cd backend-go
+go test ./... -v
+go test ./... -cover
 ```
 
 **Before committing code:**
@@ -125,18 +134,21 @@ npm test
 
 ### Key Libraries
 
-- `win32com.client` - Outlook COM interface
-- `sqlite3` - Database operations
-- `tkinter` - GUI framework
-- `requests` - HTTP API calls
-- `json` - Data serialization
+- **Go Packages:**
+  - `github.com/go-ole/go-ole` - Windows COM interface for Outlook (CGO)
+  - `database/sql` with SQLite driver - Database operations
+  - `net/http` - HTTP server and client
+  - `encoding/json` - JSON serialization
+- **Frontend:**
+  - React, TypeScript, Vite
+  - CSS modules for styling
 
 ## Configuration Management
 
-- Configuration is managed through `src/azure_config.py`
+- Configuration is managed through environment variables in `backend-go/.env`
 - User-specific data is stored in `user_specific_data/`
 - Sensitive credentials should use environment variables
-- Follow existing patterns for configuration loading
+- Follow existing patterns in `backend-go/config/` for configuration loading
 
 ## Database Schema
 
@@ -163,11 +175,11 @@ npm test
 
 ## GUI Development
 
-### Tkinter Patterns
+### React Frontend
 
-- Use the existing widget patterns from `unified_gui.py`
+- Use the React component patterns from `frontend/src/`
 - Implement responsive layouts that work across screen sizes
-- Follow consistent styling and color schemes
+- Follow consistent styling using `unified.css`
 - Provide user feedback for long-running operations
 
 ### User Experience
@@ -181,12 +193,13 @@ npm test
 
 ### Directory Structure
 
-- `src/` - Core application code
-- `backend/` - FastAPI backend services
-- `frontend/` - React frontend application
+- `backend-go/` - Go backend API server
+  - `cmd/api/` - Application entry point
+  - `internal/` - Private application code
+  - `pkg/` - Public packages
+  - `config/` - Configuration management
+- `frontend/` - React TypeScript frontend application
 - `electron/` - Electron desktop wrapper
-- `test/` - Unit and integration tests for src/
-- `backend/tests/` - Backend API tests
 - `prompts/` - AI prompt templates
 - `docs/` - Documentation and guides (organized by category)
 - `scripts/` - Reusable setup and utility scripts
@@ -232,8 +245,7 @@ npm test
 ### Test Organization
 
 **Proper test locations:**
-- `test/` - Tests for `src/` modules (legacy desktop app)
-- `backend/tests/` - Tests for `backend/` API and services
+- `backend-go/` - Tests for Go backend (use `*_test.go` files alongside source)
 - `frontend/tests/` - Tests for React frontend components
 
 **NEVER create these in root:**
@@ -246,56 +258,91 @@ npm test
 1. Write a proper test in the appropriate test directory
 2. Use existing test frameworks and patterns
 3. Follow test naming conventions
-4. Run tests with `pytest` or existing test runners
+4. Run tests with `go test` or existing test runners
 
 ### Naming Conventions
 
-- Use snake_case for Python files and functions
+- Use camelCase for Go unexported names, PascalCase for exported names
+- Use kebab-case for file names in frontend
 - Use descriptive names that indicate purpose
 - Group related functionality in appropriately named modules
 - Keep file names concise but clear
-- Avoid prefixes like `test_`, `fix_`, `check_` in root directory
 
 ## Common Patterns
 
 ### Email Processing
 
-```python
-# Follow this pattern for email analysis
-def process_email(email_data):
-    try:
-        # Validate input
-        # Call AI service
-        # Process response
-        # Store results
-        # Return structured data
-    except Exception as e:
-        logger.error(f"Error processing email: {e}")
-        return default_response
+```go
+// Follow this pattern for email analysis
+func ProcessEmail(emailData EmailData) (*Result, error) {
+    // Validate input
+    if err := validateEmailData(emailData); err != nil {
+        return nil, fmt.Errorf("invalid email data: %w", err)
+    }
+    
+    // Call AI service
+    response, err := aiClient.Process(prompt, emailData)
+    if err != nil {
+        return nil, fmt.Errorf("AI service error: %w", err)
+    }
+    
+    // Process response
+    result, err := parseAIResponse(response)
+    if err != nil {
+        return nil, fmt.Errorf("failed to parse response: %w", err)
+    }
+    
+    // Store results
+    if err := repository.Store(result); err != nil {
+        return nil, fmt.Errorf("failed to store results: %w", err)
+    }
+    
+    return result, nil
+}
 ```
 
 ### Database Operations
 
-```python
-# Use connection context managers
-def store_data(data):
-    with get_database_connection() as conn:
-        cursor = conn.cursor()
-        # Perform operations
-        conn.commit()
+```go
+// Use proper transaction handling
+func StoreData(db *sql.DB, data Data) error {
+    tx, err := db.Begin()
+    if err != nil {
+        return fmt.Errorf("failed to begin transaction: %w", err)
+    }
+    defer tx.Rollback() // Will be no-op if committed
+    
+    // Perform operations
+    if err := insertData(tx, data); err != nil {
+        return fmt.Errorf("failed to insert data: %w", err)
+    }
+    
+    if err := tx.Commit(); err != nil {
+        return fmt.Errorf("failed to commit transaction: %w", err)
+    }
+    
+    return nil
+}
 ```
 
 ### AI Service Calls
 
-```python
-# Follow existing patterns for AI integration
-def call_ai_service(prompt, data):
-    try:
-        response = ai_client.process(prompt, data)
-        return parse_ai_response(response)
-    except Exception as e:
-        logger.warning(f"AI service unavailable: {e}")
-        return fallback_response()
+```go
+// Follow existing patterns for AI integration
+func CallAIService(prompt string, data interface{}) (*Response, error) {
+    response, err := aiClient.Process(prompt, data)
+    if err != nil {
+        log.Printf("AI service unavailable: %v", err)
+        return nil, fmt.Errorf("AI service error: %w", err)
+    }
+    
+    parsed, err := parseAIResponse(response)
+    if err != nil {
+        return nil, fmt.Errorf("failed to parse response: %w", err)
+    }
+    
+    return parsed, nil
+}
 ```
 
 ## Performance Considerations
@@ -470,13 +517,13 @@ The Beads database is located in `.beads/` directory (gitignored). The source of
 ❌ **WRONG - Will prompt for confirmation and block:**
 ```powershell
 taskkill /IM electron.exe /F
-taskkill /IM python.exe /F
+taskkill /IM api.exe /F
 ```
 
 ✅ **CORRECT - No prompts, never blocks:**
 ```powershell
 Get-Process -Name electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-Process -Name python -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process -Name api -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 ```
 
 ### Why This Matters
@@ -491,7 +538,7 @@ Get-Process -Name python -ErrorAction SilentlyContinue | Stop-Process -Force -Er
 ```powershell
 # Kill processes without prompts
 Get-Process -Name electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-Process -Name python -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process -Name api -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
 # Free specific ports if needed
 $port8000 = Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
@@ -514,7 +561,7 @@ cd c:\Users\ameliapayne\email_helper\electron
 ```
 
 This script handles:
-- Killing existing Electron and Python processes (without prompts!)
+- Killing existing Electron and Go API processes (without prompts!)
 - Freeing port 8000
 - Starting the app cleanly
 
@@ -532,8 +579,8 @@ When running terminal commands:
 
 ❌ **WRONG - Can cause hangs and hide errors:**
 ```powershell
-cd backend; python -m pytest tests/ 2>&1 | Select-Object -First 50
-cd backend; python -m pytest tests/ 2>&1 | Select-Object -Last 30
+cd backend-go; go test ./... 2>&1 | Select-Object -First 50
+cd backend-go; go test ./... 2>&1 | Select-Object -Last 30
 ```
 
 **Problems with line-limited output:**
@@ -544,8 +591,8 @@ cd backend; python -m pytest tests/ 2>&1 | Select-Object -Last 30
 
 ✅ **CORRECT - Let all output flow naturally:**
 ```powershell
-cd backend; python -m pytest tests/ 2>&1
-cd c:\Users\ameliapayne\email_helper\backend; python -m pytest tests/
+cd backend-go; go test ./... 2>&1
+cd c:\Users\ameliapayne\email_helper\backend-go; go test ./...
 ```
 
 **If you MUST limit output (very long outputs only):**
