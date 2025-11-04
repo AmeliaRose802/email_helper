@@ -629,14 +629,21 @@ func (p *Provider) ApplyClassification(entryID, category string) error {
 		log.Printf("[ApplyClassification] Email stays in Inbox, setting category to: %s", folderName)
 		return p.setCategory(entryID, folderName)
 	} else if folderName, isNonInbox := NonInboxCategories[category]; isNonInbox {
-		// Move to folder
+		// Set category BEFORE moving - the EntryID changes after a move!
+		log.Printf("[ApplyClassification] Setting category before move: %s", folderName)
+		if err := p.setCategory(entryID, folderName); err != nil {
+			log.Printf("[ApplyClassification] ❌ Failed to set category: %v", err)
+			return err
+		}
+		
+		// Move to folder - category will move with the email
 		log.Printf("[ApplyClassification] Moving email to folder: %s", folderName)
 		if err := p.moveToFolder(entryID, folderName); err != nil {
 			log.Printf("[ApplyClassification] ❌ Failed to move email: %v", err)
 			return err
 		}
 		log.Printf("[ApplyClassification] ✅ Successfully moved email to: %s", folderName)
-		return p.setCategory(entryID, folderName)
+		return nil
 	}
 
 	log.Printf("[ApplyClassification] ❌ Unknown category: %s", category)
