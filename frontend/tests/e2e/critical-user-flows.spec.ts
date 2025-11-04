@@ -392,7 +392,13 @@ test.describe('Critical User Flow 3: Bulk Processing and Category Review', () =>
 test.describe('Critical User Flow 4: Settings Configuration', () => {
   test('happy path: should update settings and verify changes applied', async ({ page }) => {
     // Mock settings API
-    let savedSettings: any = {
+    interface SettingsData {
+      username: string;
+      theme: string;
+      emailsPerPage: number;
+      autoClassify: boolean;
+    }
+    let savedSettings: SettingsData = {
       username: 'Test User',
       theme: 'light',
       emailsPerPage: 20,

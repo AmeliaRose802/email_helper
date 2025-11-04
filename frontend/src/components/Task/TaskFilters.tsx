@@ -11,7 +11,7 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({ filters, onChange, onR
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchInput, setSearchInput] = useState(filters.search || '');
 
-  const handleFilterChange = (key: keyof TaskFilter, value: any) => {
+  const handleFilterChange = (key: keyof TaskFilter, value: TaskFilter[keyof TaskFilter]) => {
     onChange({
       ...filters,
       [key]: value || undefined,
@@ -21,8 +21,11 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({ filters, onChange, onR
   const handleSearchChange = (value: string) => {
     setSearchInput(value);
     // Debounce search
-    clearTimeout((window as any).searchTimeout);
-    (window as any).searchTimeout = setTimeout(() => {
+    interface WindowWithSearchTimeout extends Window {
+      searchTimeout?: ReturnType<typeof setTimeout>;
+    }
+    clearTimeout((window as WindowWithSearchTimeout).searchTimeout);
+    (window as WindowWithSearchTimeout).searchTimeout = setTimeout(() => {
       handleFilterChange('search', value.trim());
     }, 300);
   };

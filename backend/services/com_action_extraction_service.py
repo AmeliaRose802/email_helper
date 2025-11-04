@@ -15,20 +15,20 @@ logger = logging.getLogger(__name__)
 
 class COMActionExtractionService:
     """Service for extracting action items from emails.
-    
+
     Uses prompty templates to extract structured action item data.
     """
 
     def __init__(self, ai_processor, azure_config):
         """Initialize action extraction service.
-        
+
         Args:
             ai_processor: AIProcessor instance for AI operations
             azure_config: Azure OpenAI configuration
         """
         self.ai_processor = ai_processor
         self.azure_config = azure_config
-        
+
         # Performance optimization: Cache user settings
         self._user_settings_cache: Optional[Tuple[str, str, str]] = None
         self._cache_timestamp: Optional[datetime] = None
@@ -179,7 +179,7 @@ class COMActionExtractionService:
                 try:
                     result = json.loads(result)
                 except json.JSONDecodeError:
-                    logger.warning(f"[Action Extraction] Failed to parse JSON")
+                    logger.warning("[Action Extraction] Failed to parse JSON")
                     result = {
                         "action_required": "Review email content",
                         "explanation": "Unable to parse structured response",
@@ -214,5 +214,5 @@ class COMActionExtractionService:
 
             return response
 
-        except Exception as e:
+        except Exception:
             raise

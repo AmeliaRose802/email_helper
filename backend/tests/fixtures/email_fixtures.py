@@ -11,10 +11,10 @@ from typing import List, Dict, Any
 
 def get_simple_email(email_id: str = "simple-1") -> Dict[str, Any]:
     """Get a simple email for basic testing.
-    
+
     Args:
         email_id: Unique identifier for the email
-        
+
     Returns:
         dict: Simple email data
     """
@@ -34,7 +34,7 @@ def get_simple_email(email_id: str = "simple-1") -> Dict[str, Any]:
 
 def get_action_required_email() -> Dict[str, Any]:
     """Get an email that requires action.
-    
+
     Returns:
         dict: Email with action items
     """
@@ -65,7 +65,7 @@ HR Team""",
 
 def get_meeting_invitation_email() -> Dict[str, Any]:
     """Get a meeting invitation email.
-    
+
     Returns:
         dict: Meeting invitation data
     """
@@ -101,7 +101,7 @@ Project Manager""",
 
 def get_newsletter_email() -> Dict[str, Any]:
     """Get a newsletter/FYI email.
-    
+
     Returns:
         dict: Newsletter email data
     """
@@ -131,7 +131,7 @@ Tech Newsletter Team""",
 
 def get_urgent_email() -> Dict[str, Any]:
     """Get an urgent email requiring immediate attention.
-    
+
     Returns:
         dict: Urgent email data
     """
@@ -166,7 +166,7 @@ IT Operations""",
 
 def get_job_listing_email() -> Dict[str, Any]:
     """Get a job listing email.
-    
+
     Returns:
         dict: Job listing data
     """
@@ -202,7 +202,7 @@ Recruiting Team""",
 
 def get_team_collaboration_email() -> Dict[str, Any]:
     """Get a team collaboration email.
-    
+
     Returns:
         dict: Team collaboration data
     """
@@ -238,7 +238,7 @@ Developer""",
 
 def get_spam_email() -> Dict[str, Any]:
     """Get a spam/promotional email.
-    
+
     Returns:
         dict: Spam email data
     """
@@ -268,7 +268,7 @@ Unsubscribe: [broken link]""",
 
 def get_email_batch_for_classification() -> List[Dict[str, Any]]:
     """Get a batch of emails for classification testing.
-    
+
     Returns:
         list: Batch of diverse emails
     """
@@ -285,12 +285,12 @@ def get_email_batch_for_classification() -> List[Dict[str, Any]]:
 
 def get_duplicate_emails() -> List[Dict[str, Any]]:
     """Get a set of duplicate emails for testing duplicate detection.
-    
+
     Returns:
         list: Emails with duplicates
     """
     original_time = datetime.now() - timedelta(hours=1)
-    
+
     return [
         {
             "id": "original-1",
@@ -333,12 +333,12 @@ def get_duplicate_emails() -> List[Dict[str, Any]]:
 
 def get_conversation_thread() -> List[Dict[str, Any]]:
     """Get a conversation thread for testing thread operations.
-    
+
     Returns:
         list: Emails in a conversation thread
     """
     thread_start = datetime.now() - timedelta(days=2)
-    
+
     return [
         {
             "id": "thread-1",
@@ -381,7 +381,7 @@ def get_conversation_thread() -> List[Dict[str, Any]]:
 
 def get_email_with_attachments() -> Dict[str, Any]:
     """Get an email with attachments.
-    
+
     Returns:
         dict: Email with attachment metadata
     """
@@ -414,7 +414,7 @@ def get_email_with_attachments() -> Dict[str, Any]:
 
 def get_edge_case_emails() -> List[Dict[str, Any]]:
     """Get edge case emails for testing robustness.
-    
+
     Returns:
         list: Edge case email data
     """

@@ -5,9 +5,8 @@ including mock objects, sample data, and common test utilities.
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock, MagicMock, patch
+from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
 
 
 # ============================================================================
@@ -17,10 +16,10 @@ from typing import Dict, Any, List
 @pytest.fixture
 def mock_outlook_manager():
     """Create a mock OutlookManager for testing.
-    
+
     This fixture provides a mock OutlookManager with pre-configured
     responses for common operations like connecting, getting emails, etc.
-    
+
     Returns:
         Mock: Configured mock OutlookManager instance
     """
@@ -36,10 +35,10 @@ def mock_outlook_manager():
 @pytest.fixture
 def mock_outlook_adapter():
     """Create a mock OutlookEmailAdapter for COM provider testing.
-    
+
     This fixture provides a mock adapter that simulates the OutlookEmailAdapter
     behavior used by COMEmailProvider.
-    
+
     Returns:
         tuple: (adapter_class, adapter_instance) for patching
     """
@@ -51,7 +50,7 @@ def mock_outlook_adapter():
     adapter_instance.mark_as_read = Mock(return_value=True)
     adapter_instance.move_email = Mock(return_value=True)
     adapter_instance.get_conversation_thread = Mock(return_value=[])
-    
+
     adapter_class = Mock(return_value=adapter_instance)
     return adapter_class, adapter_instance
 
@@ -63,10 +62,10 @@ def mock_outlook_adapter():
 @pytest.fixture
 def mock_ai_processor():
     """Create a mock AIProcessor for testing.
-    
+
     This fixture provides a mock AIProcessor with pre-configured
     responses for common AI operations like classification, action items, etc.
-    
+
     Returns:
         Mock: Configured mock AIProcessor instance
     """
@@ -76,7 +75,7 @@ def mock_ai_processor():
         "api_key": "test-api-key",
         "deployment_name": "test-deployment"
     }
-    
+
     # Configure common AI methods
     processor.classify_email = Mock(return_value="required_personal_action")
     processor.classify_email_improved = Mock(return_value="required_personal_action")
@@ -92,14 +91,14 @@ def mock_ai_processor():
         "category": "required_personal_action",
         "confidence": 0.85
     })
-    
+
     # Confidence thresholds
     processor.CONFIDENCE_THRESHOLDS = {
         'optional_action': 0.8,
         'work_relevant': 0.8,
         'required_personal_action': 0.9
     }
-    
+
     return processor
 
 
@@ -113,7 +112,7 @@ def mock_ai_processor():
 @pytest.fixture
 def sample_email_data():
     """Sample email data for testing.
-    
+
     Returns:
         dict: Sample email with common fields
     """
@@ -134,7 +133,7 @@ def sample_email_data():
 @pytest.fixture
 def sample_email_list():
     """List of sample emails for testing batch operations.
-    
+
     Returns:
         list: List of sample email dictionaries
     """
@@ -182,7 +181,7 @@ def sample_email_list():
 @pytest.fixture
 def sample_action_item_email():
     """Sample email with action items for testing.
-    
+
     Returns:
         dict: Email containing action items
     """
@@ -190,7 +189,7 @@ def sample_action_item_email():
         "id": "action-email-456",
         "subject": "Action Required: Budget Approval by EOD",
         "body": """Hi Team,
-        
+
 Please review and approve the Q1 budget by end of day today. 
 The document is attached and needs your signature.
 
@@ -219,7 +218,7 @@ Finance Team
 @pytest.fixture
 def sample_classification_response():
     """Sample AI classification response.
-    
+
     Returns:
         dict: Classification result with confidence
     """
@@ -233,7 +232,7 @@ def sample_classification_response():
 @pytest.fixture
 def sample_action_items_response():
     """Sample AI action items extraction response.
-    
+
     Returns:
         dict: Action items with details
     """
@@ -263,7 +262,7 @@ def sample_action_items_response():
 @pytest.fixture
 def sample_summary_response():
     """Sample AI summary generation response.
-    
+
     Returns:
         dict: Email summary
     """
@@ -281,7 +280,7 @@ def sample_summary_response():
 @pytest.fixture
 def sample_duplicate_detection_response():
     """Sample AI duplicate detection response.
-    
+
     Returns:
         dict: Duplicate email IDs
     """
@@ -304,15 +303,15 @@ def sample_duplicate_detection_response():
 @pytest.fixture
 def com_email_provider(mock_outlook_adapter):
     """Create a COM email provider with mocked adapter.
-    
+
     Args:
         mock_outlook_adapter: Mock adapter fixture
-        
+
     Returns:
         COMEmailProvider: Provider instance with mocked dependencies
     """
     adapter_class, adapter_instance = mock_outlook_adapter
-    
+
     with patch('backend.services.com_email_provider.OutlookEmailAdapter', adapter_class):
         with patch('backend.services.com_email_provider.COM_AVAILABLE', True):
             from backend.services.com_email_provider import COMEmailProvider
@@ -324,10 +323,10 @@ def com_email_provider(mock_outlook_adapter):
 @pytest.fixture
 def authenticated_com_provider(com_email_provider):
     """Create an authenticated COM email provider.
-    
+
     Args:
         com_email_provider: COM provider fixture
-        
+
     Returns:
         COMEmailProvider: Authenticated provider instance
     """
@@ -342,7 +341,7 @@ def authenticated_com_provider(com_email_provider):
 @pytest.fixture
 def com_ai_service():
     """Create a COM AI service instance.
-    
+
     Returns:
         COMAIService: Service instance for testing
     """
@@ -353,11 +352,11 @@ def com_ai_service():
 @pytest.fixture
 def initialized_com_ai_service(mock_ai_processor, mock_azure_config_obj):
     """Create an initialized COM AI service with mocked dependencies.
-    
+
     Args:
         mock_ai_processor: Mock AI processor fixture
         mock_azure_config_obj: Mock Azure config fixture
-        
+
     Returns:
         COMAIService: Initialized service instance
     """
@@ -376,15 +375,15 @@ def initialized_com_ai_service(mock_ai_processor, mock_azure_config_obj):
 @pytest.fixture
 def mock_email_provider():
     """Create a mock email provider for testing.
-    
+
     This fixture provides a properly configured mock EmailProvider that can be
     used in tests without requiring a real email backend (COM or Graph API).
-    
+
     Returns:
         Mock: Configured mock EmailProvider instance with EmailProvider spec
     """
     from backend.services.email_provider import EmailProvider
-    
+
     provider = Mock(spec=EmailProvider)
     provider.authenticate = Mock(return_value=True)
     provider.get_emails = Mock(return_value=[])
@@ -414,12 +413,12 @@ def mock_email_provider():
 @pytest.fixture(autouse=True)
 def patch_email_provider_factory(mock_email_provider, monkeypatch):
     """Automatically patch email provider factory for all tests.
-    
+
     This fixture prevents RuntimeError from being raised when tests import
     modules that try to initialize email providers. It patches both:
     - backend.services.email_provider.get_email_provider_instance
     - backend.core.dependencies.get_email_provider
-    
+
     Args:
         mock_email_provider: The mock provider fixture
         monkeypatch: pytest monkeypatch fixture
@@ -427,29 +426,29 @@ def patch_email_provider_factory(mock_email_provider, monkeypatch):
     # Reset the global singletons before patching
     import backend.services.email_provider as ep_module
     import backend.core.dependencies as dep_module
-    
+
     ep_module._email_provider = None
     dep_module._email_provider = None
     dep_module._com_email_provider = None
-    
+
     # Patch the factory function to return mock provider
     monkeypatch.setattr(
         'backend.services.email_provider.get_email_provider_instance',
         lambda: mock_email_provider
     )
-    
+
     # Patch the global in email_provider module
     monkeypatch.setattr(
         'backend.services.email_provider._email_provider',
         mock_email_provider
     )
-    
+
     # Also patch the dependencies module
     monkeypatch.setattr(
         'backend.core.dependencies.get_email_provider',
         lambda: mock_email_provider
     )
-    
+
     # Patch the singleton in dependencies module
     monkeypatch.setattr(
         'backend.core.dependencies._email_provider',
@@ -460,15 +459,15 @@ def patch_email_provider_factory(mock_email_provider, monkeypatch):
 @pytest.fixture
 def mock_ai_service():
     """Create a mock AI service for testing.
-    
+
     This fixture provides a properly configured mock AIService that can be
     used in tests without requiring real Azure OpenAI credentials.
-    
+
     Returns:
         Mock: Configured mock AIService instance
     """
     from backend.services.ai_service import AIService
-    
+
     service = Mock(spec=AIService)
     service._ensure_initialized = Mock()
     service.classify_email = AsyncMock(return_value={
@@ -498,11 +497,11 @@ def mock_ai_service():
 @pytest.fixture
 def mock_ai_orchestrator():
     """Create a mock AIOrchestrator for testing.
-    
+
     This fixture provides a properly configured mock AIOrchestrator that
     can be used in tests requiring AI operations. This is NOT auto-used,
     allowing tests to customize the mock as needed.
-    
+
     Returns:
         Mock: Configured mock AIOrchestrator instance
     """
@@ -526,7 +525,7 @@ def mock_ai_orchestrator():
 @pytest.fixture
 def mock_azure_config_obj():
     """Create mock Azure configuration object.
-    
+
     Returns:
         Mock: Azure configuration object with required attributes
     """
@@ -541,14 +540,14 @@ def mock_azure_config_obj():
 @pytest.fixture(autouse=True)
 def patch_ai_service_factory(mock_ai_service, mock_azure_config_obj, monkeypatch):
     """Automatically patch AI service factory for all tests.
-    
+
     This fixture prevents initialization errors when tests import modules
     that try to initialize AI services without Azure credentials.
-    
+
     NOTE: This fixture does NOT auto-patch AIOrchestrator. Tests that need
     to customize AI orchestrator behavior should explicitly patch it in their
     test or use the mock_ai_orchestrator fixture with their own context managers.
-    
+
     Args:
         mock_ai_service: The mock AI service fixture
         mock_azure_config_obj: The mock Azure config fixture
@@ -556,38 +555,38 @@ def patch_ai_service_factory(mock_ai_service, mock_azure_config_obj, monkeypatch
     """
     # Reset the global singletons before patching
     import backend.core.dependencies as dep_module
-    
+
     dep_module._ai_service = None
-    
+
     # Patch the dependencies module functions
     monkeypatch.setattr(
         'backend.core.dependencies.get_ai_service',
         lambda: mock_ai_service
     )
-    
+
     monkeypatch.setattr(
         'backend.core.dependencies.get_com_ai_service',
         lambda: mock_ai_service
     )
-    
+
     # Patch the singleton in dependencies module
     monkeypatch.setattr(
         'backend.core.dependencies._ai_service',
         mock_ai_service
     )
-    
+
     # Patch the API module's imported reference (critical for FastAPI Depends)
     monkeypatch.setattr(
         'backend.api.ai.get_ai_service',
         lambda: mock_ai_service
     )
-    
+
     # Patch get_azure_config for tests that create AIService directly
     monkeypatch.setattr(
         'backend.core.infrastructure.azure_config.get_azure_config',
         lambda: mock_azure_config_obj
     )
-    
+
     # NOTE: We do NOT patch AIOrchestrator here. Tests should explicitly
     # patch it when needed, allowing them to customize the mock behavior.
 
@@ -599,16 +598,16 @@ def patch_ai_service_factory(mock_ai_service, mock_azure_config_obj, monkeypatch
 @pytest.fixture
 def temp_prompts_dir(tmp_path):
     """Create a temporary prompts directory with sample prompty files.
-    
+
     Args:
         tmp_path: pytest temporary path fixture
-        
+
     Returns:
         Path: Path to temporary prompts directory
     """
     prompts_dir = tmp_path / "prompts"
     prompts_dir.mkdir()
-    
+
     # Create sample prompty files
     (prompts_dir / "email_classifier.prompty").write_text("""
 ---
@@ -617,7 +616,7 @@ description: Classify emails into categories
 ---
 Classify this email: {{email_content}}
 """)
-    
+
     (prompts_dir / "action_item.prompty").write_text("""
 ---
 name: Action Item Extractor
@@ -625,7 +624,7 @@ description: Extract action items from emails
 ---
 Extract action items: {{email_content}}
 """)
-    
+
     return prompts_dir
 
 

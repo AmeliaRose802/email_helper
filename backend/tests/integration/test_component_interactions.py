@@ -10,8 +10,8 @@ Target: 70%+ coverage of integration paths, execution time <2min.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, AsyncMock, patch
-from datetime import datetime, timedelta
+from unittest.mock import Mock, MagicMock
+from datetime import datetime
 from typing import Dict, Any, List
 import sqlite3
 import tempfile
@@ -27,10 +27,10 @@ def test_database():
     """Create a test database with schema."""
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp_file:
         db_path = temp_file.name
-    
+
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    
+
     # Create schema
     conn.execute("""
         CREATE TABLE IF NOT EXISTS emails (
@@ -48,7 +48,7 @@ def test_database():
             processed_at TEXT
         )
     """)
-    
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,7 +63,7 @@ def test_database():
             FOREIGN KEY (email_id) REFERENCES emails (id)
         )
     """)
-    
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS action_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,10 +76,10 @@ def test_database():
             FOREIGN KEY (email_id) REFERENCES emails (id)
         )
     """)
-    
+
     conn.commit()
     yield db_path, conn
-    
+
     conn.close()
     try:
         os.unlink(db_path)
@@ -93,7 +93,7 @@ def mock_email_provider():
     provider = MagicMock()
     provider.authenticate = Mock(return_value=True)
     provider.authenticated = True
-    
+
     # Sample emails with different characteristics
     provider.get_emails = Mock(return_value=[
         {
@@ -130,11 +130,11 @@ def mock_email_provider():
             'conversation_id': 'conv-3'
         }
     ])
-    
+
     provider.get_email_by_id = Mock(side_effect=lambda email_id: next(
         (e for e in provider.get_emails() if e['id'] == email_id), None
     ))
-    
+
     return provider
 
 
@@ -142,12 +142,12 @@ def mock_email_provider():
 def mock_ai_service():
     """Mock AI service with realistic classification responses."""
     service = MagicMock()
-    
+
     # Configure classification responses based on email content
     def classify_email(email_data: Dict[str, Any]) -> Dict[str, Any]:
         subject = email_data.get('subject', '')
         body = email_data.get('body', '')
-        
+
         # Determine category based on content
         if 'URGENT' in subject or 'Code Review' in subject:
             return {
@@ -185,13 +185,13 @@ def mock_ai_service():
                     {'category': 'work_relevant', 'confidence': 0.18}
                 ]
             }
-    
+
     service.classify_email = Mock(side_effect=classify_email)
-    
+
     # Configure action item extraction
     def extract_action_items(email_data: Dict[str, Any]) -> Dict[str, Any]:
         body = email_data.get('body', '')
-        
+
         if 'review' in body.lower():
             return {
                 'action_items': [
@@ -204,16 +204,16 @@ def mock_ai_service():
                 ]
             }
         return {'action_items': []}
-    
+
     service.extract_action_items = Mock(side_effect=extract_action_items)
-    
+
     # Configure summarization
     service.generate_summary = Mock(return_value={
         'summary': 'Brief summary of email content',
         'key_points': ['Point 1', 'Point 2'],
         'confidence': 0.85
     })
-    
+
     return service
 
 
@@ -221,12 +221,12 @@ def mock_ai_service():
 def mock_task_persistence(test_database):
     """Mock task persistence using test database."""
     db_path, conn = test_database
-    
+
     class TestTaskPersistence:
         def __init__(self):
             self.db_path = db_path
             self.conn = conn
-        
+
         def save_task(self, task_data: Dict[str, Any]) -> int:
             """Save task to database."""
             cursor = self.conn.execute("""
@@ -245,7 +245,7 @@ def mock_task_persistence(test_database):
             ))
             self.conn.commit()
             return cursor.lastrowid
-        
+
         def get_task(self, task_id: int) -> Dict[str, Any]:
             """Retrieve task by ID."""
             cursor = self.conn.execute(
@@ -255,14 +255,14 @@ def mock_task_persistence(test_database):
             if row:
                 return dict(row)
             return None
-        
+
         def get_tasks_by_email(self, email_id: str) -> List[Dict[str, Any]]:
             """Get all tasks for an email."""
             cursor = self.conn.execute(
                 "SELECT * FROM tasks WHERE email_id = ?", (email_id,)
             )
             return [dict(row) for row in cursor.fetchall()]
-        
+
         def update_task_status(self, task_id: int, status: str) -> bool:
             """Update task status."""
             self.conn.execute(
@@ -271,7 +271,7 @@ def mock_task_persistence(test_database):
             )
             self.conn.commit()
             return True
-        
+
         def save_email_classification(self, email_id: str, classification: Dict[str, Any]) -> bool:
             """Save email classification."""
             self.conn.execute("""
@@ -285,7 +285,7 @@ def mock_task_persistence(test_database):
             ))
             self.conn.commit()
             return True
-    
+
     return TestTaskPersistence()
 
 
@@ -296,7 +296,7 @@ def mock_task_persistence(test_database):
 @pytest.mark.integration
 class TestEmailRetrievalToClassification:
     """Test integration between email retrieval and AI classification."""
-    
+
     def test_retrieve_and_classify_single_email(
         self, mock_email_provider, mock_ai_service
     ):
@@ -304,26 +304,26 @@ class TestEmailRetrievalToClassification:
         # Retrieve emails
         emails = mock_email_provider.get_emails()
         assert len(emails) > 0
-        
+
         # Classify first email
         email = emails[0]
         classification = mock_ai_service.classify_email(email)
-        
+
         # Verify classification
         assert classification['category'] == 'required_personal_action'
         assert classification['confidence'] >= 0.9
         assert 'explanation' in classification
-        
+
         # Verify email data passed correctly
         mock_ai_service.classify_email.assert_called_once_with(email)
-    
+
     def test_retrieve_and_classify_batch_emails(
         self, mock_email_provider, mock_ai_service
     ):
         """Test batch email classification."""
         # Retrieve all emails
         emails = mock_email_provider.get_emails()
-        
+
         # Classify each email
         classifications = []
         for email in emails:
@@ -332,16 +332,16 @@ class TestEmailRetrievalToClassification:
                 'email_id': email['id'],
                 'classification': classification
             })
-        
+
         # Verify all emails classified
         assert len(classifications) == 3
-        
+
         # Verify different categories assigned
         categories = [c['classification']['category'] for c in classifications]
         assert 'required_personal_action' in categories
         assert 'optional_event' in categories
         assert 'optional_fyi' in categories
-    
+
     def test_classification_with_missing_fields(
         self, mock_ai_service
     ):
@@ -352,22 +352,22 @@ class TestEmailRetrievalToClassification:
             'subject': 'Test',
             'body': ''
         }
-        
+
         # Should still classify without error
         classification = mock_ai_service.classify_email(incomplete_email)
-        
+
         assert 'category' in classification
         assert 'confidence' in classification
-    
+
     def test_classification_confidence_thresholds(
         self, mock_email_provider, mock_ai_service
     ):
         """Test that confidence thresholds are properly evaluated."""
         emails = mock_email_provider.get_emails()
-        
+
         for email in emails:
             classification = mock_ai_service.classify_email(email)
-            
+
             # High-priority categories should have high confidence
             if classification['category'] == 'required_personal_action':
                 assert classification['confidence'] >= 0.9
@@ -383,7 +383,7 @@ class TestEmailRetrievalToClassification:
 @pytest.mark.integration
 class TestClassificationToTaskPersistence:
     """Test integration between AI classification and task persistence."""
-    
+
     def test_save_classification_to_database(
         self, mock_email_provider, mock_ai_service, mock_task_persistence
     ):
@@ -392,14 +392,14 @@ class TestClassificationToTaskPersistence:
         emails = mock_email_provider.get_emails()
         email = emails[0]
         classification = mock_ai_service.classify_email(email)
-        
+
         # Save classification
         success = mock_task_persistence.save_email_classification(
             email['id'], classification
         )
-        
+
         assert success is True
-    
+
     def test_create_task_from_classification(
         self, mock_email_provider, mock_ai_service, mock_task_persistence
     ):
@@ -407,9 +407,9 @@ class TestClassificationToTaskPersistence:
         # Get action-required email
         emails = mock_email_provider.get_emails()
         action_email = emails[0]  # URGENT email
-        
+
         classification = mock_ai_service.classify_email(action_email)
-        
+
         # If requires action, create task
         if classification['category'] == 'required_personal_action':
             task_data = {
@@ -420,25 +420,25 @@ class TestClassificationToTaskPersistence:
                 'priority': 'high',
                 'status': 'pending'
             }
-            
+
             task_id = mock_task_persistence.save_task(task_data)
             assert task_id > 0
-            
+
             # Verify task saved
             saved_task = mock_task_persistence.get_task(task_id)
             assert saved_task['email_id'] == action_email['id']
             assert saved_task['priority'] == 'high'
-    
+
     def test_extract_and_save_action_items(
         self, mock_email_provider, mock_ai_service, mock_task_persistence
     ):
         """Test extracting action items and creating tasks."""
         emails = mock_email_provider.get_emails()
         action_email = emails[0]
-        
+
         # Extract action items
         action_items = mock_ai_service.extract_action_items(action_email)
-        
+
         # Create task for each action item
         task_ids = []
         for item in action_items.get('action_items', []):
@@ -452,14 +452,14 @@ class TestClassificationToTaskPersistence:
             }
             task_id = mock_task_persistence.save_task(task_data)
             task_ids.append(task_id)
-        
+
         # Verify tasks created
         assert len(task_ids) > 0
-        
+
         # Verify tasks associated with email
         email_tasks = mock_task_persistence.get_tasks_by_email(action_email['id'])
         assert len(email_tasks) == len(task_ids)
-    
+
     def test_update_task_status_workflow(
         self, mock_task_persistence
     ):
@@ -473,15 +473,15 @@ class TestClassificationToTaskPersistence:
             'status': 'pending'
         }
         task_id = mock_task_persistence.save_task(task_data)
-        
+
         # Update to in-progress
         success = mock_task_persistence.update_task_status(task_id, 'in_progress')
         assert success is True
-        
+
         # Verify update
         updated_task = mock_task_persistence.get_task(task_id)
         assert updated_task['status'] == 'in_progress'
-        
+
         # Update to completed
         mock_task_persistence.update_task_status(task_id, 'completed')
         completed_task = mock_task_persistence.get_task(task_id)
@@ -495,7 +495,7 @@ class TestClassificationToTaskPersistence:
 @pytest.mark.integration
 class TestCompleteEmailProcessingPipeline:
     """Test end-to-end email processing workflow."""
-    
+
     def test_full_pipeline_action_email(
         self, mock_email_provider, mock_ai_service, mock_task_persistence
     ):
@@ -503,19 +503,19 @@ class TestCompleteEmailProcessingPipeline:
         # Step 1: Retrieve emails
         emails = mock_email_provider.get_emails()
         action_email = emails[0]  # URGENT email
-        
+
         # Step 2: Classify email
         classification = mock_ai_service.classify_email(action_email)
-        
+
         # Step 3: Save classification
         mock_task_persistence.save_email_classification(
             action_email['id'], classification
         )
-        
+
         # Step 4: If action required, extract action items
         if classification['category'] == 'required_personal_action':
             action_items = mock_ai_service.extract_action_items(action_email)
-            
+
             # Step 5: Create tasks for action items
             for item in action_items.get('action_items', []):
                 task_data = {
@@ -528,12 +528,12 @@ class TestCompleteEmailProcessingPipeline:
                 }
                 task_id = mock_task_persistence.save_task(task_data)
                 assert task_id > 0
-        
+
         # Verify complete workflow
         email_tasks = mock_task_persistence.get_tasks_by_email(action_email['id'])
         assert len(email_tasks) > 0
         assert all(task['status'] == 'pending' for task in email_tasks)
-    
+
     def test_full_pipeline_meeting_email(
         self, mock_email_provider, mock_ai_service, mock_task_persistence
     ):
@@ -541,59 +541,59 @@ class TestCompleteEmailProcessingPipeline:
         # Step 1: Retrieve meeting email
         emails = mock_email_provider.get_emails()
         meeting_email = emails[1]
-        
+
         # Step 2: Classify
         classification = mock_ai_service.classify_email(meeting_email)
         assert classification['category'] == 'optional_event'
-        
+
         # Step 3: Save classification
         mock_task_persistence.save_email_classification(
             meeting_email['id'], classification
         )
-        
+
         # Step 4: Generate summary for meetings
         summary = mock_ai_service.generate_summary(meeting_email)
         assert 'summary' in summary
-    
+
     def test_full_pipeline_fyi_email(
         self, mock_email_provider, mock_ai_service, mock_task_persistence
     ):
         """Test complete pipeline for FYI email."""
         emails = mock_email_provider.get_emails()
         fyi_email = emails[2]
-        
+
         # Classify FYI email
         classification = mock_ai_service.classify_email(fyi_email)
         assert classification['category'] == 'optional_fyi'
-        
+
         # Save classification (no task creation needed)
         mock_task_persistence.save_email_classification(
             fyi_email['id'], classification
         )
-        
+
         # Verify no tasks created for FYI
         tasks = mock_task_persistence.get_tasks_by_email(fyi_email['id'])
         assert len(tasks) == 0
-    
+
     def test_pipeline_batch_processing(
         self, mock_email_provider, mock_ai_service, mock_task_persistence
     ):
         """Test processing multiple emails in batch."""
         emails = mock_email_provider.get_emails()
-        
+
         processed_count = 0
         tasks_created = 0
-        
+
         for email in emails:
             # Classify
             classification = mock_ai_service.classify_email(email)
-            
+
             # Save classification
             mock_task_persistence.save_email_classification(
                 email['id'], classification
             )
             processed_count += 1
-            
+
             # Create tasks if needed
             if classification['category'] == 'required_personal_action':
                 action_items = mock_ai_service.extract_action_items(email)
@@ -606,7 +606,7 @@ class TestCompleteEmailProcessingPipeline:
                     }
                     mock_task_persistence.save_task(task_data)
                     tasks_created += 1
-        
+
         # Verify batch processing
         assert processed_count == 3
         assert tasks_created >= 1  # At least one action email
@@ -619,7 +619,7 @@ class TestCompleteEmailProcessingPipeline:
 @pytest.mark.integration
 class TestPipelineErrorHandling:
     """Test error handling in integration workflows."""
-    
+
     def test_classification_failure_recovery(
         self, mock_email_provider, mock_ai_service
     ):
@@ -628,18 +628,18 @@ class TestPipelineErrorHandling:
         mock_ai_service.classify_email = Mock(
             side_effect=Exception("AI service unavailable")
         )
-        
+
         emails = mock_email_provider.get_emails()
         email = emails[0]
-        
+
         # Attempt classification with error handling
         try:
-            classification = mock_ai_service.classify_email(email)
+            mock_ai_service.classify_email(email)
             assert False, "Should have raised exception"
         except Exception as e:
             # Verify error can be caught and handled
             assert "AI service unavailable" in str(e)
-    
+
     def test_task_persistence_failure_recovery(
         self, mock_task_persistence
     ):
@@ -649,7 +649,7 @@ class TestPipelineErrorHandling:
             'email_id': None,  # Invalid
             'title': 'Test Task'
         }
-        
+
         # Should handle gracefully (implementation dependent)
         # This tests that the interface is robust
         try:
@@ -660,21 +660,21 @@ class TestPipelineErrorHandling:
         except Exception:
             # If it fails, that's also acceptable behavior
             pass
-    
+
     def test_empty_email_batch_handling(
         self, mock_ai_service, mock_task_persistence
     ):
         """Test handling of empty email batch."""
         empty_emails = []
-        
+
         processed_count = 0
         for email in empty_emails:
-            classification = mock_ai_service.classify_email(email)
+            mock_ai_service.classify_email(email)
             processed_count += 1
-        
+
         # Should handle empty list gracefully
         assert processed_count == 0
-    
+
     def test_malformed_email_data_handling(
         self, mock_ai_service
     ):
@@ -683,10 +683,10 @@ class TestPipelineErrorHandling:
             'id': 'malformed',
             # Missing subject, sender, body, etc.
         }
-        
+
         # Should still attempt classification
         classification = mock_ai_service.classify_email(malformed_email)
-        
+
         # Should return valid structure even for malformed input
         assert 'category' in classification
         assert 'confidence' in classification
@@ -700,15 +700,15 @@ class TestPipelineErrorHandling:
 @pytest.mark.slow
 class TestPipelinePerformance:
     """Test pipeline performance and scalability."""
-    
+
     def test_processing_time_under_target(
         self, mock_email_provider, mock_ai_service, mock_task_persistence
     ):
         """Test that processing completes within time target."""
         import time
-        
+
         start_time = time.time()
-        
+
         # Process all emails
         emails = mock_email_provider.get_emails()
         for email in emails:
@@ -716,7 +716,7 @@ class TestPipelinePerformance:
             mock_task_persistence.save_email_classification(
                 email['id'], classification
             )
-            
+
             if classification['category'] == 'required_personal_action':
                 action_items = mock_ai_service.extract_action_items(email)
                 for item in action_items.get('action_items', []):
@@ -726,9 +726,9 @@ class TestPipelinePerformance:
                         'status': 'pending'
                     }
                     mock_task_persistence.save_task(task_data)
-        
+
         elapsed_time = time.time() - start_time
-        
+
         # Should complete in under 1 second for 3 emails
         # (Target is <2min for full suite)
         assert elapsed_time < 1.0

@@ -1,6 +1,5 @@
 """Backend configuration for FastAPI Email Helper API."""
 
-import os
 from typing import Optional, List
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -11,60 +10,60 @@ try:
 except ImportError:
     get_azure_config_instance = None
 
-
 def _is_com_available() -> bool:
     """Check if COM email provider is available on this system."""
     try:
-        import pythoncom
-        from adapters.outlook_email_adapter import OutlookEmailAdapter
-        return True
-    except ImportError:
+        import importlib.util
+        return (
+            importlib.util.find_spec("pythoncom") is not None and
+            importlib.util.find_spec("backend.services.outlook.adapters.outlook_email_adapter") is not None
+        )
+    except (ImportError, ModuleNotFoundError):
         return False
-
 
 class Settings(BaseSettings):
     """FastAPI application settings."""
-    
+
     # App settings
     app_name: str = "Email Helper API"
     app_version: str = "1.0.0"
     debug: bool = False
-    
+
     # Server settings
     host: str = "0.0.0.0"
     port: int = 8000
-    
+
     # Security
     secret_key: str = "your-secret-key-change-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 30
-    
+
     # CORS - Allow all origins for development
     cors_origins: List[str] = Field(default_factory=lambda: ["*"])
     cors_allow_credentials: bool = True
     cors_allow_methods: List[str] = Field(default_factory=lambda: ["*"])
     cors_allow_headers: List[str] = Field(default_factory=lambda: ["*"])
-    
+
     # Database
     database_url: Optional[str] = None
-    
+
     # Azure OpenAI
     azure_openai_endpoint: Optional[str] = None
     azure_openai_api_key: Optional[str] = None
     azure_openai_deployment: str = "gpt-4o"
     azure_openai_api_version: str = "2024-02-01"
-    
+
     # COM Adapter (Windows + Outlook) - Auto-detect availability
     use_com_backend: bool = Field(default_factory=_is_com_available)
     com_connection_timeout: int = 30
     com_retry_attempts: int = 3
     email_provider: Optional[str] = None
-    
+
     # Development
     require_authentication: bool = False
     email_processing_limit: int = 100
-    
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": False
@@ -84,7 +83,7 @@ def get_database_path() -> str:
 def get_azure_config() -> dict:
     """Get Azure configuration."""
     settings = get_settings()
-    
+
     if get_azure_config_instance:
         try:
             azure_config_obj = get_azure_config_instance()
@@ -96,7 +95,7 @@ def get_azure_config() -> dict:
             }
         except Exception:
             pass
-    
+
     return {
         "endpoint": settings.azure_openai_endpoint,
         "api_key": settings.azure_openai_api_key,

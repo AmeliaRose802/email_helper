@@ -186,7 +186,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
   test.describe('AI Classification API Integration', () => {
     test('should call POST /api/ai/classify with email data', async ({ page }) => {
       let classifyRequestCaptured = false;
-      let requestBody: any = null;
+      let requestBody: unknown = null;
       let requestMethod = '';
       
       // Mock emails list
@@ -251,7 +251,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
   test.describe('Task Creation API Integration', () => {
     test('should call POST /api/tasks with task data', async ({ page }) => {
       let taskRequestCaptured = false;
-      let requestBody: any = null;
+      let requestBody: unknown = null;
       
       // Mock task creation endpoint
       await page.route('**/api/tasks', async (route: Route) => {
@@ -314,7 +314,7 @@ test.describe('Frontend-to-Backend API Integration', () => {
   test.describe('Bulk Operations API Integration', () => {
     test('should call POST /api/emails/batch or bulk endpoint', async ({ page }) => {
       let bulkRequestCaptured = false;
-      let requestBody: any = null;
+      let requestBody: unknown = null;
       let requestUrl = '';
       
       // Mock emails list

@@ -6,7 +6,7 @@ COMEmailProvider for end-to-end processing.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
+from unittest.mock import Mock, MagicMock, patch
 import json
 
 
@@ -61,7 +61,7 @@ def com_ai_service(mock_ai_orchestrator, mock_azure_config):
 @pytest.mark.asyncio
 class TestAIEmailClassificationIntegration:
     """Integration tests for AI email classification workflows."""
-    
+
     async def test_classify_email_workflow(self, com_ai_service):
         """Test complete email classification workflow."""
         # Setup mock classification result - configure the mock orchestrator
@@ -74,31 +74,31 @@ class TestAIEmailClassificationIntegration:
                 {"category": "optional_fyi", "confidence": 0.05}
             ]
         })
-        
+
         # Classify email
         email_content = """
         Subject: Project Review Required
         From: manager@example.com
-        
+
         Hi Team,
-        
+
         Please review the Q4 project report by Friday and provide your feedback.
         This is critical for our board meeting next week.
-        
+
         Thanks
         """
-        
+
         result = await com_ai_service.classify_email(email_content)
-        
+
         # Verify classification
         assert result['category'] == 'required_personal_action'
         assert result['confidence'] == 0.95
         assert 'action items' in result['reasoning'].lower()
         assert len(result['alternatives']) == 1
-        
+
         # Verify AI processor was called
         com_ai_service.ai_orchestrator.classify_email_with_explanation.assert_called_once()
-    
+
     async def test_classify_multiple_email_types(self, mock_ai_orchestrator, mock_azure_config_obj):
         """Test classification of different email types."""
         # Test demonstrates classification with proper mocking
@@ -107,25 +107,25 @@ class TestAIEmailClassificationIntegration:
             'expected_category': 'optional_event',
             'confidence': 0.88
         }
-        
-        # Setup mock result  
+
+        # Setup mock result
         mock_ai_orchestrator.classify_email_with_explanation.return_value = {
             "category": email_test['expected_category'],
             "confidence": email_test['confidence'],
             "explanation": f"Classified as {email_test['expected_category']}",
             "alternatives": []
         }
-        
+
         from backend.services.ai_service import AIService
         service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
 
         # Classify email
         result = await service.classify_email(email_test['content'])
-        
+
         # Verify
         assert result['category'] == email_test['expected_category']
         assert result['confidence'] == email_test['confidence']
-    
+
     async def test_classification_with_context(self, mock_ai_orchestrator, mock_azure_config_obj):
         """Test email classification with additional context."""
         mock_ai_orchestrator.classify_email_with_explanation.return_value = {
@@ -134,15 +134,15 @@ class TestAIEmailClassificationIntegration:
             "explanation": "High priority based on sender and context",
             "alternatives": []
         }
-        
+
         from backend.services.ai_service import AIService
         service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
 
         email_content = "Subject: Quick Question\nCan you help with this?"
         context = "This is from your direct manager about an urgent project"
-        
+
         result = await service.classify_email(email_content, context=context)
-        
+
         assert result['category'] == 'required_personal_action'
         assert result['confidence'] > 0.9
 
@@ -150,12 +150,12 @@ class TestAIEmailClassificationIntegration:
         """Test classification with AI service errors."""
         # Simulate AI error - will trigger fallback
         mock_ai_orchestrator.classify_email_with_explanation.side_effect = Exception("AI service unavailable")
-        
+
         from backend.services.ai_service import AIService
         service = AIService(ai_orchestrator=mock_ai_orchestrator, azure_config=mock_azure_config_obj)
 
         result = await service.classify_email("Test email")
-        
+
         # Should return fallback classification
         assert 'category' in result
         assert result['confidence'] < 1.0
@@ -166,7 +166,7 @@ class TestAIEmailClassificationIntegration:
 @pytest.mark.asyncio
 class TestAIActionItemExtractionIntegration:
     """Integration tests for AI action item extraction workflows."""
-    
+
     async def test_extract_action_items_workflow(self, com_ai_service, mock_ai_orchestrator):
         """Test complete action item extraction workflow."""
         action_items_result = json.dumps({
@@ -177,21 +177,21 @@ class TestAIActionItemExtractionIntegration:
             "links": []
         })
         mock_ai_orchestrator.execute_prompty.return_value = action_items_result
-        
+
         email_content = """
         Subject: Project Review Required
-        
+
         Please review the Q4 project report by Friday and provide your feedback.
         This is critical for our board meeting next week.
         """
-        
+
         result = await com_ai_service.extract_action_items(email_content)
-        
+
         # Verify extraction - updated to match actual response structure
         assert len(result['action_items']) >= 0  # May have 0 or 1 items
         assert 'Friday' in result['action_required']
         assert result['confidence'] >= 0.0
-    
+
     async def test_extract_action_items_no_actions(self, com_ai_service, mock_ai_orchestrator):
         """Test action item extraction with no actions found."""
         no_actions_result = json.dumps({
@@ -202,26 +202,26 @@ class TestAIActionItemExtractionIntegration:
             "links": []
         })
         mock_ai_orchestrator.execute_prompty.return_value = no_actions_result
-        
+
         email_content = "Subject: FYI\nJust wanted to let you know the meeting went well."
-        
+
         result = await com_ai_service.extract_action_items(email_content)
-        
+
         assert result['action_required'] == "No action required"
         assert result['confidence'] >= 0.0
-    
+
     async def test_extract_action_items_with_invalid_json(self, com_ai_service, mock_ai_orchestrator):
         """Test action item extraction with malformed JSON response."""
         # Return invalid JSON
         mock_ai_orchestrator.execute_prompty.return_value = "Invalid JSON response"
-        
+
         result = await com_ai_service.extract_action_items("Test email content")
-        
+
         # Should use fallback parsing
         assert 'action_required' in result
         assert result['confidence'] >= 0
         assert isinstance(result['action_items'], list)
-    
+
     async def test_extract_multiple_action_types(self, com_ai_service, mock_ai_orchestrator):
         """Test extraction of different types of action items."""
         action_items_result = json.dumps({
@@ -232,10 +232,10 @@ class TestAIActionItemExtractionIntegration:
             "links": []
         })
         mock_ai_orchestrator.execute_prompty.return_value = action_items_result
-        
+
         email_content = "Multiple action items email"
         result = await com_ai_service.extract_action_items(email_content)
-        
+
         assert 'action_required' in result
         assert result['confidence'] >= 0.0
 
@@ -244,28 +244,28 @@ class TestAIActionItemExtractionIntegration:
 @pytest.mark.asyncio
 class TestAISummarizationIntegration:
     """Integration tests for AI email summarization workflows."""
-    
+
     async def test_generate_summary_brief(self, com_ai_service, mock_ai_orchestrator):
         """Test brief summary generation workflow."""
         summary_result = "Manager requests Q4 report review and feedback by Friday for board meeting"
         mock_ai_orchestrator.execute_prompty.return_value = summary_result
-        
+
         email_content = """
         Subject: Project Review Required
-        
+
         Hi Team,
-        
+
         Please review the Q4 project report by Friday and provide your feedback.
         This is critical for our board meeting next week.
         """
-        
+
         result = await com_ai_service.generate_summary(email_content, summary_type="brief")
-        
+
         assert 'Q4 report' in result['summary']
         assert 'Friday' in result['summary']
         assert result['confidence'] >= 0.8
         assert len(result['key_points']) > 0
-    
+
     async def test_generate_summary_detailed(self, com_ai_service, mock_ai_orchestrator):
         """Test detailed summary generation workflow."""
         detailed_summary = """
@@ -275,15 +275,15 @@ class TestAISummarizationIntegration:
         Critical for upcoming board meeting.
         """
         mock_ai_orchestrator.execute_prompty.return_value = detailed_summary
-        
+
         email_content = "Long email content here..."
-        
+
         result = await com_ai_service.generate_summary(email_content, summary_type="detailed")
-        
+
         assert len(result['summary']) > 50  # Detailed should be longer
         assert len(result['key_points']) >= 0  # May have varying key points
         assert result['confidence'] >= 0.8
-    
+
     async def test_generate_summary_for_different_email_types(self, com_ai_service, mock_ai_orchestrator):
         """Test summary generation for various email types."""
         test_cases = [
@@ -300,21 +300,21 @@ class TestAISummarizationIntegration:
                 'summary': 'Colleague asks about project timeline and deliverables'
             }
         ]
-        
+
         for test_case in test_cases:
             mock_ai_orchestrator.execute_prompty.return_value = test_case['summary']
-            
+
             result = await com_ai_service.generate_summary(f"Email about {test_case['type']}")
-            
+
             assert len(result['summary']) > 0
             assert result['confidence'] > 0
-    
+
     async def test_summary_generation_error_handling(self, com_ai_service, mock_ai_orchestrator):
         """Test summary generation with errors."""
         mock_ai_orchestrator.execute_prompty.side_effect = Exception("Summarization failed")
-        
+
         result = await com_ai_service.generate_summary("Test email")
-        
+
         # Should return fallback
         assert 'summary' in result
         assert 'error' in result
@@ -325,7 +325,7 @@ class TestAISummarizationIntegration:
 @pytest.mark.asyncio
 class TestAIEmailProviderIntegration:
     """Integration tests combining AI service with email provider."""
-    
+
     async def test_email_retrieval_and_summarization_workflow(
         self, com_ai_service, mock_ai_orchestrator
     ):
@@ -339,7 +339,7 @@ class TestAIEmailProviderIntegration:
         ]
         mock_provider.get_emails.return_value = mock_emails
         mock_provider.authenticate.return_value = True
-        
+
         # Setup summaries
         summaries = [
             "Team meeting scheduled for tomorrow",
@@ -347,7 +347,7 @@ class TestAIEmailProviderIntegration:
             "Project status updated to in progress"
         ]
         mock_ai_orchestrator.execute_prompty.side_effect = summaries
-        
+
         # Execute workflow
         with patch('backend.services.com_email_provider.OutlookEmailAdapter', return_value=MagicMock()):
             with patch('backend.services.com_email_provider.COM_AVAILABLE', True):
@@ -355,11 +355,11 @@ class TestAIEmailProviderIntegration:
                 provider = COMEmailProvider()
                 provider.adapter = mock_provider
                 provider.authenticated = True
-                
+
                 # Get emails and summarize
                 emails = provider.get_emails("Inbox", count=3)
                 summarized_emails = []
-                
+
                 for email in emails:
                     email_text = f"Subject: {email['subject']}\n\n{email['body']}"
                     summary = await com_ai_service.generate_summary(email_text)
@@ -367,7 +367,7 @@ class TestAIEmailProviderIntegration:
                         **email,
                         'summary': summary
                     })
-                
+
                 # Verify
                 assert len(summarized_emails) == 3
                 assert all('summary' in email for email in summarized_emails)
@@ -377,15 +377,15 @@ class TestAIEmailProviderIntegration:
 @pytest.mark.asyncio
 class TestAIServiceResilience:
     """Integration tests for AI service error resilience."""
-    
+
     async def test_ai_service_retry_logic(self, com_ai_service, mock_ai_orchestrator):
         """Test retry logic for transient failures."""
         # For this test, we'll just verify error handling works
         # First attempt should fail and return fallback
         mock_ai_orchestrator.classify_email_with_explanation.side_effect = Exception("Transient error")
-        
+
         result = await com_ai_service.classify_email("Test email")
-        
+
         # Should return fallback with error
         assert 'category' in result
         assert 'error' in result

@@ -23,7 +23,7 @@ export const settingsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getSettings: builder.query<UserSettings, void>({
       query: () => '/api/settings',
-      providesTags: ['Settings'] as any,
+      providesTags: ['Settings'],
     }),
     updateSettings: builder.mutation<SettingsResponse, UserSettings>({
       query: (settings) => ({
@@ -31,14 +31,14 @@ export const settingsApi = apiSlice.injectEndpoints({
         method: 'PUT',
         body: settings,
       }),
-      invalidatesTags: ['Settings'] as any,
+      invalidatesTags: ['Settings'],
     }),
     resetSettings: builder.mutation<SettingsResponse, void>({
       query: () => ({
         url: '/api/settings',
         method: 'DELETE',
       }),
-      invalidatesTags: ['Settings'] as any,
+      invalidatesTags: ['Settings'],
     }),
   }),
 });

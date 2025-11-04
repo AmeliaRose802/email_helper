@@ -1,6 +1,25 @@
 # Email Helper Startup Script - Production Ready Version
 Write-Host "🚀 Starting Email Helper..." -ForegroundColor Green
 
+# Function to cleanup on exit
+function Cleanup {
+    Write-Host ""
+    Write-Host "🛑 Shutting down Email Helper services..." -ForegroundColor Yellow
+    
+    # Stop Electron
+    Get-Process -Name electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    
+    # Stop Python backend
+    Get-Process -Name python -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    
+    # Stop Node/frontend (be careful not to kill VS Code)
+    Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object {
+        $_.MainWindowTitle -notlike "*Visual Studio Code*"
+    } | Stop-Process -Force -ErrorAction SilentlyContinue
+    
+    Write-Host "✓ Shutdown complete" -ForegroundColor Green
+}
+
 # Clean up any existing processes
 Write-Host "🧹 Cleaning up existing processes..." -ForegroundColor Yellow
 Get-Process -Name electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -112,14 +131,28 @@ if ($BackendReady -and $FrontendReady) {
     
     # Start Electron in a new window (non-blocking)
     Set-Location $PSScriptRoot
-    $ElectronProcess = Start-Process -FilePath "npx" -ArgumentList "electron", "main.js" -WorkingDirectory $PSScriptRoot -PassThru
     
-    Write-Host "✅ Electron app launched (PID: $($ElectronProcess.Id))" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "📝 Services are running in the background" -ForegroundColor Cyan
-    Write-Host "   To stop all services, close the Electron app or run:" -ForegroundColor Gray
-    Write-Host "   Get-Process python,node,electron | Stop-Process -Force" -ForegroundColor Gray
-    Write-Host ""
+    try {
+        $ElectronProcess = Start-Process -FilePath "npx" -ArgumentList "electron", "main.js" -WorkingDirectory $PSScriptRoot -PassThru
+        
+        Write-Host "✅ Electron app launched (PID: $($ElectronProcess.Id))" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "📝 Services are running in the background" -ForegroundColor Cyan
+        Write-Host "   Press Ctrl+C to shut down all services cleanly" -ForegroundColor Gray
+        Write-Host ""
+        
+        # Wait for Electron to exit
+        $ElectronProcess.WaitForExit()
+        
+        Write-Host ""
+        Write-Host "👋 Electron app closed" -ForegroundColor Yellow
+        Cleanup
+        
+    } catch {
+        Write-Host "⚠ Error running Electron: $($_.Exception.Message)" -ForegroundColor Yellow
+        Cleanup
+        exit 1
+    }
 } else {
     Write-Host ""
     Write-Host "❌ Services failed to start properly. Please check the configuration." -ForegroundColor Red
@@ -138,5 +171,6 @@ if ($BackendReady -and $FrontendReady) {
         Stop-Process -Id $FrontendJob.Id -Force -ErrorAction SilentlyContinue
     }
     
+    Cleanup
     exit 1
 }

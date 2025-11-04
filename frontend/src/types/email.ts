@@ -5,8 +5,19 @@ export interface Email {
   subject: string;
   sender: string;
   recipient: string;
-  date: string;
-  body: string;
+  
+  // Standardized field names (use these in new code)
+  content: string;  // Email body content
+  received_time: string;  // When email was received
+  ai_category?: 'required_personal_action' | 'team_action' | 'optional_action' | 'job_listing' | 'optional_event' | 'work_relevant' | 'fyi' | 'newsletter' | 'spam_to_delete';  // AI classification
+  
+  // Deprecated field names (kept for backward compatibility - will be removed in 6 months)
+  /** @deprecated Use 'content' instead */
+  body?: string;
+  /** @deprecated Use 'received_time' instead */
+  date?: string;
+  
+  // Other fields
   html_body?: string;
   has_attachments: boolean;
   is_read: boolean;
@@ -15,12 +26,13 @@ export interface Email {
   conversation_id?: string;
   conversation_count?: number; // Number of emails in conversation
   folder_name?: string;
+  
   // AI Classification fields
-  ai_category?: 'required_personal_action' | 'team_action' | 'optional_action' | 'job_listing' | 'optional_event' | 'work_relevant' | 'fyi' | 'newsletter' | 'spam_to_delete';
   ai_confidence?: number;
   ai_reasoning?: string;
   classification_status?: 'pending' | 'classifying' | 'classified' | 'error';
   one_line_summary?: string; // AI-generated one-line summary
+  category?: string; // User-corrected category (for accuracy tracking)
   holistic_classification?: HolisticClassification; // Holistic inbox analysis results
 }
 

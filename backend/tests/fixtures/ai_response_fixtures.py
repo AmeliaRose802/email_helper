@@ -10,7 +10,7 @@ from typing import Dict, Any, List
 
 def get_classification_response_required_action() -> Dict[str, Any]:
     """Get a classification response for required personal action.
-    
+
     Returns:
         dict: Classification result
     """
@@ -24,7 +24,7 @@ def get_classification_response_required_action() -> Dict[str, Any]:
 
 def get_classification_response_optional_action() -> Dict[str, Any]:
     """Get a classification response for optional action.
-    
+
     Returns:
         dict: Classification result
     """
@@ -38,7 +38,7 @@ def get_classification_response_optional_action() -> Dict[str, Any]:
 
 def get_classification_response_work_relevant() -> Dict[str, Any]:
     """Get a classification response for work relevant email.
-    
+
     Returns:
         dict: Classification result
     """
@@ -52,7 +52,7 @@ def get_classification_response_work_relevant() -> Dict[str, Any]:
 
 def get_classification_response_fyi() -> Dict[str, Any]:
     """Get a classification response for FYI email.
-    
+
     Returns:
         dict: Classification result
     """
@@ -66,7 +66,7 @@ def get_classification_response_fyi() -> Dict[str, Any]:
 
 def get_classification_response_optional_event() -> Dict[str, Any]:
     """Get a classification response for optional event.
-    
+
     Returns:
         dict: Classification result
     """
@@ -80,7 +80,7 @@ def get_classification_response_optional_event() -> Dict[str, Any]:
 
 def get_classification_response_job_listing() -> Dict[str, Any]:
     """Get a classification response for job listing.
-    
+
     Returns:
         dict: Classification result
     """
@@ -94,7 +94,7 @@ def get_classification_response_job_listing() -> Dict[str, Any]:
 
 def get_classification_response_low_confidence() -> Dict[str, Any]:
     """Get a classification response with low confidence.
-    
+
     Returns:
         dict: Classification result requiring review
     """
@@ -108,7 +108,7 @@ def get_classification_response_low_confidence() -> Dict[str, Any]:
 
 def get_action_items_response_single() -> Dict[str, Any]:
     """Get action items response with a single action.
-    
+
     Returns:
         dict: Action items result
     """
@@ -133,7 +133,7 @@ def get_action_items_response_single() -> Dict[str, Any]:
 
 def get_action_items_response_multiple() -> Dict[str, Any]:
     """Get action items response with multiple actions.
-    
+
     Returns:
         dict: Action items result with multiple tasks
     """
@@ -171,7 +171,7 @@ def get_action_items_response_multiple() -> Dict[str, Any]:
 
 def get_action_items_response_urgent() -> Dict[str, Any]:
     """Get action items response for urgent task.
-    
+
     Returns:
         dict: Urgent action items result
     """
@@ -200,7 +200,7 @@ def get_action_items_response_urgent() -> Dict[str, Any]:
 
 def get_action_items_response_no_action() -> Dict[str, Any]:
     """Get action items response when no action is required.
-    
+
     Returns:
         dict: No action required result
     """
@@ -216,7 +216,7 @@ def get_action_items_response_no_action() -> Dict[str, Any]:
 
 def get_summary_response_meeting() -> Dict[str, Any]:
     """Get summary response for meeting invitation.
-    
+
     Returns:
         dict: Meeting summary
     """
@@ -236,7 +236,7 @@ def get_summary_response_meeting() -> Dict[str, Any]:
 
 def get_summary_response_action_required() -> Dict[str, Any]:
     """Get summary response for action-required email.
-    
+
     Returns:
         dict: Action-required summary
     """
@@ -255,7 +255,7 @@ def get_summary_response_action_required() -> Dict[str, Any]:
 
 def get_summary_response_fyi() -> Dict[str, Any]:
     """Get summary response for FYI email.
-    
+
     Returns:
         dict: FYI summary
     """
@@ -274,7 +274,7 @@ def get_summary_response_fyi() -> Dict[str, Any]:
 
 def get_summary_response_urgent() -> Dict[str, Any]:
     """Get summary response for urgent email.
-    
+
     Returns:
         dict: Urgent email summary
     """
@@ -296,7 +296,7 @@ def get_summary_response_urgent() -> Dict[str, Any]:
 
 def get_duplicate_detection_response_with_duplicates() -> Dict[str, Any]:
     """Get duplicate detection response when duplicates are found.
-    
+
     Returns:
         dict: Duplicate detection result
     """
@@ -316,7 +316,7 @@ def get_duplicate_detection_response_with_duplicates() -> Dict[str, Any]:
 
 def get_duplicate_detection_response_no_duplicates() -> Dict[str, Any]:
     """Get duplicate detection response when no duplicates are found.
-    
+
     Returns:
         dict: No duplicates result
     """
@@ -329,7 +329,7 @@ def get_duplicate_detection_response_no_duplicates() -> Dict[str, Any]:
 
 def get_batch_classification_responses() -> List[Dict[str, Any]]:
     """Get batch classification responses for multiple emails.
-    
+
     Returns:
         list: Multiple classification results
     """
@@ -381,7 +381,7 @@ def get_batch_classification_responses() -> List[Dict[str, Any]]:
 
 def get_error_response() -> Dict[str, Any]:
     """Get an error response for testing error handling.
-    
+
     Returns:
         dict: Error response
     """
@@ -394,7 +394,7 @@ def get_error_response() -> Dict[str, Any]:
 
 def get_malformed_response() -> str:
     """Get a malformed response for testing parsing error handling.
-    
+
     Returns:
         str: Non-JSON response string
     """
@@ -403,7 +403,7 @@ def get_malformed_response() -> str:
 
 def get_incomplete_response() -> Dict[str, Any]:
     """Get an incomplete response missing required fields.
-    
+
     Returns:
         dict: Incomplete response
     """
@@ -415,7 +415,7 @@ def get_incomplete_response() -> Dict[str, Any]:
 
 def get_confidence_thresholds() -> Dict[str, float]:
     """Get confidence thresholds for classification.
-    
+
     Returns:
         dict: Category confidence thresholds
     """
@@ -431,7 +431,7 @@ def get_confidence_thresholds() -> Dict[str, float]:
 
 def get_prompty_template_list() -> List[str]:
     """Get list of available prompty templates.
-    
+
     Returns:
         list: Template file names
     """

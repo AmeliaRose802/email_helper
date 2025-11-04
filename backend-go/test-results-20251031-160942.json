@@ -1,0 +1,145 @@
+{
+  "summary": {
+    "total": 22,
+    "passed": 13,
+    "duration_seconds": 5.5401329,
+    "skipped": 4,
+    "failed": 5
+  },
+  "base_url": "http://localhost:8000",
+  "tests": [
+    {
+      "Timestamp": "16:09:36",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "GET /health"
+    },
+    {
+      "Timestamp": "16:09:36",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "GET /"
+    },
+    {
+      "Timestamp": "16:09:37",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "GET /api/ai/health"
+    },
+    {
+      "Timestamp": "16:09:38",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "POST /api/ai/classify"
+    },
+    {
+      "Timestamp": "16:09:40",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "POST /api/ai/action-items"
+    },
+    {
+      "Timestamp": "16:09:41",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "POST /api/ai/summarize"
+    },
+    {
+      "Timestamp": "16:09:41",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "GET /api/ai/templates"
+    },
+    {
+      "Timestamp": "16:09:41",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "GET /api/emails"
+    },
+    {
+      "Timestamp": "16:09:41",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "GET /api/emails/stats"
+    },
+    {
+      "Timestamp": "16:09:41",
+      "Status": "FAIL",
+      "Message": "Response status code does not indicate success: 500 (Internal Server Error).",
+      "Name": "GET /api/emails/search"
+    },
+    {
+      "Timestamp": "16:09:41",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "GET /api/emails/:id"
+    },
+    {
+      "Timestamp": "16:09:42",
+      "Status": "FAIL",
+      "Message": "Response status code does not indicate success: 500 (Internal Server Error).",
+      "Name": "GET /api/folders"
+    },
+    {
+      "Timestamp": "16:09:42",
+      "Status": "FAIL",
+      "Message": "Response status code does not indicate success: 500 (Internal Server Error).",
+      "Name": "GET /api/tasks"
+    },
+    {
+      "Timestamp": "16:09:42",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "GET /api/tasks/stats"
+    },
+    {
+      "Timestamp": "16:09:42",
+      "Status": "FAIL",
+      "Message": "Response status code does not indicate success: 500 (Internal Server Error).",
+      "Name": "POST /api/tasks"
+    },
+    {
+      "Timestamp": "16:09:42",
+      "Status": "SKIP",
+      "Message": "Task creation failed",
+      "Name": "GET /api/tasks/:id"
+    },
+    {
+      "Timestamp": "16:09:42",
+      "Status": "SKIP",
+      "Message": "Task creation failed",
+      "Name": "PUT /api/tasks/:id"
+    },
+    {
+      "Timestamp": "16:09:42",
+      "Status": "SKIP",
+      "Message": "Task creation failed",
+      "Name": "DELETE /api/tasks/:id"
+    },
+    {
+      "Timestamp": "16:09:42",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "GET /api/settings"
+    },
+    {
+      "Timestamp": "16:09:42",
+      "Status": "PASS",
+      "Message": "",
+      "Name": "PUT /api/settings"
+    },
+    {
+      "Timestamp": "16:09:42",
+      "Status": "FAIL",
+      "Message": "Response status code does not indicate success: 501 (Not Implemented).",
+      "Name": "GET /api/processing/stats"
+    },
+    {
+      "Timestamp": "16:09:42",
+      "Status": "SKIP",
+      "Message": "Skipping to avoid processing real data",
+      "Name": "POST /api/processing/start"
+    }
+  ],
+  "timestamp": "2025-10-31T16:09:42.4609244-07:00"
+}

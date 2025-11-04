@@ -27,20 +27,28 @@ const AccuracyDashboard: React.FC = () => {
           throw new Error('Failed to fetch accuracy stats');
         }
         
-        const data = await response.json();
+        const data = await response.json() as { categories: Array<{
+          category: string;
+          total: number;
+          correct: number;
+          accuracy: number;
+          precision: number;
+          recall: number;
+          f1_score: number;
+        }> };
         
         // Transform backend data to match our interface
-        const transformedStats: AccuracyStat[] = data.categories.map((cat: any) => ({
+        const transformedStats: AccuracyStat[] = data.categories.map((cat) => ({
           category: cat.category,
           total: cat.total,
           correct: cat.correct,
           accuracy: cat.accuracy,
           precision: cat.precision,
           recall: cat.recall,
-          f1: cat.f1,
-          truePositives: cat.truePositives,
-          falsePositives: cat.falsePositives,
-          falseNegatives: cat.falseNegatives,
+          f1: cat.f1_score,
+          truePositives: 0,  // TODO: Add these fields to API response
+          falsePositives: 0,
+          falseNegatives: 0,
         }));
         
         setStats(transformedStats);

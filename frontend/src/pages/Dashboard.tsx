@@ -49,7 +49,7 @@ const SkeletonLoader: React.FC<{ height?: string; width?: string }> = ({
 }) => (
   <div 
     className="skeleton" 
-    style={{ height, width, display: 'inline-block' }}
+    style={{ height, width }}
   />
 );
 
@@ -66,23 +66,23 @@ const StatCard: React.FC<{
   return (
     <div className="stat-card">
       <h3>
-        <span style={{ marginRight: '0.5rem' }}>{icon}</span>
+        <span className="stat-card__icon">{icon}</span>
         {title}
       </h3>
       {isLoading ? (
-        <div style={{ padding: '1rem 0' }}>
+        <div className="stat-card__loading">
           <SkeletonLoader height="30px" width="60%" />
-          <div style={{ marginTop: '0.5rem' }}>
+          <div className="stat-card__loading-row">
             <SkeletonLoader height="20px" width="80%" />
           </div>
-          <div style={{ marginTop: '0.5rem' }}>
+          <div className="stat-card__loading-row">
             <SkeletonLoader height="20px" width="70%" />
           </div>
         </div>
       ) : (
         <div>
           {stats.map((stat, index) => (
-            <p key={index} style={{ fontSize: index === 0 ? '1.5rem' : '1rem' }}>
+            <p key={index} className={index === 0 ? 'stat-card__stat-primary' : 'stat-card__stat-secondary'}>
               <strong>{stat.label}:</strong>{' '}
               <AnimatedCounter end={stat.value} suffix={stat.suffix || ''} />
             </p>
@@ -125,16 +125,10 @@ const Dashboard: React.FC = () => {
       <h1>📧 Email Helper Dashboard</h1>
 
       {/* Email Processing Settings */}
-      <div className="settings-section" style={{
-        background: 'var(--color-card-bg)',
-        padding: '1rem',
-        borderRadius: '8px',
-        marginBottom: '1.5rem',
-        border: '1px solid var(--color-border)'
-      }}>
-        <h3 style={{ marginTop: 0 }}>⚙️ Processing Settings</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <label htmlFor="email-limit" style={{ fontWeight: 500 }}>
+      <div className="settings-section">
+        <h3>⚙️ Processing Settings</h3>
+        <div className="settings-section__controls">
+          <label htmlFor="email-limit" className="settings-section__label">
             📊 Number of emails to process:
           </label>
           <input
@@ -145,24 +139,13 @@ const Dashboard: React.FC = () => {
             step="10"
             value={emailLimit}
             onChange={(e) => setEmailLimit(Math.max(10, Math.min(1000, parseInt(e.target.value) || 100)))}
-            style={{
-              padding: '0.5rem',
-              borderRadius: '4px',
-              border: '1px solid var(--color-border)',
-              width: '100px',
-              fontSize: '1rem'
-            }}
+            className="settings-section__input"
           />
-          <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
+          <span className="settings-section__hint">
             (10-1000 emails)
           </span>
         </div>
-        <p style={{ 
-          marginTop: '0.5rem', 
-          marginBottom: 0, 
-          fontSize: '0.85rem', 
-          color: 'var(--color-text-secondary)' 
-        }}>
+        <p className="settings-section__description">
           💡 Lower numbers = faster processing. Higher numbers = more complete statistics.
         </p>
       </div>
@@ -201,7 +184,7 @@ const Dashboard: React.FC = () => {
 
       {/* Error handling */}
       {(emailError || taskError) && (
-        <div className="error-message" style={{ marginTop: '1rem' }}>
+        <div className="error-message">
           ⚠️ Failed to load some statistics. Please try refreshing the page.
         </div>
       )}
@@ -210,9 +193,8 @@ const Dashboard: React.FC = () => {
         <h3>⚡ Quick Actions</h3>
         <button 
           type="button"
-          className="action-button"
+          className="action-button action-button--electron"
           onClick={handleProcessEmails}
-          style={{ pointerEvents: 'auto', zIndex: 100, WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           data-testid="process-emails-button"
         >
           📥 Process New Emails
@@ -220,9 +202,8 @@ const Dashboard: React.FC = () => {
         
         <button 
           type="button"
-          className="action-button"
+          className="action-button action-button--electron"
           onClick={handleViewTasks}
-          style={{ pointerEvents: 'auto', zIndex: 100, WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           data-testid="view-tasks-button"
         >
           📋 View Pending Tasks

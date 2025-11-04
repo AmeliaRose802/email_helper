@@ -10,7 +10,7 @@ from .ai_models import (
 )
 
 __all__ = [
-    "Email", "EmailCreate", "EmailUpdate", "EmailInDB", 
+    "Email", "EmailCreate", "EmailUpdate", "EmailInDB",
     "EmailClassification", "EmailBatch", "EmailBatchResult",
     "Task", "TaskCreate", "TaskUpdate", "TaskInDB",
     "EmailClassificationRequest", "EmailClassificationResponse",

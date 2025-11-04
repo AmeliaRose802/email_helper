@@ -4,7 +4,7 @@ import {
   useGetEmailByIdQuery
 } from '@/services/emailApi';
 import { CategoryBadge } from '@/components/Email/CategoryBadge';
-import { formatEmailDate, getPriorityIcon } from '@/utils/emailUtils';
+// import { formatEmailDate, getPriorityIcon } from '@/utils/emailUtils';
 
 // Helper function to strip email metadata from HTML body
 const stripEmailMetadata = (html: string): string => {
@@ -120,9 +120,10 @@ export const EmailDetailView: React.FC<EmailDetailViewProps> = ({
       )}
 
       {/* Email Body - renders HTML content directly */}
+      {/* Use standardized field name with backward compatibility */}
       <div
         className="email-detail-content"
-        dangerouslySetInnerHTML={{ __html: prepareEmailHTML(email.body || '') }}
+        dangerouslySetInnerHTML={{ __html: prepareEmailHTML(email.content || email.body || '') }}
       />
     </div>
   );

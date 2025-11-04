@@ -1,7 +1,7 @@
 """Settings endpoints for FastAPI Email Helper API."""
 
-from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional, Dict
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 import json
 
@@ -46,7 +46,7 @@ def _ensure_settings_table():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # Insert default user if doesn't exist
         conn.execute("""
             INSERT OR IGNORE INTO user_settings (user_id) VALUES (1)
@@ -57,13 +57,13 @@ def _ensure_settings_table():
 @router.get("/settings", response_model=UserSettings)
 async def get_settings():
     """Get current user settings.
-    
+
     Returns:
         Current user settings from database
     """
     try:
         _ensure_settings_table()
-        
+
         with db_manager.get_connection() as conn:
             cursor = conn.execute("""
                 SELECT username, job_context, newsletter_interests,
@@ -73,7 +73,7 @@ async def get_settings():
                 WHERE user_id = 1
             """)
             row = cursor.fetchone()
-            
+
             if row:
                 custom_prompts = None
                 if row[5]:  # custom_prompts field
@@ -81,7 +81,7 @@ async def get_settings():
                         custom_prompts = json.loads(row[5])
                     except:
                         custom_prompts = {}
-                
+
                 return UserSettings(
                     username=row[0],
                     job_context=row[1],
@@ -94,7 +94,7 @@ async def get_settings():
                 )
             else:
                 return UserSettings()
-                
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -105,21 +105,21 @@ async def get_settings():
 @router.put("/settings", response_model=SettingsResponse)
 async def update_settings(settings: UserSettings):
     """Update user settings.
-    
+
     Args:
         settings: New settings to save
-    
+
     Returns:
         Success status and updated settings
     """
     try:
         _ensure_settings_table()
-        
+
         # Serialize custom_prompts to JSON
         custom_prompts_json = None
         if settings.custom_prompts:
             custom_prompts_json = json.dumps(settings.custom_prompts)
-        
+
         with db_manager.get_connection() as conn:
             conn.execute("""
                 UPDATE user_settings
@@ -144,13 +144,13 @@ async def update_settings(settings: UserSettings):
                 settings.ado_pat
             ))
             conn.commit()
-        
+
         return SettingsResponse(
             success=True,
             message="Settings updated successfully",
             settings=settings
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -161,13 +161,13 @@ async def update_settings(settings: UserSettings):
 @router.delete("/settings", response_model=SettingsResponse)
 async def reset_settings():
     """Reset user settings to defaults.
-    
+
     Returns:
         Success status
     """
     try:
         _ensure_settings_table()
-        
+
         with db_manager.get_connection() as conn:
             conn.execute("""
                 UPDATE user_settings
@@ -183,13 +183,13 @@ async def reset_settings():
                 WHERE user_id = 1
             """)
             conn.commit()
-        
+
         return SettingsResponse(
             success=True,
             message="Settings reset to defaults",
             settings=UserSettings()
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

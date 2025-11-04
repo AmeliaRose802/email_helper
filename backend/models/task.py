@@ -10,7 +10,7 @@ class TaskStatus(str, Enum):
     """Task status enumeration."""
     TODO = "todo"
     PENDING = "pending"
-    IN_PROGRESS = "in_progress" 
+    IN_PROGRESS = "in_progress"
     REVIEW = "review"
     DONE = "done"
     COMPLETED = "completed"

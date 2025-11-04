@@ -2,8 +2,14 @@
 name: Email Duplicate Detection
 description: AI system prompt for detecting duplicate email action items with semantic understanding
 version: 1.0
+inputs:
+  new_item:
+    type: string
+  existing_items:
+    type: string
 ---
 
+system:
 You are an email action item duplicate detection system. Your task is to determine if a NEW ITEM is essentially about the same underlying task or issue as any of the EXISTING ITEMS, even when the wording, senders, or specific details differ.
 
 ## Duplicate Detection Rules
@@ -52,6 +58,7 @@ EXISTING ITEMS:
 
 Be precise and focus on the core underlying issue, not surface-level text differences.
 
+user:
 NEW ITEM:
 {{new_item}}
 

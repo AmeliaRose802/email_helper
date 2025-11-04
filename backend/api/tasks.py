@@ -4,8 +4,8 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.models.task import (
-    Task, TaskCreate, TaskUpdate, TaskListResponse, 
-    BulkTaskUpdate, BulkTaskDelete, TaskStatus
+    Task, TaskCreate, TaskUpdate, TaskListResponse,
+    BulkTaskUpdate, BulkTaskDelete
 )
 from backend.services.task_service import TaskService, get_task_service
 
@@ -26,7 +26,7 @@ async def create_task(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to create task")
 
 
@@ -49,7 +49,7 @@ async def get_tasks(
             priority=priority,
             search=search
         )
-        
+
         return TaskListResponse(
             tasks=result.tasks,
             total_count=result.total_count,
@@ -57,7 +57,7 @@ async def get_tasks(
             page_size=result.page_size,
             has_next=result.has_next
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to retrieve tasks")
 
 
@@ -69,7 +69,7 @@ async def get_task_stats(
     try:
         stats = await task_service.get_task_stats(LOCALHOST_USER_ID)
         return stats
-    except Exception as e:
+    except Exception:
         # Return mock stats if there's an error
         return {
             "total_tasks": 0,
@@ -109,7 +109,7 @@ async def update_task(
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to update task")
 
 
@@ -126,7 +126,7 @@ async def delete_task(
         return {"message": "Task deleted successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete task")
 
 
@@ -143,7 +143,7 @@ async def bulk_update_tasks(
             LOCALHOST_USER_ID
         )
         return results
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to bulk update tasks")
 
 
@@ -162,7 +162,7 @@ async def bulk_delete_tasks(
             "message": f"Successfully deleted {deleted_count} tasks",
             "deleted_count": deleted_count
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to bulk delete tasks")
 
 
@@ -182,7 +182,7 @@ async def update_task_status(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid status: {str(e)}")
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to update task status")
 
 
@@ -200,7 +200,7 @@ async def link_email_to_task(
         if not result:
             raise HTTPException(status_code=404, detail="Task not found")
         return {"message": "Email linked to task successfully", "task": result}
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to link email to task")
 
 
@@ -209,7 +209,7 @@ async def deduplicate_fyi_tasks(
     task_service: TaskService = Depends(get_task_service)
 ):
     """Deduplicate FYI task summaries using AI analysis.
-    
+
     This endpoint:
     1. Retrieves all FYI tasks from the database
     2. Extracts their summary content
@@ -227,10 +227,10 @@ async def deduplicate_fyi_tasks(
             priority=None,
             search=None
         )
-        
+
         # Filter for FYI category
         fyi_tasks = [task for task in result.tasks if task.category == 'fyi']
-        
+
         if not fyi_tasks:
             return {
                 "message": "No FYI tasks found to deduplicate",
@@ -240,11 +240,11 @@ async def deduplicate_fyi_tasks(
                     "duplicates_removed": 0
                 }
             }
-        
+
         # Format tasks for deduplication
         from backend.core.dependencies import get_com_ai_service
         ai_service = get_com_ai_service()
-        
+
         content_items = []
         for task in fyi_tasks:
             content_items.append({
@@ -255,24 +255,24 @@ async def deduplicate_fyi_tasks(
                     "created_at": task.created_at.isoformat() if task.created_at else None
                 }
             })
-        
+
         # Call AI service for deduplication
         dedup_result = await ai_service.deduplicate_content(content_items, "fyi")
-        
+
         # Update database with deduplicated content
         # For now, just return the results without updating
         # In production, would update task descriptions and mark duplicates as deleted
-        
+
         return {
             "message": f"Deduplicated {len(fyi_tasks)} FYI tasks",
             "deduplicated_items": dedup_result["deduplicated_items"],
             "removed_duplicates": dedup_result["removed_duplicates"],
             "statistics": dedup_result["statistics"]
         }
-        
+
     except Exception as e:
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=f"Failed to deduplicate FYI tasks: {str(e)}"
         )
 
@@ -282,7 +282,7 @@ async def deduplicate_newsletter_tasks(
     task_service: TaskService = Depends(get_task_service)
 ):
     """Deduplicate newsletter task summaries using AI analysis.
-    
+
     This endpoint:
     1. Retrieves all newsletter tasks from the database
     2. Extracts their summary content
@@ -300,10 +300,10 @@ async def deduplicate_newsletter_tasks(
             priority=None,
             search=None
         )
-        
+
         # Filter for newsletter category
         newsletter_tasks = [task for task in result.tasks if task.category == 'newsletter']
-        
+
         if not newsletter_tasks:
             return {
                 "message": "No newsletter tasks found to deduplicate",
@@ -313,11 +313,11 @@ async def deduplicate_newsletter_tasks(
                     "duplicates_removed": 0
                 }
             }
-        
+
         # Format tasks for deduplication
         from backend.core.dependencies import get_com_ai_service
         ai_service = get_com_ai_service()
-        
+
         content_items = []
         for task in newsletter_tasks:
             content_items.append({
@@ -328,24 +328,24 @@ async def deduplicate_newsletter_tasks(
                     "created_at": task.created_at.isoformat() if task.created_at else None
                 }
             })
-        
+
         # Call AI service for deduplication
         dedup_result = await ai_service.deduplicate_content(content_items, "newsletter")
-        
+
         # Update database with deduplicated content
         # For now, just return the results without updating
         # In production, would update task descriptions and mark duplicates as deleted
-        
+
         return {
             "message": f"Deduplicated {len(newsletter_tasks)} newsletter tasks",
             "deduplicated_items": dedup_result["deduplicated_items"],
             "removed_duplicates": dedup_result["removed_duplicates"],
             "statistics": dedup_result["statistics"]
         }
-        
+
     except Exception as e:
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=f"Failed to deduplicate newsletter tasks: {str(e)}"
         )
 

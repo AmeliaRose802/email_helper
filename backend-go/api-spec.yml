@@ -1,0 +1,1045 @@
+openapi: 3.0.3
+info:
+  title: Email Helper API
+  description: REST API for Email Helper application with AI-powered email classification and task management
+  version: 1.0.0
+  contact:
+    name: Email Helper
+    
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+tags:
+  - name: Health
+    description: Health check and status endpoints
+  - name: AI
+    description: AI-powered email processing
+  - name: Emails
+    description: Email management and operations
+  - name: Tasks
+    description: Task management
+  - name: Settings
+    description: User settings
+  - name: Processing
+    description: Background processing pipelines
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: email-helper-api
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  database:
+                    type: string
+                    example: healthy
+
+  /:
+    get:
+      summary: API root information
+      tags: [Health]
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  version:
+                    type: string
+                  docs:
+                    type: string
+                  health:
+                    type: string
+
+  /api/ai/classify:
+    post:
+      summary: Classify email content
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subject
+                - sender
+                - content
+              properties:
+                subject:
+                  type: string
+                  example: "Team meeting tomorrow"
+                sender:
+                  type: string
+                  example: "manager@company.com"
+                content:
+                  type: string
+                  example: "Please join us for the team meeting tomorrow at 2 PM"
+                context:
+                  type: string
+                  example: ""
+      responses:
+        '200':
+          description: Classification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailClassificationResponse'
+        '500':
+          description: AI processing failed
+          
+  /api/ai/action-items:
+    post:
+      summary: Extract action items from email
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_content
+              properties:
+                email_content:
+                  type: string
+                context:
+                  type: string
+      responses:
+        '200':
+          description: Action items extracted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionItemResponse'
+
+  /api/ai/summarize:
+    post:
+      summary: Generate email summary
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_content
+              properties:
+                email_content:
+                  type: string
+                summary_type:
+                  type: string
+                  enum: [brief, detailed]
+                  default: brief
+      responses:
+        '200':
+          description: Summary generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryResponse'
+
+  /api/ai/templates:
+    get:
+      summary: Get available prompt templates
+      tags: [AI]
+      responses:
+        '200':
+          description: List of available templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templates:
+                    type: array
+                    items:
+                      type: string
+                  descriptions:
+                    type: object
+                    additionalProperties:
+                      type: string
+
+  /api/ai/health:
+    get:
+      summary: Check AI service health
+      tags: [AI]
+      responses:
+        '200':
+          description: AI service is healthy
+        '503':
+          description: AI service unavailable
+
+  /api/emails:
+    get:
+      summary: Get paginated list of emails
+      tags: [Emails]
+      parameters:
+        - name: folder
+          in: query
+          schema:
+            type: string
+            default: Inbox
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50000
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [outlook, database]
+            default: outlook
+      responses:
+        '200':
+          description: List of emails
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailListResponse'
+
+  /api/emails/{id}:
+    get:
+      summary: Get specific email by ID
+      tags: [Emails]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Email details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Email'
+        '404':
+          description: Email not found
+
+  /api/emails/search:
+    get:
+      summary: Search emails
+      tags: [Emails]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailListResponse'
+
+  /api/emails/stats:
+    get:
+      summary: Get email statistics
+      tags: [Emails]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 10
+            maximum: 1000
+            default: 100
+      responses:
+        '200':
+          description: Email statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_emails:
+                    type: integer
+                  unread_emails:
+                    type: integer
+                  emails_by_folder:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  emails_by_sender:
+                    type: object
+                    additionalProperties:
+                      type: integer
+
+  /api/emails/prefetch:
+    post:
+      summary: Prefetch multiple emails
+      tags: [Emails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+      responses:
+        '200':
+          description: Prefetch results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  emails:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Email'
+                  success_count:
+                    type: integer
+                  error_count:
+                    type: integer
+                  errors:
+                    type: array
+                    items:
+                      type: string
+
+  /api/emails/{id}/read:
+    put:
+      summary: Update email read status
+      tags: [Emails]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: read
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailOperationResponse'
+
+  /api/emails/{id}/move:
+    post:
+      summary: Move email to folder
+      tags: [Emails]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: destination_folder
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Email moved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailOperationResponse'
+
+  /api/emails/{id}/classification:
+    put:
+      summary: Update email classification
+      tags: [Emails]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - category
+              properties:
+                category:
+                  type: string
+                apply_to_outlook:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Classification updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailOperationResponse'
+
+  /api/emails/bulk-apply-to-outlook:
+    post:
+      summary: Bulk apply classifications to Outlook
+      tags: [Emails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_ids
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+                apply_to_outlook:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: Bulk apply results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkApplyResponse'
+
+  /api/emails/extract-tasks:
+    post:
+      summary: Extract tasks from emails
+      tags: [Emails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_ids
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+                apply_to_outlook:
+                  type: boolean
+      responses:
+        '200':
+          description: Task extraction completed
+
+  /api/emails/sync-to-database:
+    post:
+      summary: Sync classified emails to database
+      tags: [Emails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - emails
+              properties:
+                emails:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Email'
+      responses:
+        '200':
+          description: Sync completed
+
+  /api/folders:
+    get:
+      summary: Get list of email folders
+      tags: [Emails]
+      responses:
+        '200':
+          description: List of folders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  folders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmailFolder'
+                  total:
+                    type: integer
+
+  /api/conversations/{id}:
+    get:
+      summary: Get conversation thread
+      tags: [Emails]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Conversation thread
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversation_id:
+                    type: string
+                  emails:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Email'
+                  total:
+                    type: integer
+
+  /api/tasks:
+    get:
+      summary: Get paginated list of tasks
+      tags: [Tasks]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: priority
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+    post:
+      summary: Create new task
+      tags: [Tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+  /api/tasks/{id}:
+    get:
+      summary: Get task by ID
+      tags: [Tasks]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          description: Task not found
+    put:
+      summary: Update task
+      tags: [Tasks]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+    delete:
+      summary: Delete task
+      tags: [Tasks]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task deleted
+
+  /api/tasks/stats:
+    get:
+      summary: Get task statistics
+      tags: [Tasks]
+      responses:
+        '200':
+          description: Task statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_tasks:
+                    type: integer
+                  pending_tasks:
+                    type: integer
+                  completed_tasks:
+                    type: integer
+                  overdue_tasks:
+                    type: integer
+                  tasks_by_priority:
+                    type: object
+                  tasks_by_category:
+                    type: object
+
+  /api/settings:
+    get:
+      summary: Get user settings
+      tags: [Settings]
+      responses:
+        '200':
+          description: User settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettings'
+    put:
+      summary: Update user settings
+      tags: [Settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSettings'
+      responses:
+        '200':
+          description: Settings updated
+    delete:
+      summary: Reset settings to defaults
+      tags: [Settings]
+      responses:
+        '200':
+          description: Settings reset
+
+  /api/processing/start:
+    post:
+      summary: Start processing pipeline
+      tags: [Processing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_ids
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+                priority:
+                  type: string
+                  enum: [low, medium, high, urgent]
+                  default: medium
+      responses:
+        '200':
+          description: Pipeline started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pipeline_id:
+                    type: string
+                  status:
+                    type: string
+                  email_count:
+                    type: integer
+                  message:
+                    type: string
+
+  /api/processing/{id}/status:
+    get:
+      summary: Get pipeline status
+      tags: [Processing]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pipeline status
+        '404':
+          description: Pipeline not found
+
+components:
+  schemas:
+    Email:
+      type: object
+      properties:
+        id:
+          type: string
+        subject:
+          type: string
+        sender:
+          type: string
+        recipient:
+          type: string
+        body:
+          type: string
+        content:
+          type: string
+        received_time:
+          type: string
+          format: date-time
+        date:
+          type: string
+          format: date-time
+        is_read:
+          type: boolean
+        has_attachments:
+          type: boolean
+        importance:
+          type: string
+          enum: [Low, Normal, High]
+        categories:
+          type: array
+          items:
+            type: string
+        conversation_id:
+          type: string
+        conversation_count:
+          type: integer
+        ai_category:
+          type: string
+        ai_confidence:
+          type: number
+        ai_reasoning:
+          type: string
+        one_line_summary:
+          type: string
+        category:
+          type: string
+
+    EmailListResponse:
+      type: object
+      properties:
+        emails:
+          type: array
+          items:
+            $ref: '#/components/schemas/Email'
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+        has_more:
+          type: boolean
+
+    EmailOperationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        email_id:
+          type: string
+
+    EmailFolder:
+      type: object
+      properties:
+        name:
+          type: string
+        unread_count:
+          type: integer
+        total_count:
+          type: integer
+        folder_path:
+          type: string
+
+    EmailClassificationResponse:
+      type: object
+      properties:
+        category:
+          type: string
+          enum:
+            - required_personal_action
+            - team_action
+            - optional_event
+            - fyi
+            - newsletter
+            - job_listing
+            - spam_to_delete
+            - work_relevant
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        reasoning:
+          type: string
+        alternative_categories:
+          type: array
+          items:
+            type: string
+        processing_time:
+          type: number
+        one_line_summary:
+          type: string
+
+    ActionItemResponse:
+      type: object
+      properties:
+        action_items:
+          type: array
+          items:
+            type: string
+        urgency:
+          type: string
+        deadline:
+          type: string
+        confidence:
+          type: number
+        due_date:
+          type: string
+        action_required:
+          type: boolean
+        explanation:
+          type: string
+        relevance:
+          type: string
+        links:
+          type: array
+          items:
+            type: string
+
+    SummaryResponse:
+      type: object
+      properties:
+        summary:
+          type: string
+        key_points:
+          type: array
+          items:
+            type: string
+        confidence:
+          type: number
+        processing_time:
+          type: number
+
+    BulkApplyResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        processed:
+          type: integer
+        successful:
+          type: integer
+        failed:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed, cancelled]
+        priority:
+          type: string
+          enum: [low, medium, high, urgent]
+        category:
+          type: string
+        email_id:
+          type: string
+        one_line_summary:
+          type: string
+        due_date:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    TaskCreate:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        category:
+          type: string
+        email_id:
+          type: string
+        due_date:
+          type: string
+          format: date-time
+
+    TaskUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        category:
+          type: string
+        email_id:
+          type: string
+        due_date:
+          type: string
+          format: date-time
+
+    TaskListResponse:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        total_count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_next:
+          type: boolean
+
+    UserSettings:
+      type: object
+      properties:
+        username:
+          type: string
+        job_context:
+          type: string
+        newsletter_interests:
+          type: string
+        azure_openai_endpoint:
+          type: string
+        azure_openai_deployment:
+          type: string
+        custom_prompts:
+          type: object
+        ado_area_path:
+          type: string
+        ado_pat:
+          type: string

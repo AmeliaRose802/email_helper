@@ -18,8 +18,8 @@ The COMAIService handles:
 This adapter follows T1.2 requirements for Wave 1 foundation tasks.
 """
 
-import asyncio
 import logging
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 try:
@@ -56,7 +56,7 @@ class COMAIService:
         self.ai_orchestrator = None
         self.azure_config = None
         self._initialized = False
-        
+
         # Specialized service instances (lazy initialized)
         self._classification_service = None
         self._action_extraction_service = None
@@ -76,7 +76,7 @@ class COMAIService:
             try:
                 self.azure_config = get_azure_config()
                 self.ai_orchestrator = AIOrchestrator(self.azure_config)
-                
+
                 # Initialize specialized services
                 self._classification_service = COMClassificationService(
                     self.ai_orchestrator, self.azure_config
@@ -90,7 +90,7 @@ class COMAIService:
                 self._duplicate_detection_service = COMDuplicateDetectionService(
                     self.ai_orchestrator, self.azure_config
                 )
-                
+
                 self._initialized = True
             except Exception as e:
                 raise RuntimeError(f"Failed to initialize AI components: {e}")
@@ -199,13 +199,13 @@ class COMAIService:
 
     def _requires_review(self, category: str, confidence: float) -> bool:
         """Determine if classification requires manual review.
-        
+
         Delegates to classification service for backward compatibility with tests.
-        
+
         Args:
             category: Classification category
             confidence: Confidence score (0.0 to 1.0)
-            
+
         Returns:
             True if manual review is required, False otherwise
         """

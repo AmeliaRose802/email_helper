@@ -6,7 +6,7 @@ import App from '../App';
 // Mock fetch to prevent real API calls in tests
 beforeEach(() => {
   // Create a proper mock Response with clone() method
-  const createMockResponse = (data: any, status = 401, ok = false) => {
+  const createMockResponse = (data: unknown, status = 401, ok = false) => {
     const response = {
       ok,
       status,

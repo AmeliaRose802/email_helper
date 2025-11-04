@@ -17,6 +17,19 @@ export const emailApi = apiSlice.injectEndpoints({
         url: '/api/emails',
         params,
       }),
+      transformResponse: (response: EmailListResponse) => {
+        console.log('[getEmails] Received emails from API:', {
+          count: response.emails.length,
+          total: response.total,
+          sampleClassifications: response.emails.slice(0, 3).map(e => ({
+            id: e.id.substring(0, 30),
+            subject: e.subject,
+            ai_category: e.ai_category,
+            categories: e.categories
+          }))
+        });
+        return response;
+      },
       providesTags: (result) =>
         result?.emails
           ? [
@@ -24,6 +37,8 @@ export const emailApi = apiSlice.injectEndpoints({
               { type: 'Email', id: 'LIST' },
             ]
           : [{ type: 'Email', id: 'LIST' }],
+      // Keep data fresh for 60 seconds, then refetch when tags are invalidated
+      keepUnusedDataFor: 60,
     }),
 
     // Search emails
@@ -132,25 +147,91 @@ export const emailApi = apiSlice.injectEndpoints({
           apply_to_outlook: applyToOutlook,
         },
       }),
-      // Optimistic update for better UX
-      async onQueryStarted({ emailId, category }, { dispatch, queryFulfilled }) {
-        // Optimistically update the individual email cache
-        const patchResult = dispatch(
-          emailApi.util.updateQueryData('getEmailById', emailId, (draft) => {
-            draft.ai_category = category as any;
-            draft.categories = [category];
-          })
-        );
+      // Optimistic updates for immediate UI feedback
+      async onQueryStarted({ emailId, category }, { dispatch, queryFulfilled, getState }) {
+        console.log('[Classification Update] Starting update:', { emailId: emailId.substring(0, 30), category });
+        const patches: any[] = [];
+        
+        // Update individual email cache
         try {
-          await queryFulfilled;
-        } catch {
-          // Revert on error
-          patchResult.undo();
+          const patch1 = dispatch(
+            emailApi.util.updateQueryData('getEmailById', emailId, (draft) => {
+              console.log('[Classification Update] Updating detail cache:', { 
+                emailId: emailId.substring(0, 30),
+                oldCategory: draft.ai_category,
+                newCategory: category 
+              });
+              draft.ai_category = category as any;
+              if (!draft.categories) draft.categories = [];
+              if (!draft.categories.includes(category)) {
+                draft.categories.push(category);
+              }
+            })
+          );
+          patches.push(patch1);
+        } catch (e) {
+          console.log('[Classification Update] Detail cache not found (expected if not viewing email)');
+        }
+        
+        // Update all email list caches
+        const state: any = getState();
+        const queries = state.api?.queries || {};
+        
+        console.log('[Classification Update] Active queries:', Object.keys(queries).filter(k => k.startsWith('getEmails(')));
+        
+        Object.entries(queries).forEach(([key, value]: [string, any]) => {
+          if (key.startsWith('getEmails(') && value?.data?.emails) {
+            const args = value.originalArgs;
+            try {
+              const patch = dispatch(
+                emailApi.util.updateQueryData('getEmails', args, (draft) => {
+                  const email = draft.emails?.find(e => e.id === emailId);
+                  if (email) {
+                    console.log('[Classification Update] Updating list cache:', {
+                      emailId: emailId.substring(0, 30),
+                      oldCategory: email.ai_category,
+                      newCategory: category,
+                      queryKey: key
+                    });
+                    email.ai_category = category as any;
+                    if (!email.categories) email.categories = [];
+                    if (!email.categories.includes(category)) {
+                      email.categories.push(category);
+                    }
+                  } else {
+                    console.warn('[Classification Update] Email not found in list cache:', { emailId: emailId.substring(0, 30), queryKey: key });
+                  }
+                })
+              );
+              patches.push(patch);
+            } catch (e) {
+              console.warn('[Classification Update] Failed to update email list cache:', e);
+            }
+          }
+        });
+        
+        console.log('[Classification Update] Applied', patches.length, 'optimistic updates');
+        
+        try {
+          const result = await queryFulfilled;
+          console.log('[Classification Update] ✅ Success:', result);
+        } catch (error) {
+          console.error('[Classification Update] ❌ Failed, reverting updates:', error);
+          // Revert all optimistic updates on error
+          patches.forEach(patch => {
+            try {
+              patch.undo();
+            } catch (e) {
+              console.warn('[Classification Update] Failed to undo patch:', e);
+            }
+          });
         }
       },
+      // Invalidate caches as fallback
       invalidatesTags: (_result, _error, { emailId }) => [
         { type: 'Email', id: emailId },
         { type: 'Email', id: 'LIST' },
+        { type: 'Email', id: 'SEARCH' },
       ],
     }),
 
@@ -176,7 +257,7 @@ export const emailApi = apiSlice.injectEndpoints({
     // Sync classified emails to database
     syncEmailsToDatabase: builder.mutation<
       { success: boolean; synced_count: number; message: string },
-      { emails: any[] }
+      { emails: Email[] }
     >({
       query: (data) => ({
         url: '/api/emails/sync-to-database',

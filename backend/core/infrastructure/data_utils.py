@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 
 def save_to_csv(data: List[Dict[str, Any]], file_path: str) -> None:
     """Consolidate CSV saving logic.
-    
+
     Args:
         data: List of dictionaries to save
         file_path: Path to CSV file
@@ -26,10 +26,10 @@ def save_to_csv(data: List[Dict[str, Any]], file_path: str) -> None:
 
 def normalize_data_for_storage(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Convert objects to strings for CSV storage.
-    
+
     Args:
         data: List of dictionaries with data to normalize
-        
+
     Returns:
         List of normalized dictionaries
     """
@@ -48,11 +48,11 @@ def normalize_data_for_storage(data: List[Dict[str, Any]]) -> List[Dict[str, Any
 
 def load_csv_or_empty(file_path: str, dtype: Any = str) -> pd.DataFrame:
     """Load CSV file or return empty DataFrame.
-    
+
     Args:
         file_path: Path to CSV file
         dtype: Data type for columns
-        
+
     Returns:
         DataFrame with CSV data or empty DataFrame
     """

@@ -15,6 +15,7 @@ sys.path.insert(0, str(project_root / "backend"))
 # Configure environment
 os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
 
+
 def main():
     """Start the FastAPI backend server."""
     import uvicorn
@@ -30,15 +31,23 @@ def main():
     print(f"[Backend] Port: {port}")
     print(f"[Backend] Debug: {debug}")
     
-    # Start uvicorn server
-    uvicorn.run(
-        app,
-        host=host,
-        port=port,
-        log_level="info" if debug else "warning",
-        access_log=debug,
-        reload=False,  # Don't reload in production
-    )
+    try:
+        # Start uvicorn server
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            log_level="info" if debug else "warning",
+            access_log=debug,
+            reload=False,  # Don't reload in production
+        )
+    except KeyboardInterrupt:
+        print("\n[Backend] Received keyboard interrupt, shutting down...")
+    except Exception as e:
+        print(f"[Backend] Error: {e}")
+        sys.exit(1)
+    finally:
+        print("[Backend] Shutdown complete")
 
 if __name__ == "__main__":
     main()

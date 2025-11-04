@@ -3,10 +3,16 @@
   "version": "1.0.0",
   "description": "Intelligent email management system with AI processing",
   "scripts": {
-    "start": "concurrently \"npm run backend\" \"npm run frontend\" --names \"API,WEB\" --prefix-colors \"blue,green\" --kill-others-on-fail",
-    "backend": "pwsh -Command \".venv/Scripts/python.exe -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000\"",
+  "start": "npx --yes concurrently -k -s first \"npm run backend:noreload\" \"npm run frontend\" --names \"API,WEB\" --prefix-colors \"blue,green\" --kill-others-on-fail",
+    "backend": "pwsh -NoProfile -Command \"cd backend-go; go run cmd/api/main.go\"",
+    "backend:noreload": "pwsh -NoProfile -Command \"cd backend-go; go run cmd/api/main.go\"",
+    "backend:build": "pwsh -NoProfile -Command \"cd backend-go; .\\build.ps1 -Build\"",
+    "backend:python": "pwsh -NoProfile -Command \".venv/Scripts/python.exe -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000 --reload-exclude '*.log' --reload-exclude 'runtime_data/*' --reload-exclude '.beads/*' --reload-exclude 'frontend/*'\"",
+    "backend:python:noreload": "pwsh -NoProfile -Command \".venv/Scripts/python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000\"",
     "frontend": "cd frontend && npm run dev",
-    "dev": "concurrently \"npm run backend\" \"npm run frontend\" --names \"API,WEB\" --prefix-colors \"blue,green\" --restart-tries 3",
+  "predev": "npm run backend:build",
+  "dev": "npx --yes concurrently -k -s first \"npm run backend:noreload\" \"npm run frontend\" --names \"API,WEB\" --prefix-colors \"blue,green\" --kill-others-on-fail",
+  "dev:reload": "npx --yes concurrently -k -s first \"npm run backend\" \"npm run frontend\" --names \"API,WEB\" --prefix-colors \"blue,green\" --kill-others-on-fail",
     "install-deps": "cd frontend && npm install && echo Frontend dependencies installed!",
     "setup": "npm install && npm run install-deps && echo All dependencies installed!",
     "build": "cd frontend && npm run build",
@@ -25,7 +31,8 @@
     "electron": "npm run electron:dev"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "electron": "^39.0.0"
   },
   "keywords": [
     "email",

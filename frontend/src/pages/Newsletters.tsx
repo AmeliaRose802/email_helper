@@ -31,7 +31,7 @@ const Newsletters: React.FC = () => {
       const newStatus = task.status === 'done' ? 'todo' : 'done';
       await updateTask({
         id: task.id,
-        data: { status: newStatus as any }
+        data: { status: newStatus }
       }).unwrap();
       refetch();
     } catch (error) {
@@ -92,7 +92,7 @@ const Newsletters: React.FC = () => {
         newsletterTasks.map(task => 
           updateTask({
             id: task.id,
-            data: { status: 'done' as any }
+            data: { status: 'done' }
           }).unwrap()
         )
       );

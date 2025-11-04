@@ -28,13 +28,38 @@ export const EmailItem: React.FC<EmailItemProps> = ({
   const [applyToOutlook, setApplyToOutlook] = useState(true);
   const [localCategory, setLocalCategory] = useState(email.ai_category || '');
   
+  console.log('[EmailItem] Rendering:', {
+    emailId: email.id.substring(0, 30),
+    subject: email.subject,
+    ai_category: email.ai_category,
+    localCategory,
+    isUpdating
+  });
+  
   // Sync local category with email prop when it changes
   React.useEffect(() => {
-    setLocalCategory(email.ai_category || '');
-  }, [email.ai_category]);
+    const newCategory = email.ai_category || '';
+    console.log('[EmailItem] Email category changed:', {
+      emailId: email.id.substring(0, 30),
+      subject: email.subject,
+      ai_category: email.ai_category,
+      categories: email.categories,
+      localCategory: localCategory,
+      newCategory: newCategory,
+      willUpdate: newCategory !== localCategory
+    });
+    setLocalCategory(newCategory);
+  }, [email.ai_category, email.id, email.subject]);
   
   // Ensure categoryMappings is an array
   const mappings = Array.isArray(categoryMappings) ? categoryMappings : [];
+  
+  console.log('[EmailItem] Category mappings:', {
+    isLoadingMappings,
+    hasMappings: !!categoryMappings,
+    mappingsCount: mappings.length,
+    mappingCategories: mappings.map(m => m.category)
+  });
   
   const handleClick = async () => {
     // Mark as read if unread
@@ -65,20 +90,30 @@ export const EmailItem: React.FC<EmailItemProps> = ({
     
     if (!category) return;
     
+    console.log('[EmailItem] Classification change triggered:', {
+      emailId: email.id.substring(0, 30),
+      subject: email.subject,
+      oldCategory: email.ai_category,
+      newCategory: category,
+      applyToOutlook
+    });
+    
     // Update local state immediately for responsive UI
     setLocalCategory(category);
     
     try {
-      await updateClassification({
+      const result = await updateClassification({
         emailId: email.id,
         category,
         applyToOutlook,
       }).unwrap();
       
+      console.log('[EmailItem] Classification update result:', result);
+      
       // RTK Query will automatically invalidate cache and update UI
       // No need to manually trigger refresh
     } catch (error) {
-      console.error('Failed to update classification:', error);
+      console.error('[EmailItem] Failed to update classification:', error);
       alert('Failed to update classification. Please try again.');
       // Revert local state on error
       setLocalCategory(email.ai_category || '');
@@ -110,7 +145,8 @@ export const EmailItem: React.FC<EmailItemProps> = ({
             {email.sender || 'Unknown Sender'}
           </div>
           <div className="email-item-timestamp">
-            {formatEmailDate(email.date)}
+            {/* Use standardized field name with backward compatibility */}
+            {formatEmailDate(email.received_time || email.date || '')}
           </div>
         </div>
         
@@ -125,9 +161,9 @@ export const EmailItem: React.FC<EmailItemProps> = ({
             💡 {email.one_line_summary}
           </div>
         ) : (
-          /* Fallback to body preview if no AI summary */
+          /* Fallback to body preview if no AI summary - use standardized field name */
           <div className="email-item-preview">
-            {email.body ? getEmailPreview(email.body, 120) : '(No content)'}
+            {(email.content || email.body) ? getEmailPreview(email.content || email.body || '', 120) : '(No content)'}
           </div>
         )}
         
@@ -229,6 +265,12 @@ export const EmailItem: React.FC<EmailItemProps> = ({
                     </option>
                   ))}
                 </select>
+                {/* Debug display */}
+                {localCategory && (
+                  <span style={{ fontSize: '10px', color: '#888', marginLeft: '8px' }}>
+                    [{localCategory}]
+                  </span>
+                )}
                 {/* Confidence indicator */}
                 {email.ai_confidence && localCategory && (
                   <span 

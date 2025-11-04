@@ -25,7 +25,7 @@ const FYI: React.FC = () => {
       const newStatus = task.status === 'done' ? 'todo' : 'done';
       await updateTask({
         id: task.id,
-        data: { status: newStatus as any }
+        data: { status: newStatus }
       }).unwrap();
       refetch();
     } catch (error) {
@@ -86,7 +86,7 @@ const FYI: React.FC = () => {
         fyiTasks.map(task => 
           updateTask({
             id: task.id,
-            data: { status: 'done' as any }
+            data: { status: 'done' }
           }).unwrap()
         )
       );
@@ -119,7 +119,14 @@ const FYI: React.FC = () => {
           <div className="empty-state">
             <div className="empty-state__icon">📭</div>
             <div className="empty-state__title">No FYI items yet</div>
-            <div className="empty-state__description">Extract tasks from emails to see FYI summaries here</div>
+            <div className="empty-state__description">
+              FYI summaries will appear here after you process emails.
+              <br /><br />
+              <strong>To get started:</strong>
+              <br />1. Go to the <a href="#/emails" style={{color: '#00f9ff', textDecoration: 'underline'}}>📧 Emails</a> tab
+              <br />2. Wait for emails to be classified (happens automatically)
+              <br />3. Click the <strong>"Approve"</strong> button to extract tasks
+            </div>
           </div>
         ) : (
           <div className="flex-column gap-12">

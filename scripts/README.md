@@ -53,6 +53,27 @@ Checks:
 powershell -ExecutionPolicy Bypass -File scripts\check-prerequisites.ps1
 ```
 
+### 🧪 verify_dependencies.py
+**Python dependency verification script**
+
+Checks:
+- ✅ All required Python packages are installed
+- ✅ Packages can be imported successfully
+- ✅ No package dependency conflicts
+- ✅ Reports missing or broken packages
+
+**Usage:**
+```bash
+python scripts\verify_dependencies.py
+```
+
+**When to use:**
+- After fresh checkout or clone
+- After updating requirements.txt
+- When encountering import errors
+- Before starting development
+- During troubleshooting
+
 ## Quick Start
 
 1. **First time setup:**

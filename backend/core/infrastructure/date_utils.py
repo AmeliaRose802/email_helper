@@ -45,24 +45,24 @@ def parse_date_string(date_str: str) -> Optional[datetime]:
     """Parse various date string formats"""
     if not date_str or date_str == "No specific deadline":
         return None
-        
+
     # Common date formats
     date_formats = [
         '%Y-%m-%d',
-        '%m/%d/%Y', 
+        '%m/%d/%Y',
         '%d/%m/%Y',
         '%B %d, %Y',
         '%b %d, %Y',
         '%Y-%m-%d %H:%M',
         '%m/%d/%Y %H:%M'
     ]
-    
+
     for fmt in date_formats:
         try:
             return datetime.strptime(date_str, fmt)
         except ValueError:
             continue
-    
+
     # If no format matches, return None
     return None
 

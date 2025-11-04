@@ -57,7 +57,7 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
       
       await updateTask({
         id: task.id,
-        data: { status: newStatus as any }
+        data: { status: newStatus }
       }).unwrap();
       
       if (onRefresh) {
@@ -71,7 +71,8 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
   const playCompletionSound = () => {
     // Create a simple beep sound using Web Audio API
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const audioContext = new AudioContextClass();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       

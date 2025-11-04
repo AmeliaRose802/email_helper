@@ -83,7 +83,34 @@ function startBackend() {
 function stopBackend() {
   if (backendProcess) {
     console.log('Stopping Python backend server...');
-    backendProcess.kill();
+    
+    // Send SIGTERM for graceful shutdown
+    try {
+      if (process.platform === 'win32') {
+        // Windows: try graceful shutdown first
+        backendProcess.kill('SIGTERM');
+        
+        // Give it 2 seconds to shut down gracefully
+        setTimeout(() => {
+          if (backendProcess && !backendProcess.killed) {
+            console.log('Backend did not stop gracefully, forcing shutdown...');
+            backendProcess.kill('SIGKILL');
+          }
+        }, 2000);
+      } else {
+        // Unix: SIGTERM should work
+        backendProcess.kill('SIGTERM');
+      }
+    } catch (err) {
+      console.error('Error stopping backend:', err);
+      // Force kill if graceful shutdown fails
+      try {
+        backendProcess.kill('SIGKILL');
+      } catch (e) {
+        // Already dead
+      }
+    }
+    
     backendProcess = null;
   }
 }

@@ -13,21 +13,21 @@ logger = logging.getLogger(__name__)
 
 class COMClassificationService:
     """Service for classifying emails with AI.
-    
+
     Provides email classification with confidence scoring, explanation,
     and review requirement determination.
     """
 
     def __init__(self, ai_processor, azure_config):
         """Initialize classification service.
-        
+
         Args:
             ai_processor: AIProcessor instance for AI operations
             azure_config: Azure OpenAI configuration
         """
         self.ai_processor = ai_processor
         self.azure_config = azure_config
-        
+
         # Performance optimization: Cache user settings
         self._user_settings_cache: Optional[Tuple[str, str, str]] = None
         self._cache_timestamp: Optional[datetime] = None
@@ -46,7 +46,7 @@ class COMClassificationService:
             Tuple of (job_role_context, custom_interests, username)
         """
         from pathlib import Path
-        
+
         # Check if cache is valid
         now = datetime.now()
         if (self._user_settings_cache is not None and
@@ -224,7 +224,7 @@ class COMClassificationService:
                     'requires_review': True
                 }
 
-        except Exception as e:
+        except Exception:
             raise
 
     def _requires_review(self, category: str, confidence: float) -> bool:

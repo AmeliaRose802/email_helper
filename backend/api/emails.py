@@ -1,14 +1,13 @@
 """Email endpoints for FastAPI Email Helper API."""
 
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Body, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
 import logging
-import time
 from functools import wraps
 
 from backend.services.email_provider import EmailProvider
 from backend.core.dependencies import get_email_provider, get_ai_service
-from backend.models.email import Email, EmailBatch, EmailBatchResult
+from backend.models.email import EmailBatch, EmailBatchResult
 from backend.models.email_requests import (
     EmailListResponse,
     EmailFolderResponse,
@@ -26,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 def _diagnose_error(error: Exception, email_id: str, context: str = "processing") -> None:
     """Diagnose and log API/AI errors with specific error type identification.
-    
+
     Args:
         error: The exception that occurred
         email_id: ID of the email being processed (truncated for logging)
@@ -35,7 +34,7 @@ def _diagnose_error(error: Exception, email_id: str, context: str = "processing"
     error_type = type(error).__name__
     error_msg = str(error).lower()
     email_short = email_id[:30] if len(email_id) > 30 else email_id
-    
+
     if 'content_filter' in error_msg or 'responsibleaipolicyviolation' in error_msg or 'content management policy' in error_msg:
         logger.warning(f"[Task Extraction] ⚠️ CONTENT FILTER blocked {context} for {email_short}: {error}")
     elif 'rate' in error_msg or 'quota' in error_msg or '429' in error_msg or 'throttl' in error_msg:
@@ -70,14 +69,14 @@ def handle_errors(default_message: str = "Operation failed"):
 @router.get("/emails", response_model=EmailListResponse)
 async def get_emails(
     folder: str = Query("Inbox", description="Email folder name"),
-    limit: int = Query(50000, ge=1, le=50000, description="Number of emails to retrieve"),
+    limit: int = Query(50, ge=1, le=50000, description="Number of emails to retrieve (max 50,000)"),
     offset: int = Query(0, ge=0, description="Number of emails to skip"),
     category: Optional[str] = Query(None, description="Filter by AI category"),
     source: str = Query("outlook", description="Data source: 'outlook' or 'database'"),
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Get paginated list of emails from specified source.
-    
+
     Args:
         folder: Name of the email folder (default: Inbox) - for Outlook source
         limit: Maximum number of emails to return
@@ -85,7 +84,7 @@ async def get_emails(
         category: Filter by AI category (only for database source)
         source: Data source - 'outlook' for live Outlook emails, 'database' for classified emails
         provider: Email provider instance
-    
+
     Returns:
         Paginated list of emails with metadata
     """
@@ -93,21 +92,21 @@ async def get_emails(
         if source == "database":
             # Get emails from database with AI classifications
             from backend.database.connection import db_manager
-            
+
             with db_manager.get_connection() as conn:
                 # Build query with optional category filter
                 where_clause = "WHERE 1=1"
                 params = []
-                
+
                 if category:
                     where_clause += " AND ai_category = ?"
                     params.append(category)
-                
+
                 # Get total count
                 count_query = f"SELECT COUNT(*) FROM emails {where_clause}"
                 cursor = conn.execute(count_query, params)
                 total = cursor.fetchone()[0]
-                
+
                 # Get emails
                 query = f"""
                     SELECT id, subject, sender, recipient, body, content, date, received_date,
@@ -120,32 +119,39 @@ async def get_emails(
                 """
                 params.extend([limit, offset])
                 cursor = conn.execute(query, params)
-                
+
                 rows = cursor.fetchall()
                 emails = []
                 for row in rows:
                     row_dict = dict(row)
-                    # Ensure required fields exist
+                    # Ensure standardized field names with backward compatibility
                     email = {
                         'id': row_dict.get('id'),
                         'subject': row_dict.get('subject'),
                         'sender': row_dict.get('sender'),
                         'recipient': row_dict.get('recipient'),
-                        'body': row_dict.get('body') or row_dict.get('content'),
+                        # Standardized fields
+                        'content': row_dict.get('body') or row_dict.get('content'),
                         'received_time': row_dict.get('date') or row_dict.get('received_date'),
-                        'date': row_dict.get('date') or row_dict.get('received_date'),
                         'ai_category': row_dict.get('ai_category'),
                         'ai_confidence': row_dict.get('ai_confidence'),
                         'ai_reasoning': row_dict.get('ai_reasoning'),
                         'one_line_summary': row_dict.get('one_line_summary'),
                         'conversation_id': row_dict.get('conversation_id'),
+                        # User-corrected category (for accuracy tracking)
+                        'category': row_dict.get('category'),
+                        # Backward compatibility aliases (deprecated)
+                        'body': row_dict.get('body') or row_dict.get('content'),
+                        'date': row_dict.get('date') or row_dict.get('received_date'),
+                        'received_date': row_dict.get('date') or row_dict.get('received_date'),
+                        # Other fields
                         'is_read': True,  # Assume read if in database
                         'has_attachments': False,
                         'importance': 'Normal',
                         'categories': []
                     }
                     emails.append(email)
-                
+
                 return EmailListResponse(
                     emails=emails,
                     total=total,
@@ -154,39 +160,49 @@ async def get_emails(
                     has_more=(offset + len(emails)) < total
                 )
         else:
-            # Get emails from Outlook
-            emails = provider.get_emails(
+            # Outlook source: apply in-memory filtering (category) before pagination
+            # Fetch enough to determine if there are more emails
+            # If category filtering, we might need more than the page size
+            # If no category, fetch one extra to determine has_more
+            fetch_count = offset + limit + 1
+            logger.info(f"[Email API] Fetching emails from Outlook: folder={folder}, count={fetch_count}, provider={type(provider).__name__}")
+            raw_emails = provider.get_emails(
                 folder_name=folder,
-                count=limit,
-                offset=offset
+                count=fetch_count,
+                offset=0  # Always start from 0 so offset applies after filtering
             )
-            
-            # Calculate conversation counts by grouping emails
+            logger.info(f"[Email API] Received {len(raw_emails)} emails from provider")
+
+            filtered = raw_emails
+            if category:
+                cat_lower = category.lower()
+                filtered = [e for e in raw_emails if str(e.get('ai_category', '')).lower() == cat_lower]
+
+            total_filtered = len(filtered)
+            paginated = filtered[offset:offset + limit]
+
+            # has_more is True if we got more emails than the page
+            has_more = len(filtered) > (offset + limit)
+
+            # Conversation counts per paginated subset
             conversation_counts = {}
-            for email in emails:
+            for email in paginated:
                 conv_id = email.get('conversation_id')
                 if conv_id:
                     conversation_counts[conv_id] = conversation_counts.get(conv_id, 0) + 1
-            
-            # Add conversation_count to each email
-            for email in emails:
+
+            for email in paginated:
                 conv_id = email.get('conversation_id')
-                if conv_id and conv_id in conversation_counts:
-                    email['conversation_count'] = conversation_counts[conv_id]
-                else:
-                    email['conversation_count'] = 1  # Single email, not part of thread
-            
-            # Calculate if there are more emails
-            has_more = len(emails) == limit
-            
+                email['conversation_count'] = conversation_counts.get(conv_id, 1) if conv_id else 1
+
             return EmailListResponse(
-                emails=emails,
-                total=len(emails),
+                emails=paginated,
+                total=total_filtered,
                 offset=offset,
                 limit=limit,
                 has_more=has_more
             )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -204,25 +220,25 @@ async def search_emails(
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Search emails by query string.
-    
+
     Args:
         q: Search query text
         page: Page number for pagination
         per_page: Number of results per page
         provider: Email provider instance
-    
+
     Returns:
         Search results with pagination metadata
     """
     try:
         # Calculate offset from page number
         offset = (page - 1) * per_page
-        
+
         # Get all emails and filter by search query
         # Note: This is a simplified implementation. In production, you'd want
         # to use a proper search index or database query
         all_emails = provider.get_emails(folder_name="Inbox", count=500)
-        
+
         # Simple search: check if query appears in subject, sender, or body
         query_lower = q.lower()
         filtered_emails = [
@@ -231,12 +247,12 @@ async def search_emails(
                 query_lower in email.get('sender', '').lower() or
                 query_lower in email.get('body', '').lower())
         ]
-        
+
         # Apply pagination
         total_results = len(filtered_emails)
         paginated_emails = filtered_emails[offset:offset + per_page]
         has_more = (offset + per_page) < total_results
-        
+
         return EmailListResponse(
             emails=paginated_emails,
             total=total_results,
@@ -244,7 +260,7 @@ async def search_emails(
             limit=per_page,
             has_more=has_more
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -260,20 +276,20 @@ async def get_email_stats(
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Get email statistics for the current user.
-    
+
     Args:
         limit: Maximum number of emails to process (10-1000, default: 100)
     """
     try:
         logger.info("Getting email stats for localhost user (limit: %d)", limit)
-        
+
         # Get emails from inbox to calculate stats
         emails = provider.get_emails(folder_name="Inbox", count=limit)
         logger.info("Retrieved %d emails from inbox", len(emails))
-        
+
         total_emails = len(emails)
         unread_emails = sum(1 for email in emails if not email.get("is_read", False))
-        
+
         # Get folder counts (simplified)
         folders = provider.get_folders()
         emails_by_folder = {}
@@ -284,18 +300,18 @@ async def get_email_stats(
                 emails_by_folder[folder_name] = len(folder_emails)
             except Exception:
                 emails_by_folder[folder_name] = 0
-        
+
         # Count by sender (top 5)
         sender_counts = {}
         for email in emails[:100]:  # Limit to recent 100 emails
             sender = email.get("sender", "Unknown")
             sender_counts[sender] = sender_counts.get(sender, 0) + 1
-        
+
         # Get top 5 senders
         emails_by_sender = dict(
             sorted(sender_counts.items(), key=lambda x: x[1], reverse=True)[:5]
         )
-        
+
         logger.info("Email stats calculated successfully")
         return {
             "total_emails": total_emails,
@@ -319,13 +335,13 @@ async def get_email_stats(
 @router.get("/emails/category-mappings", response_model=List[CategoryFolderMapping])
 async def get_category_mappings():
     """Get the mapping of AI categories to Outlook folders.
-    
+
     Returns:
         List of category mappings with folder names and inbox status
     """
     # Import categories from com_email_provider to ensure consistency
     from backend.services.com_email_provider import INBOX_CATEGORIES, NON_INBOX_CATEGORIES
-    
+
     mappings = []
     for category, folder_name in INBOX_CATEGORIES.items():
         mappings.append(CategoryFolderMapping(
@@ -333,14 +349,14 @@ async def get_category_mappings():
             folder_name=folder_name,
             stays_in_inbox=True
         ))
-    
+
     for category, folder_name in NON_INBOX_CATEGORIES.items():
         mappings.append(CategoryFolderMapping(
             category=category,
             folder_name=folder_name,
             stays_in_inbox=False
         ))
-    
+
     return mappings
 
 
@@ -349,19 +365,20 @@ async def get_accuracy_stats(
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Get AI classification accuracy statistics.
-    
+
     Calculates accuracy metrics by comparing ai_category with category (user-corrected).
-    
+
     Returns:
         Dictionary with overall and per-category accuracy statistics including:
         - total emails analyzed
         - overall accuracy percentage
         - per-category stats (total, correct, accuracy, precision, recall, f1)
     """
-    from backend.services.accuracy_service import calculate_accuracy_stats
-    
+    from backend.services.email_accuracy_service import EmailAccuracyService
+
     try:
-        return calculate_accuracy_stats()
+        service = EmailAccuracyService()
+        return await service.get_accuracy_statistics()
     except Exception as e:
         logger.error(f"[Accuracy Stats] Failed: {e}", exc_info=True)
         raise HTTPException(
@@ -376,26 +393,35 @@ async def prefetch_emails(
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Prefetch multiple emails by their IDs for background loading.
-    
+
     This endpoint fetches the full content of multiple emails in one request,
     useful for prefetching the next page of emails in the background.
-    
+
     Args:
         email_ids: List of email IDs to prefetch
         provider: Email provider instance
-    
+
     Returns:
         Dictionary with fetched emails and success/error counts
     """
+    import inspect
+    
     try:
         emails = []
         success_count = 0
         error_count = 0
         errors = []
-        
+
+        # Check if provider's get_email_content is async
+        is_async = inspect.iscoroutinefunction(provider.get_email_content)
+
         for email_id in email_ids:
             try:
-                email = await provider.get_email_content(email_id)
+                if is_async:
+                    email = await provider.get_email_content(email_id)
+                else:
+                    email = provider.get_email_content(email_id)
+                    
                 if email:
                     emails.append(email)
                     success_count += 1
@@ -406,14 +432,14 @@ async def prefetch_emails(
                 error_count += 1
                 errors.append(f"Failed to fetch email {email_id}: {str(e)}")
                 logger.error(f"Error prefetching email {email_id}: {e}")
-        
+
         return {
             "emails": emails,
             "success_count": success_count,
             "error_count": error_count,
             "errors": errors if errors else []
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -430,31 +456,93 @@ async def get_email(
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Get specific email by ID with full content.
-    
+
     Args:
         email_id: Unique email identifier
         current_user: Authenticated user
         provider: Email provider instance
-    
+
     Returns:
         Full email data including body content
     """
     import time
     start_time = time.time()
-    
-    email = await provider.get_email_content(email_id)
-    
+
+    # Primary retrieval via provider (COM or mocked provider in tests)
+    import asyncio
+    get_content = getattr(provider, 'get_email_content', None)
+    if get_content is None:
+        raise HTTPException(status_code=500, detail="Email provider missing get_email_content")
+    # Support both sync and async implementations
+    if asyncio.iscoroutinefunction(get_content):
+        email = await get_content(email_id)
+    else:
+        email = get_content(email_id)
+
     elapsed = time.time() - start_time
     if elapsed > 1.0:  # Log if slower than 1 second
-        print(f"⚠️ Slow email fetch: {email_id} took {elapsed:.2f}s")
-    
-    if not email:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Email with ID '{email_id}' not found"
-        )
-    
-    return email
+        logger.warning(f"[Email Fetch] Slow fetch: {email_id} took {elapsed:.2f}s")
+
+    if email:
+        return email
+
+    # Fallback: attempt retrieval from database if provider didn't find it.
+    # This addresses cases where the email was synced into the local database
+    # (e.g., via sync-to-database or classification pipeline) but the COM layer
+    # cannot currently resolve the original Outlook EntryID (e.g., moved/deleted).
+    try:
+        from backend.database.connection import db_manager
+        with db_manager.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT id, subject, sender, recipient, body, content, date, received_date,
+                       ai_category, ai_confidence, ai_reasoning, one_line_summary,
+                       conversation_id, category
+                FROM emails
+                WHERE id = ?
+                LIMIT 1
+                """,
+                (email_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                row_dict = dict(row)
+                # Normalize to API response with standardized field names and backward compatibility
+                db_email = {
+                    'id': row_dict.get('id'),
+                    'subject': row_dict.get('subject'),
+                    'sender': row_dict.get('sender'),
+                    'recipient': row_dict.get('recipient'),
+                    # Standardized fields
+                    'content': row_dict.get('body') or row_dict.get('content') or '',
+                    'received_time': row_dict.get('date') or row_dict.get('received_date'),
+                    'ai_category': row_dict.get('ai_category'),
+                    'ai_confidence': row_dict.get('ai_confidence'),
+                    'ai_reasoning': row_dict.get('ai_reasoning'),
+                    'one_line_summary': row_dict.get('one_line_summary'),
+                    'conversation_id': row_dict.get('conversation_id'),
+                    'category': row_dict.get('category'),  # user corrected category if present
+                    # Backward compatibility aliases (deprecated)
+                    'body': row_dict.get('body') or row_dict.get('content') or '',
+                    'date': row_dict.get('date') or row_dict.get('received_date'),
+                    'received_date': row_dict.get('date') or row_dict.get('received_date'),
+                    # Other fields
+                    'is_read': True,  # Assume read once stored locally
+                    'has_attachments': False,
+                    'importance': 'Normal',
+                    'categories': []
+                }
+                logger.info(f"[Email Fetch] Served from database fallback: {email_id}")
+                return db_email
+    except Exception as db_error:
+        # Log but do not mask original not-found semantics if DB also fails
+        logger.warning(f"[Email Fetch] Database fallback failed for {email_id}: {db_error}")
+
+    # Not found in provider or database
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Email with ID '{email_id}' not found"
+    )
 
 
 @router.put("/emails/{email_id}/read", response_model=EmailOperationResponse)
@@ -465,12 +553,12 @@ async def update_email_read_status(
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Update email read status.
-    
+
     Args:
         email_id: Unique email identifier
         read: True to mark as read, False to mark as unread
         provider: Email provider instance
-    
+
     Returns:
         Operation result
     """
@@ -480,7 +568,7 @@ async def update_email_read_status(
     else:
         success = provider.mark_as_unread(email_id) if hasattr(provider, 'mark_as_unread') else False
         message = "Email marked as unread successfully" if success else "Failed to mark email as unread"
-    
+
     return EmailOperationResponse(
         success=success,
         message=message,
@@ -495,17 +583,17 @@ async def mark_email_as_read(
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Mark email as read (deprecated - use PUT /emails/{email_id}/read instead).
-    
+
     Args:
         email_id: Unique email identifier
         current_user: Authenticated user
         provider: Email provider instance
-    
+
     Returns:
         Operation result
     """
     success = provider.mark_as_read(email_id)
-    
+
     return EmailOperationResponse(
         success=success,
         message="Email marked as read successfully" if success else "Failed to mark email as read",
@@ -521,18 +609,18 @@ async def move_email(
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Move email to another folder.
-    
+
     Args:
         email_id: Unique email identifier
         destination_folder: Name of destination folder
         current_user: Authenticated user
         provider: Email provider instance
-    
+
     Returns:
         Operation result
     """
     success = provider.move_email(email_id, destination_folder)
-    
+
     return EmailOperationResponse(
         success=success,
         message=f"Email moved to '{destination_folder}' successfully" if success else f"Failed to move email to '{destination_folder}'",
@@ -546,16 +634,16 @@ async def get_folders(
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Get list of available email folders.
-    
+
     Args:
         current_user: Authenticated user
         provider: Email provider instance
-    
+
     Returns:
         List of available folders with metadata
     """
     folders = provider.get_folders()
-    
+
     return EmailFolderResponse(
         folders=folders,
         total=len(folders)
@@ -569,17 +657,17 @@ async def get_conversation_thread(
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Get all emails in a conversation thread.
-    
+
     Args:
         conversation_id: Unique conversation identifier
         current_user: Authenticated user
         provider: Email provider instance
-    
+
     Returns:
         All emails in the conversation thread
     """
     emails = provider.get_conversation_thread(conversation_id)
-    
+
     return ConversationResponse(
         conversation_id=conversation_id,
         emails=emails,
@@ -594,29 +682,29 @@ async def update_email_classification(
     provider: EmailProvider = Depends(get_email_provider)
 ):
     """Update email classification and optionally apply to Outlook.
-    
+
     Args:
         email_id: Unique email identifier
         request: Classification update request with category and apply_to_outlook flag
         provider: Email provider instance
-    
+
     Returns:
         Operation result with success status and message
     """
     try:
         from backend.database.connection import db_manager
         from backend.services.com_email_provider import INBOX_CATEGORIES, NON_INBOX_CATEGORIES
-        
+
         category = request.category.lower()
         folder_name = None
-        
+
         # Find the appropriate folder for this category
         all_categories = {**INBOX_CATEGORIES, **NON_INBOX_CATEGORIES}
         if category in all_categories:
             folder_name = all_categories[category]
         else:
             folder_name = 'Work Relevant'  # Default fallback
-        
+
         # CRITICAL: Store user correction in database for accuracy tracking
         # This allows us to compare ai_category (original AI) vs category (user-corrected)
         with db_manager.get_connection() as conn:
@@ -627,11 +715,11 @@ async def update_email_classification(
                 WHERE id = ?
             """, (category, email_id))
             conn.commit()
-        
+
         if request.apply_to_outlook and folder_name:
             # Move email to the category folder
             success = provider.move_email(email_id, folder_name)
-            
+
             if success:
                 return EmailOperationResponse(
                     success=True,
@@ -651,7 +739,7 @@ async def update_email_classification(
                 message=f"Email classified as '{request.category}' (stored in database)",
                 email_id=email_id
             )
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -668,19 +756,19 @@ async def bulk_apply_to_outlook(
     ai_service = Depends(get_ai_service)
 ):
     """Bulk apply AI classifications to Outlook folders.
-    
+
     This endpoint:
     1. Classifies all selected emails using AI (if not already classified)
     2. Moves emails to appropriate Outlook folders based on their category
     3. Returns detailed results about the operation
-    
+
     Note: Task extraction happens separately via /api/emails/extract-tasks endpoint
-    
+
     Args:
         request: Bulk apply request with email IDs and options
         provider: Email provider instance
         ai_service: AI service instance
-    
+
     Returns:
         Results of the bulk apply operation
     """
@@ -690,14 +778,14 @@ async def bulk_apply_to_outlook(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No email IDs provided"
             )
-        
+
         successful = 0
         failed = 0
         errors = []
-        
+
         # Category mappings from Python version
         from backend.services.com_email_provider import INBOX_CATEGORIES, NON_INBOX_CATEGORIES
-        
+
         for email_id in request.email_ids:
             try:
                 # Get email data
@@ -706,14 +794,15 @@ async def bulk_apply_to_outlook(
                     # Skip emails that can't be found (might have been moved/deleted)
                     logger.warning(f"[Bulk Apply] Email {email_id[:20]}... not found, skipping")
                     continue
-                
+
                 # Get or determine AI category
                 ai_category = email.get('ai_category')
-                
+
                 if not ai_category:
                     # Classify the email first
-                    email_text = f"Subject: {email.get('subject', '')}\nFrom: {email.get('sender', '')}\n\n{email.get('body', '')}"
-                    
+                    # Use standardized field name 'content' with backward compatibility fallback to 'body'
+                    email_text = f"Subject: {email.get('subject', '')}\nFrom: {email.get('sender', '')}\n\n{email.get('content', email.get('body', ''))}"
+
                     try:
                         classification_result = await ai_service.classify_email(
                             email_content=email_text,
@@ -723,19 +812,19 @@ async def bulk_apply_to_outlook(
                     except Exception as classify_error:
                         errors.append(f"Failed to classify email {email_id}: {str(classify_error)}")
                         ai_category = 'work_relevant'  # Fallback category
-                
+
                 # Apply to Outlook if requested
                 if request.apply_to_outlook:
                     # Determine folder name based on category
                     all_categories = {**INBOX_CATEGORIES, **NON_INBOX_CATEGORIES}
                     folder_name = all_categories.get(ai_category.lower())
-                    
+
                     logger.info(f"[Bulk Apply] Email {email_id[:20]}... -> Category: '{ai_category}' -> Folder: '{folder_name}'")
-                    
+
                     if folder_name:
                         # Move email to appropriate folder
                         move_success = provider.move_email(email_id, folder_name)
-                        
+
                         if move_success:
                             successful += 1
                             logger.info(f"[Bulk Apply] [OK] Successfully moved to {folder_name}")
@@ -751,11 +840,11 @@ async def bulk_apply_to_outlook(
                 else:
                     # Just classification without moving
                     successful += 1
-                    
+
             except Exception as e:
                 errors.append(f"Error processing email {email_id}: {str(e)}")
                 failed += 1
-        
+
         return BulkApplyResponse(
             success=failed == 0,
             processed=len(request.email_ids),
@@ -763,7 +852,7 @@ async def bulk_apply_to_outlook(
             failed=failed,
             errors=errors
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -780,15 +869,15 @@ async def batch_process_emails(
     ai_service = Depends(get_ai_service)
 ):
     """Batch process multiple emails for classification and analysis.
-    
+
     Uses AI service to classify each email and extract action items in batch.
     Optimized for processing multiple emails efficiently.
-    
+
     Args:
         batch_request: Batch of emails to process
         provider: Email provider instance
         ai_service: AI service for classification
-    
+
     Returns:
         Batch processing results with AI classifications
     """
@@ -796,55 +885,61 @@ async def batch_process_emails(
         # Get email content for each email ID in the batch
         processed_emails = []
         errors = []
-        
+
         for email_data in batch_request.emails:
             try:
                 if isinstance(email_data, dict) and "id" in email_data:
                     email_id = email_data["id"]
-                    email_content = await provider.get_email_content(email_id)
+                    email_content = provider.get_email_content(email_id)
                     if email_content:
                         processed_emails.append(email_content)
-                elif isinstance(email_data, dict):
-                    # Already has email content
+                    else:
+                        errors.append(f"Email not found: {email_id}")
+                elif isinstance(email_data, dict) and ("subject" in email_data or "content" in email_data or "body" in email_data):
+                    # Already has email content - validate it has required fields
+                    # Accept both standardized ('content') and deprecated ('body') field names
                     processed_emails.append(email_data)
                 else:
                     errors.append(f"Invalid email data format: {email_data}")
             except Exception as e:
                 errors.append(f"Failed to process email: {str(e)}")
-        
+
         # 🤖 AI INTEGRATION: Classify and extract action items from each email
         results = []
         for email in processed_emails:
             try:
                 # Format email content for AI processing
+                # Use standardized field name 'content' with backward compatibility fallback to 'body'
                 email_text = f"Subject: {email.get('subject', 'No subject')}\n"
                 email_text += f"From: {email.get('sender', 'Unknown')}\n\n"
-                email_text += email.get('body', email.get('content', ''))
-                
+                email_text += email.get('content', email.get('body', ''))
+
                 # Classify email
                 classification = await ai_service.classify_email(email_text)
-                
+
                 # Extract action items if actionable
                 action_items = []
                 if classification.get('category') in ['required_personal_action', 'actionable']:
                     action_result = await ai_service.extract_action_items(email_text)
                     if action_result.get('action_items'):
                         action_items = action_result['action_items']
-                
+
                 # Determine priority based on classification
                 priority = "high" if classification.get('category') == 'required_personal_action' else "normal"
                 if classification.get('category') in ['spam_to_delete', 'fyi']:
                     priority = "low"
-                
+
+                # Return result with standardized field names
                 results.append({
                     "email_id": email.get('id'),
-                    "category": classification.get('category', 'unclassified'),
+                    "ai_category": classification.get('category', 'unclassified'),  # Standardized field name
+                    "category": classification.get('category', 'unclassified'),  # Backward compatibility
                     "confidence": classification.get('confidence', 0.5),
                     "reasoning": classification.get('reasoning', ''),
                     "action_items": action_items,
                     "priority": priority
                 })
-                
+
             except Exception as e:
                 logger.error(f"AI processing failed for email: {e}")
                 # Return fallback result for this email
@@ -857,7 +952,7 @@ async def batch_process_emails(
                     "priority": "normal",
                     "error": str(e)
                 })
-        
+
         return EmailBatchResult(
             processed_count=len(batch_request.emails),
             successful_count=len(processed_emails),
@@ -865,7 +960,7 @@ async def batch_process_emails(
             results=results,
             errors=errors
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:

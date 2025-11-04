@@ -7,7 +7,7 @@
  * - Data validation helpers
  */
 
-import { Page, Locator, expect } from '@playwright/test';
+import { Page, Locator, expect, Request } from '@playwright/test';
 
 /**
  * Wait for an element with retry logic and clear error messages
@@ -209,7 +209,7 @@ export async function waitForAPIResponse(
     timeout?: number;
     status?: number;
   } = {}
-): Promise<any> {
+): Promise<unknown> {
   const { timeout = 10000, status = 200 } = options;
   
   const response = await page.waitForResponse(
@@ -269,7 +269,7 @@ export async function elementExists(
 export async function assertLocalStorage(
   page: Page,
   key: string,
-  expectedValue?: any
+  expectedValue?: unknown
 ): Promise<void> {
   const value = await page.evaluate((k) => localStorage.getItem(k), key);
   
@@ -289,7 +289,7 @@ export async function assertLocalStorage(
 export async function assertSessionStorage(
   page: Page,
   key: string,
-  expectedValue?: any
+  expectedValue?: unknown
 ): Promise<void> {
   const value = await page.evaluate((k) => sessionStorage.getItem(k), key);
   
@@ -397,7 +397,7 @@ export async function assertNotification(
 export async function assertAPIPayload(
   page: Page,
   urlPattern: string | RegExp,
-  expectedPayload: Record<string, any>,
+  expectedPayload: Record<string, unknown>,
   options: {
     timeout?: number;
     method?: string;
@@ -406,7 +406,7 @@ export async function assertAPIPayload(
 ): Promise<void> {
   const { timeout = 10000, method = 'POST', partial = false } = options;
 
-  let capturedPayload: any = null;
+  let capturedPayload: unknown = null;
   let payloadFound = false;
 
   const requestPromise = page.waitForRequest(
@@ -628,7 +628,7 @@ export async function assertAPIResponseStructure(
     statusCode?: number;
   },
   options: { timeout?: number } = {}
-): Promise<any> {
+): Promise<unknown> {
   const { timeout = 10000 } = options;
   const { requiredFields, optionalFields, statusCode = 200 } = expectedStructure;
 
@@ -669,8 +669,8 @@ export async function assertAPIResponseStructure(
 export async function assertStatePersistence(
   page: Page,
   stateChecks: {
-    localStorage?: Record<string, any>;
-    sessionStorage?: Record<string, any>;
+    localStorage?: Record<string, unknown>;
+    sessionStorage?: Record<string, unknown>;
     urlParams?: Record<string, string>;
   }
 ): Promise<void> {
@@ -762,7 +762,7 @@ export async function assertAPICallSequence(
   const { timeout = 15000 } = options;
   const capturedCalls: Array<{ url: string; method: string; timestamp: number }> = [];
 
-  const requestHandler = (request: any) => {
+  const requestHandler = (request: Request) => {
     for (const expected of expectedSequence) {
       const url = request.url();
       const matchesPattern = typeof expected.urlPattern === 'string'

@@ -1,5 +1,5 @@
 ---
-description: 'Split a task up into subtasks that can be worked on in parallel by multiple agents'
+description: 'Principal software engineer mode instructions for expert-level engineering guidance.'
 tools: ['changes', 'codebase', 'editFiles', 'extensions', 'fetch', 'findTestFiles', 'githubRepo', 'new', 'openSimpleBrowser', 'problems', 'runCommands', 'runTasks', 'runTests', 'search', 'searchResults', 'terminalLastCommand', 'terminalSelection', 'testFailure', 'usages', 'vscodeAPI', 'github']
 ---
 # Principal software engineer mode instructions

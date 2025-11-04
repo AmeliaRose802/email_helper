@@ -10,13 +10,11 @@
     "dev": "set NODE_ENV=development&& electron .",
     "build": "electron-builder build --win --publish never",
     "build:mac": "electron-builder build --mac --publish never",
-    "build:linux": "electron-builder build --linux --publish never",
-    "postinstall": "electron-builder install-app-deps"
+    "build:linux": "electron-builder build --linux --publish never"
   },
-  "dependencies": {},
   "devDependencies": {
     "electron": "^28.0.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^26.0.12"
   },
   "build": {
     "appId": "com.ameliarose.emailhelper",
@@ -39,11 +37,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico"
@@ -58,12 +60,18 @@
       "artifactName": "EmailHelper-Portable-${version}.${ext}"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "assets/icon.icns",
       "category": "public.app-category.productivity"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "assets/icon.png",
       "category": "Office"
     }

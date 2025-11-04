@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 
 class COMDuplicateDetectionService:
     """Service for detecting and deduplicating emails and content.
-    
+
     Uses AI to identify duplicate or highly similar content items.
     """
 
     def __init__(self, ai_processor, azure_config):
         """Initialize duplicate detection service.
-        
+
         Args:
             ai_processor: AIProcessor instance for AI operations
             azure_config: Azure OpenAI configuration

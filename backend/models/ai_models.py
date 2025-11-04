@@ -14,13 +14,28 @@ class EmailClassificationRequest(BaseModel):
 
 
 class EmailClassificationResponse(BaseModel):
-    """Response model for email classification."""
-    category: str = Field(..., description="Classified email category")
+    """Response model for email classification.
+    
+    Uses standardized field naming: ai_category (not category).
+    Includes category field for backward compatibility during transition.
+    """
+    ai_category: str = Field(..., description="Classified email category (standardized field name)")
+    category: Optional[str] = Field(None, description="DEPRECATED: Use ai_category instead. Kept for backward compatibility.")
     confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Classification confidence score (None if AI didn't provide one)")
     reasoning: str = Field(..., description="Explanation for the classification")
     alternative_categories: List[str] = Field(default=[], description="Alternative category suggestions")
     processing_time: float = Field(..., description="Processing time in seconds")
     one_line_summary: Optional[str] = Field(None, description="AI-generated one-line summary")
+    
+    def __init__(self, **data):
+        """Initialize with backward compatibility for 'category' field."""
+        # If only 'category' provided (old code), copy to 'ai_category'
+        if 'category' in data and 'ai_category' not in data:
+            data['ai_category'] = data['category']
+        # If only 'ai_category' provided (new code), copy to 'category' for backward compat
+        elif 'ai_category' in data and 'category' not in data:
+            data['category'] = data['ai_category']
+        super().__init__(**data)
 
 
 class ActionItemRequest(BaseModel):

@@ -131,7 +131,11 @@ export const filterEmails = (emails: Email[], filters: EmailFilter): Email[] => 
     
     // Filter by date range
     if (filters.date_from || filters.date_to) {
-      const emailDate = new Date(email.date);
+      // Use standardized field name with backward compatibility fallback
+      const emailDateStr = email.received_time || email.date;
+      if (!emailDateStr) return false;
+      
+      const emailDate = new Date(emailDateStr);
       
       if (filters.date_from && emailDate < new Date(filters.date_from)) {
         return false;
@@ -152,7 +156,10 @@ export const sortEmails = (emails: Email[], sortBy: 'date' | 'sender' | 'subject
     
     switch (sortBy) {
       case 'date':
-        comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+        // Use standardized field name with backward compatibility fallback
+        const aDateStr = a.received_time || a.date || '';
+        const bDateStr = b.received_time || b.date || '';
+        comparison = new Date(aDateStr).getTime() - new Date(bDateStr).getTime();
         break;
       case 'sender':
         comparison = a.sender.localeCompare(b.sender);
@@ -184,8 +191,9 @@ export const getEmailSearchScore = (email: Email, query: string): number => {
     score += 5;
   }
   
-  // Body match
-  if (email.body.toLowerCase().includes(normalizedQuery)) {
+  // Body match - use standardized field name with backward compatibility
+  const emailBody = email.content || email.body || '';
+  if (emailBody.toLowerCase().includes(normalizedQuery)) {
     score += 3;
   }
   

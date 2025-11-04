@@ -28,6 +28,8 @@ npm start
 ```
 This will start the React frontend and API backend for browser use.
 
+**Stopping the app:** Press `Ctrl+C` once. Both backend and frontend will shut down cleanly without error noise. See [Clean Shutdown Guide](docs/setup/clean-shutdown-quickstart.md) for details.
+
 ### Option 2: Localhost Development Setup
 
 For developers working on the web application (React frontend + FastAPI backend):

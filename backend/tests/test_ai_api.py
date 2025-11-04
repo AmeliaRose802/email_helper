@@ -1,15 +1,12 @@
 """Tests for AI processing API endpoints."""
 
-import asyncio
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 from backend.main import app
-from backend.models.ai_models import (
-    EmailClassificationRequest, ActionItemRequest, SummaryRequest
-)
 from backend.core.dependencies import reset_dependencies
 
+# Create test client
 client = TestClient(app)
 
 
@@ -17,37 +14,47 @@ client = TestClient(app)
 @pytest.fixture(autouse=True)
 def reset_deps():
     """Reset dependencies before and after each test."""
+    from backend.main import app
     reset_dependencies()
+    app.dependency_overrides.clear()
     yield
+    app.dependency_overrides.clear()
     reset_dependencies()
 
 
 class TestAIClassification:
     """Tests for email classification endpoint."""
-    
-    @patch('backend.services.ai_service.AIService.classify_email', new_callable=AsyncMock)
-    def test_classify_email_success(self, mock_classify):
+
+    def test_classify_email_success(self, mock_ai_service):
         """Test successful email classification."""
-        # Mock AI service response
-        mock_classify.return_value = {
+        # Configure the mock AI service
+        mock_ai_service.classify_email = AsyncMock(return_value={
             "category": "required_personal_action",
             "confidence": 0.9,
             "reasoning": "Direct request from manager requiring immediate action",
             "alternatives": ["team_action", "work_relevant"]
-        }
-        
+        })
+        mock_ai_service.generate_summary = AsyncMock(return_value={
+            "summary": "Manager requests quarterly report review",
+            "key_points": ["Quarterly report", "Review required"],
+            "confidence": 0.9
+        })
+
+        # Create client
+        client = TestClient(app)
+
         request_data = {
             "subject": "Urgent: Please review quarterly report",
             "content": "Hi, can you please review the quarterly report by Friday?",
             "sender": "manager@company.com",
             "context": "Work email from direct manager"
         }
-        
+
         response = client.post(
             "/api/ai/classify",
             json=request_data
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["category"] == "required_personal_action"
@@ -55,33 +62,75 @@ class TestAIClassification:
         assert "reasoning" in data
         assert "processing_time" in data
         assert isinstance(data["alternative_categories"], list)
-    
-    @patch('backend.services.ai_service.AIService.classify_email', new_callable=AsyncMock)
-    def test_classify_email_with_error(self, mock_classify):
+
+    def test_classify_email_all_required_fields_present(self, mock_ai_service):
+        """Test that all required fields (subject, content, sender) are passed correctly."""
+        # Configure the mock AI service
+        mock_ai_service.classify_email = AsyncMock(return_value={
+            "category": "work_relevant",
+            "confidence": 0.8,
+            "reasoning": "Classification completed",
+            "alternatives": []
+        })
+        mock_ai_service.generate_summary = AsyncMock(return_value={
+            "summary": "Test summary",
+            "key_points": [],
+            "confidence": 0.8
+        })
+
+        # Create client
+        client = TestClient(app)
+
+        request_data = {
+            "subject": "Test Subject",
+            "content": "Test Content Body",
+            "sender": "test@example.com"
+        }
+
+        response = client.post(
+            "/api/ai/classify",
+            json=request_data
+        )
+
+        assert response.status_code == 200
+
+        # Verify classify_email was called with properly formatted email string
+        call_args = mock_ai_service.classify_email.call_args
+        email_content_arg = call_args[1]['email_content']
+
+        # The endpoint builds: "Subject: {subject}\nFrom: {sender}\n\n{content}"
+        assert "Subject: Test Subject" in email_content_arg
+        assert "From: test@example.com" in email_content_arg
+        assert "Test Content Body" in email_content_arg
+
+    def test_classify_email_with_error(self, mock_ai_service):
         """Test email classification with AI service error."""
-        # Mock AI service error
-        mock_classify.return_value = {
+        # Configure the mock AI service to return an error
+        mock_ai_service.classify_email = AsyncMock(return_value={
             "category": "work_relevant",
             "confidence": 0.5,
             "reasoning": "Classification failed: Azure OpenAI unavailable",
             "alternatives": [],
             "error": "Azure OpenAI unavailable"
-        }
-        
+        })
+
+        # Create client
+        client = TestClient(app)
+
         request_data = {
             "subject": "Test email",
             "content": "Test content",
             "sender": "test@example.com"
         }
-        
+
         response = client.post(
             "/api/ai/classify",
             json=request_data
         )
-        
+
         assert response.status_code == 500
         assert "AI classification failed" in response.json()["detail"]
-    
+
 
     def test_classify_email_invalid_data(self):
         """Test email classification with invalid request data."""
@@ -90,24 +139,23 @@ class TestAIClassification:
             "content": "",  # Empty content
             "sender": ""    # Empty sender
         }
-        
+
         response = client.post(
             "/api/ai/classify",
             json=request_data
         )
-        
+
         # Should still process but might return error from AI service
         assert response.status_code in [200, 500]
 
 
 class TestActionItemExtraction:
     """Tests for action item extraction endpoint."""
-    
-    @patch('backend.services.ai_service.AIService.extract_action_items')
-    def test_extract_action_items_success(self, mock_extract):
+
+    def test_extract_action_items_success(self, mock_ai_service):
         """Test successful action item extraction."""
-        # Mock AI service response
-        mock_extract.return_value = {
+        # Configure mock AI service
+        mock_ai_service.extract_action_items = AsyncMock(return_value={
             "action_items": ["Review quarterly report", "Submit feedback by Friday"],
             "urgency": "high",
             "deadline": "Friday",
@@ -117,30 +165,29 @@ class TestActionItemExtraction:
             "explanation": "Manager has requested quarterly report review",
             "relevance": "Directly assigned task with specific deadline",
             "links": ["https://company.com/reports/q4"]
-        }
-        
+        })
+
         request_data = {
             "email_content": "Subject: Quarterly Report Review\nFrom: manager@company.com\n\nHi, please review the quarterly report and submit your feedback by Friday.",
             "context": "Work assignment from manager"
         }
-        
+
         response = client.post(
             "/api/ai/action-items",
             json=request_data
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert len(data["action_items"]) == 2
         assert data["urgency"] == "high"
         assert data["deadline"] == "Friday"
         assert data["confidence"] == 0.85
-    
-    @patch('backend.services.ai_service.AIService.extract_action_items')
-    def test_extract_action_items_no_items(self, mock_extract):
+
+    def test_extract_action_items_no_items(self, mock_ai_service):
         """Test action item extraction with no action items found."""
-        # Mock AI service response with no action items
-        mock_extract.return_value = {
+        # Configure mock AI service
+        mock_ai_service.extract_action_items = AsyncMock(return_value={
             "action_items": [],
             "urgency": "none",
             "deadline": None,
@@ -150,17 +197,17 @@ class TestActionItemExtraction:
             "explanation": "No action items found in email",
             "relevance": "Informational email only",
             "links": []
-        }
-        
+        })
+
         request_data = {
             "email_content": "Subject: Newsletter\nFrom: newsletter@company.com\n\nHere are this week's company updates..."
         }
-        
+
         response = client.post(
             "/api/ai/action-items",
             json=request_data
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert len(data["action_items"]) == 0
@@ -169,54 +216,52 @@ class TestActionItemExtraction:
 
 class TestEmailSummarization:
     """Tests for email summarization endpoint."""
-    
-    @patch('backend.services.ai_service.AIService.generate_summary')
-    def test_summarize_email_brief(self, mock_summarize):
+
+    def test_summarize_email_brief(self, mock_ai_service):
         """Test brief email summarization."""
-        # Mock AI service response
-        mock_summarize.return_value = {
+        # Configure mock AI service
+        mock_ai_service.generate_summary = AsyncMock(return_value={
             "summary": "Manager requests quarterly report review by Friday",
             "key_points": ["Quarterly report review", "Due Friday", "Manager request"],
             "confidence": 0.9
-        }
-        
+        })
+
         request_data = {
             "email_content": "Subject: Quarterly Report Review\nFrom: manager@company.com\n\nHi, please review the quarterly report and submit your feedback by Friday. This is important for our planning.",
             "summary_type": "brief"
         }
-        
+
         response = client.post(
             "/api/ai/summarize",
             json=request_data
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert "quarterly report" in data["summary"].lower()
         assert len(data["key_points"]) == 3
         assert data["confidence"] == 0.9
         assert "processing_time" in data
-    
-    @patch('backend.services.ai_service.AIService.generate_summary')
-    def test_summarize_email_detailed(self, mock_summarize):
+
+    def test_summarize_email_detailed(self, mock_ai_service):
         """Test detailed email summarization."""
-        # Mock AI service response
-        mock_summarize.return_value = {
+        # Configure mock AI service
+        mock_ai_service.generate_summary = AsyncMock(return_value={
             "summary": "Manager has requested a detailed review of the quarterly report with specific focus on performance metrics and budget analysis. Feedback must be submitted by Friday for planning purposes.",
             "key_points": ["Detailed quarterly report review", "Focus on performance metrics", "Budget analysis required", "Due Friday", "Planning purposes"],
             "confidence": 0.85
-        }
-        
+        })
+
         request_data = {
             "email_content": "Long detailed email content...",
             "summary_type": "detailed"
         }
-        
+
         response = client.post(
             "/api/ai/summarize",
             json=request_data
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert len(data["summary"]) > 50  # Detailed summary should be longer
@@ -225,12 +270,11 @@ class TestEmailSummarization:
 
 class TestAITemplates:
     """Tests for AI templates endpoint."""
-    
-    @patch('backend.services.ai_service.AIService.get_available_templates')
-    def test_get_available_templates(self, mock_templates):
+
+    def test_get_available_templates(self, mock_ai_service):
         """Test getting available prompt templates."""
-        # Mock AI service response
-        mock_templates.return_value = {
+        # Configure mock AI service
+        mock_ai_service.get_available_templates = AsyncMock(return_value={
             "templates": [
                 "email_classifier_with_explanation.prompty",
                 "email_one_line_summary.prompty",
@@ -241,10 +285,10 @@ class TestAITemplates:
                 "email_one_line_summary.prompty": "Generate concise one-line email summaries",
                 "summerize_action_item.prompty": "Extract action items from emails"
             }
-        }
-        
+        })
+
         response = client.get("/api/ai/templates")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert len(data["templates"]) == 3
@@ -254,33 +298,31 @@ class TestAITemplates:
 
 class TestAIHealthCheck:
     """Tests for AI service health check."""
-    
-    @patch('backend.services.ai_service.AIService._ensure_initialized')
-    @patch('backend.services.ai_service.AIService.get_available_templates')
-    def test_ai_health_check_healthy(self, mock_templates, mock_init):
+
+    def test_ai_health_check_healthy(self, mock_ai_service):
         """Test AI health check when services are healthy."""
-        # Mock successful initialization
-        mock_init.return_value = None
-        mock_templates.return_value = {
+        # Configure mock AI service
+        mock_ai_service._initialized = True
+        mock_ai_service._ensure_initialized = MagicMock(return_value=None)
+        mock_ai_service.get_available_templates = AsyncMock(return_value={
             "templates": ["template1.prompty", "template2.prompty"],
             "descriptions": {}
-        }
-        
+        })
+
         response = client.get("/api/ai/health")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
         assert data["templates_available"] == 2
-    
-    @patch('backend.services.ai_service.AIService._ensure_initialized')
-    def test_ai_health_check_unhealthy(self, mock_init):
+
+    def test_ai_health_check_unhealthy(self, mock_ai_service):
         """Test AI health check when services are unhealthy."""
-        # Mock initialization failure
-        mock_init.side_effect = RuntimeError("AI services not available")
-        
+        # Configure mock AI service to fail initialization
+        mock_ai_service._ensure_initialized = MagicMock(side_effect=RuntimeError("AI services not available"))
+
         response = client.get("/api/ai/health")
-        
+
         assert response.status_code == 503
         data = response.json()
         assert data["status"] == "unhealthy"
@@ -289,7 +331,7 @@ class TestAIHealthCheck:
 
 class TestAIServiceIntegration:
     """Integration tests for AI service endpoints."""
-    
+
     def test_full_email_processing_workflow(self):
         """Test full workflow: classify -> extract action items -> summarize."""
         sample_email = {
@@ -297,13 +339,13 @@ class TestAIServiceIntegration:
             "content": "Hi, we need to schedule a project review meeting for next week. Please confirm your availability and prepare the status report.",
             "sender": "project.manager@company.com"
         }
-        
+
         # Test classification
         classify_response = client.post(
             "/api/ai/classify",
             json=sample_email
         )
-        
+
         # Test action items
         action_response = client.post(
             "/api/ai/action-items",
@@ -311,7 +353,7 @@ class TestAIServiceIntegration:
                 "email_content": f"Subject: {sample_email['subject']}\nFrom: {sample_email['sender']}\n\n{sample_email['content']}"
             }
         )
-        
+
         # Test summarization
         summary_response = client.post(
             "/api/ai/summarize",
@@ -319,7 +361,7 @@ class TestAIServiceIntegration:
                 "email_content": f"Subject: {sample_email['subject']}\nFrom: {sample_email['sender']}\n\n{sample_email['content']}"
             }
         )
-        
+
         # All endpoints should either succeed or fail gracefully
         for response in [classify_response, action_response, summary_response]:
             # Should not return server errors (5xx) for valid input

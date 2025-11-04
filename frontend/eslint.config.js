@@ -19,5 +19,17 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Forbid inline styles in React components
+      // All styling must be in CSS files (frontend/src/styles/unified.css)
+      // Exception: truly dynamic values that cannot be expressed in CSS
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector: 'JSXAttribute[name.name="style"]',
+          message: 'Inline styles are forbidden. Use CSS classes from unified.css instead. Only use inline styles for truly dynamic values that cannot be expressed in CSS (e.g., calculated widths based on runtime data).',
+        },
+      ],
+    },
   },
 ])

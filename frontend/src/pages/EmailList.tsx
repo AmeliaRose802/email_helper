@@ -119,16 +119,25 @@ const EmailList: React.FC = () => {
     });
     
     // Convert to array and sort by latest email date (most recent first)
+    // Use standardized field name with backward compatibility
     const result = Array.from(groups.entries())
       .map(([conversationId, emails]) => ({
         conversationId,
-        emails: emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        emails: emails.sort((a, b) => {
+          const aDate = new Date(a.received_time || a.date || 0);
+          const bDate = new Date(b.received_time || b.date || 0);
+          return bDate.getTime() - aDate.getTime();
+        }),
         latestDate: emails.reduce((latest, email) => {
-          const emailDate = new Date(email.date);
+          const emailDate = new Date(email.received_time || email.date || 0);
           return emailDate > latest ? emailDate : latest;
         }, new Date(0)),
         // Representative email is the most recent one
-        representativeEmail: emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+        representativeEmail: emails.sort((a, b) => {
+          const aDate = new Date(a.received_time || a.date || 0);
+          const bDate = new Date(b.received_time || b.date || 0);
+          return bDate.getTime() - aDate.getTime();
+        })[0]
       }))
       .sort((a, b) => b.latestDate.getTime() - a.latestDate.getTime());
     
@@ -214,10 +223,11 @@ const EmailList: React.FC = () => {
       setClassifyingIds(prev => new Set(prev).add(repEmail.id));
 
       try {
+        // Use standardized field name with backward compatibility
         const result = await classifyEmail({
           subject: repEmail.subject,
           sender: repEmail.sender,
-          content: repEmail.body || '',
+          content: repEmail.content || repEmail.body || '',
         }).unwrap();
 
         // Apply classification to all emails in the conversation
@@ -233,9 +243,9 @@ const EmailList: React.FC = () => {
               return;
             }
             
-            const classified = {
+            const classified: Email = {
               ...email,
-              ai_category: result.category as any,
+              ai_category: result.category as Email['ai_category'],
               ai_confidence: result.confidence,
               ai_reasoning: result.reasoning,
               one_line_summary: result.one_line_summary, // Store the AI-generated one-line summary
@@ -292,8 +302,15 @@ const EmailList: React.FC = () => {
     const classifyCurrentPageConversations = async () => {
       if (currentPageConversations.length === 0) return;
       
-      // Skip if this page has already been classified
-      if (classifiedPagesRef.current.has(currentConversationPage)) {
+      // Check if ALL representative emails on this page have been classified
+      const allClassified = currentPageConversations.every(conv => {
+        const repEmail = conv.representativeEmail;
+        return classifiedEmailsRef.current.has(repEmail.id) || repEmail.ai_category;
+      });
+      
+      // Skip if this page has already been fully classified
+      if (allClassified) {
+        classifiedPagesRef.current.add(currentConversationPage);
         return;
       }
 
@@ -326,8 +343,8 @@ const EmailList: React.FC = () => {
     const prefetchNextPage = async () => {
       const nextPage = currentConversationPage + 1;
       
-      // Check if there is a next page and it hasn't been classified yet
-      if (nextPage >= totalPages || classifiedPagesRef.current.has(nextPage)) {
+      // Check if there is a next page
+      if (nextPage >= totalPages) {
         return;
       }
 
@@ -607,7 +624,10 @@ const EmailList: React.FC = () => {
       
       switch (sortBy) {
         case 'date':
-          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+          // Use standardized field name with backward compatibility
+          const aDate = new Date(a.received_time || a.date || 0).getTime();
+          const bDate = new Date(b.received_time || b.date || 0).getTime();
+          comparison = aDate - bDate;
           break;
         case 'sender':
           comparison = a.sender.localeCompare(b.sender);

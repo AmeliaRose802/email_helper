@@ -15,13 +15,13 @@ logger = logging.getLogger(__name__)
 
 class COMSummarizationService:
     """Service for generating email summaries.
-    
+
     Supports multiple summary types: brief, detailed, newsletter, FYI.
     """
 
     def __init__(self, ai_processor, azure_config):
         """Initialize summarization service.
-        
+
         Args:
             ai_processor: AIProcessor instance for AI operations
             azure_config: Azure OpenAI configuration
@@ -172,5 +172,5 @@ class COMSummarizationService:
                 "confidence": 0.8 if summary_text else 0.5
             }
 
-        except Exception as e:
+        except Exception:
             raise
