@@ -682,3 +682,157 @@ func TestAnalyzeHolisticallyNotImplemented(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotImplemented, w.Code)
 }
+
+// Test GetOutlookEmails
+func TestGetOutlookEmails(t *testing.T) {
+	mockService := new(MockEmailService)
+	originalService := emailService
+	emailService = mockService
+	defer func() { emailService = originalService }()
+
+	router := setupTestRouter()
+	router.GET("/emails/outlook", GetOutlookEmails)
+
+	testEmails := []*models.Email{
+		testutil.CreateTestEmail("email-1"),
+		testutil.CreateTestEmail("email-2"),
+	}
+
+	// Should always use "outlook" source
+	mockService.On("GetEmails", "Inbox", 50, 0, "outlook", "").Return(testEmails, 2, nil)
+
+	req, _ := http.NewRequest("GET", "/emails/outlook", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response models.EmailListResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, response.Total)
+	assert.Len(t, response.Emails, 2)
+	assert.False(t, response.HasMore)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestGetOutlookEmailsWithParameters(t *testing.T) {
+	mockService := new(MockEmailService)
+	originalService := emailService
+	emailService = mockService
+	defer func() { emailService = originalService }()
+
+	router := setupTestRouter()
+	router.GET("/emails/outlook", GetOutlookEmails)
+
+	testEmails := []*models.Email{testutil.CreateTestEmail("email-1")}
+
+	// Should use outlook source even if folder is specified
+	mockService.On("GetEmails", "Sent", 10, 20, "outlook", "").Return(testEmails, 50, nil)
+
+	req, _ := http.NewRequest("GET", "/emails/outlook?folder=Sent&limit=10&offset=20", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response models.EmailListResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, 50, response.Total)
+	assert.True(t, response.HasMore)
+
+	mockService.AssertExpectations(t)
+}
+
+// Test GetDatabaseEmails
+func TestGetDatabaseEmails(t *testing.T) {
+	mockService := new(MockEmailService)
+	originalService := emailService
+	emailService = mockService
+	defer func() { emailService = originalService }()
+
+	router := setupTestRouter()
+	router.GET("/emails/database", GetDatabaseEmails)
+
+	testEmails := []*models.Email{
+		testutil.CreateTestEmail("email-1"),
+		testutil.CreateTestEmail("email-2"),
+	}
+
+	// Should always use "database" source
+	mockService.On("GetEmails", "", 50, 0, "database", "").Return(testEmails, 2, nil)
+
+	req, _ := http.NewRequest("GET", "/emails/database", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response models.EmailListResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, response.Total)
+	assert.Len(t, response.Emails, 2)
+	assert.False(t, response.HasMore)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestGetDatabaseEmailsWithCategory(t *testing.T) {
+	mockService := new(MockEmailService)
+	originalService := emailService
+	emailService = mockService
+	defer func() { emailService = originalService }()
+
+	router := setupTestRouter()
+	router.GET("/emails/database", GetDatabaseEmails)
+
+	testEmails := []*models.Email{testutil.CreateTestEmail("email-1")}
+
+	// Should use database source with category filter
+	mockService.On("GetEmails", "", 10, 20, "database", "fyi").Return(testEmails, 50, nil)
+
+	req, _ := http.NewRequest("GET", "/emails/database?category=fyi&limit=10&offset=20", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response models.EmailListResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, 50, response.Total)
+	assert.True(t, response.HasMore)
+
+	mockService.AssertExpectations(t)
+}
+
+// Test deprecation warning in GetEmails
+func TestGetEmailsHasDeprecationHeader(t *testing.T) {
+	mockService := new(MockEmailService)
+	originalService := emailService
+	emailService = mockService
+	defer func() { emailService = originalService }()
+
+	router := setupTestRouter()
+	router.GET("/emails", GetEmails)
+
+	testEmails := []*models.Email{testutil.CreateTestEmail("email-1")}
+
+	mockService.On("GetEmails", "Inbox", 50, 0, "outlook", "").Return(testEmails, 1, nil)
+
+	req, _ := http.NewRequest("GET", "/emails", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	
+	// Check for deprecation headers
+	assert.Contains(t, w.Header().Get("X-Deprecation-Warning"), "deprecated")
+	assert.NotEmpty(t, w.Header().Get("X-Sunset"))
+
+	mockService.AssertExpectations(t)
+}
+

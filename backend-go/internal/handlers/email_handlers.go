@@ -10,7 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetEmails retrieves paginated list of emails
+// GetEmails retrieves paginated list of emails (DEPRECATED)
+// Deprecated: Use GetOutlookEmails or GetDatabaseEmails instead
 func GetEmails(c *gin.Context) {
 	folder := c.DefaultQuery("folder", "Inbox")
 	limitStr := c.DefaultQuery("limit", "50")
@@ -25,7 +26,89 @@ func GetEmails(c *gin.Context) {
 		limit = 50
 	}
 
+	// Add deprecation warning header
+	c.Header("X-Deprecation-Warning", "This endpoint is deprecated. Use /api/emails/outlook or /api/emails/database instead.")
+	c.Header("X-Sunset", "2025-05-01")
+
 	emails, total, err := emailService.GetEmails(folder, limit, offset, source, category)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	hasMore := offset+limit < total
+
+	// Convert []*models.Email to []models.Email
+	emailList := make([]models.Email, len(emails))
+	for i, e := range emails {
+		if e != nil {
+			emailList[i] = *e
+		}
+	}
+
+	c.JSON(http.StatusOK, models.EmailListResponse{
+		Emails:  emailList,
+		Total:   total,
+		Offset:  offset,
+		Limit:   limit,
+		HasMore: hasMore,
+	})
+}
+
+// GetOutlookEmails retrieves emails from live Outlook via COM
+func GetOutlookEmails(c *gin.Context) {
+	folder := c.DefaultQuery("folder", "Inbox")
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	if limit <= 0 || limit > 50000 {
+		limit = 50
+	}
+
+	// Always use "outlook" source
+	emails, total, err := emailService.GetEmails(folder, limit, offset, "outlook", "")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	hasMore := offset+limit < total
+
+	// Convert []*models.Email to []models.Email
+	emailList := make([]models.Email, len(emails))
+	for i, e := range emails {
+		if e != nil {
+			emailList[i] = *e
+		}
+	}
+
+	c.JSON(http.StatusOK, models.EmailListResponse{
+		Emails:  emailList,
+		Total:   total,
+		Offset:  offset,
+		Limit:   limit,
+		HasMore: hasMore,
+	})
+}
+
+// GetDatabaseEmails retrieves cached/classified emails from SQLite
+func GetDatabaseEmails(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+	category := c.Query("category")
+
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	if limit <= 0 || limit > 50000 {
+		limit = 50
+	}
+
+	// Always use "database" source
+	emails, total, err := emailService.GetEmails("", limit, offset, "database", category)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -193,7 +193,15 @@ paths:
 
   /api/emails:
     get:
-      summary: Get paginated list of emails
+      summary: Get paginated list of emails (DEPRECATED)
+      deprecated: true
+      description: |
+        **Deprecated:** This endpoint is deprecated. Use `/api/emails/outlook` or `/api/emails/database` instead.
+        
+        Sunset date: 2025-05-01
+        
+        This endpoint uses the `source` query parameter to switch between Outlook and database sources,
+        which causes confusion. Use the dedicated endpoints for clearer intent.
       tags: [Emails]
       parameters:
         - name: folder
@@ -227,10 +235,120 @@ paths:
       responses:
         '200':
           description: List of emails
+          headers:
+            X-Deprecation-Warning:
+              description: Deprecation warning message
+              schema:
+                type: string
+            X-Sunset:
+              description: Sunset date for this endpoint
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EmailListResponse'
+
+  /api/emails/outlook:
+    get:
+      summary: Get emails from live Outlook via COM
+      description: |
+        Retrieves emails directly from Outlook using COM interface. Returns fresh data with current 
+        Outlook categories and folder locations. Use this endpoint when browsing the current inbox
+        or getting the latest email data.
+        
+        **Data Source:** Live Outlook (via COM interface)
+        **Caching:** Results are enriched with database data but not cached
+        **Use cases:** Browse inbox, get latest emails, check current categories
+      tags: [Emails]
+      parameters:
+        - name: folder
+          in: query
+          description: Outlook folder name to query
+          schema:
+            type: string
+            default: Inbox
+          example: Inbox
+        - name: limit
+          in: query
+          description: Maximum number of emails to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50000
+            default: 50
+          example: 50
+        - name: offset
+          in: query
+          description: Number of emails to skip for pagination
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          example: 0
+      responses:
+        '200':
+          description: List of emails from Outlook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailListResponse'
+        '500':
+          description: Failed to retrieve emails from Outlook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/emails/database:
+    get:
+      summary: Get cached/classified emails from database
+      description: |
+        Retrieves emails from the SQLite database that have been previously synced and classified by AI.
+        Returns emails with AI classifications, summaries, and action items. Use this endpoint when
+        searching through classified data or viewing emails by AI category.
+        
+        **Data Source:** SQLite database (cached data)
+        **Caching:** Fully cached, may not reflect latest Outlook state
+        **Use cases:** View classified emails, filter by AI category, search analyzed emails
+      tags: [Emails]
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of emails to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50000
+            default: 50
+          example: 50
+        - name: offset
+          in: query
+          description: Number of emails to skip for pagination
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          example: 0
+        - name: category
+          in: query
+          description: Filter by AI classification category (fyi, action_required, newsletter, etc.)
+          schema:
+            type: string
+          example: fyi
+      responses:
+        '200':
+          description: List of emails from database
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailListResponse'
+        '500':
+          description: Failed to retrieve emails from database
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /api/emails/{id}:
     get:
