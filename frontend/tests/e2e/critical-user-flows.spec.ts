@@ -27,7 +27,7 @@ test.describe('Critical User Flow 1: Email Retrieval and Classification', () => 
     await navigateToEmails(page);
     
     // Verify emails are loaded
-    await expect(page.locator('[data-testid="email-list"], .email-list, [class*="email"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="email-list-container"], .email-list-container')).toBeVisible({ timeout: 10000 });
     
     // Count emails displayed
     const emailCount = await page.locator('[data-testid="email-item"], .email-item, [class*="email-item"]').count();
@@ -103,9 +103,8 @@ test.describe('Critical User Flow 1: Email Retrieval and Classification', () => 
       await page.waitForTimeout(2000);
       
       // Verify error message is displayed
-      const hasError = await page.locator(
-        'text=/error|failed|unavailable/i, [role="alert"], .error, .alert-danger'
-      ).count();
+      const hasError = await page.locator('text=/error|failed|unavailable/i')
+        .or(page.locator('[role="alert"]')).or(page.locator('.error')).or(page.locator('.alert-danger')).count();
       expect(hasError).toBeGreaterThan(0);
     }
   });
@@ -119,8 +118,8 @@ test.describe('Critical User Flow 1: Email Retrieval and Classification', () => 
     
     // Verify empty state message
     const emptyState = await page.locator(
-      'text=/no emails|empty|no messages/i, [data-testid="empty-state"]'
-    ).count();
+      'text=/no emails|empty|no messages/i'
+    ).or(page.locator('[data-testid="empty-state"]')).count();
     expect(emptyState).toBeGreaterThan(0);
   });
 });
@@ -257,7 +256,8 @@ test.describe('Critical User Flow 2: Task Creation and Management', () => {
         await page.waitForTimeout(2000);
         
         // Verify error is displayed
-        const hasError = await page.locator('text=/error|failed|invalid/i, [role="alert"]').count();
+        const hasError = await page.locator('text=/error|failed|invalid/i')
+          .or(page.locator('[role="alert"]')).count();
         expect(hasError).toBeGreaterThan(0);
       }
     }
@@ -382,7 +382,8 @@ test.describe('Critical User Flow 3: Bulk Processing and Category Review', () =>
         await page.waitForTimeout(3000);
         
         // Verify partial failure notification
-        const hasWarning = await page.locator('text=/some failed|partially|warning/i, [role="alert"]').count();
+        const hasWarning = await page.locator('text=/some failed|partially|warning/i')
+          .or(page.locator('[role="alert"]')).count();
         expect(hasWarning).toBeGreaterThan(0);
       }
     }
@@ -442,11 +443,11 @@ test.describe('Critical User Flow 4: Settings Configuration', () => {
       // Save settings
       const saveButton = page.locator('button:has-text("Save"), button:has-text("Update"), button[type="submit"]').first();
       await saveButton.click();
-      await page.waitForTimeout(2000);
       
-      // Verify save success message
-      const hasSuccess = await page.locator('text=/saved|success|updated/i, [role="alert"]').count();
-      expect(hasSuccess).toBeGreaterThan(0);
+      // Wait for and verify save success - button text changes to "✅ Saved!"
+      await expect(page.locator('button:has-text("Saved")')).toBeVisible({ timeout: 5000 });
+      
+      await page.waitForTimeout(1000);
       
       // Verify setting was persisted
       expect(savedSettings.username).toBe('E2E Test User Updated');
@@ -504,12 +505,18 @@ test.describe('Critical User Flow 4: Settings Configuration', () => {
       await usernameInput.clear();
       await usernameInput.fill('Should Fail');
       
+      // Listen for alert dialog
+      page.once('dialog', async dialog => {
+        expect(dialog.message()).toContain('Failed to save settings');
+        await dialog.accept();
+      });
+      
       const saveButton = page.locator('button:has-text("Save"), button:has-text("Update")').first();
       await saveButton.click();
       await page.waitForTimeout(2000);
       
-      // Verify error message
-      const hasError = await page.locator('text=/error|failed|unable/i, [role="alert"], .error').count();
+      // Verify error status is shown (error-text span)
+      const hasError = await page.locator('.error-text').or(page.locator('text=/failed to save/i')).count();
       expect(hasError).toBeGreaterThan(0);
     }
   });
@@ -597,7 +604,8 @@ test.describe('Critical User Flow 5: Error Recovery and Retry', () => {
     await page.waitForTimeout(2000);
     
     // Verify error is displayed
-    const hasError = await page.locator('text=/error|failed|500/i, [role="alert"]').count();
+    const hasError = await page.locator('text=/error|failed|500/i')
+      .or(page.locator('[role="alert"]')).count();
     expect(hasError).toBeGreaterThan(0);
     
     // Click retry button
