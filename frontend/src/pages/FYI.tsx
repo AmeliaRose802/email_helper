@@ -1,49 +1,32 @@
-// FYI page - Shows FYI summaries from tasks
-import React, { useMemo } from 'react';
-import { useGetTasksQuery, useUpdateTaskMutation, useDeleteTaskMutation } from '@/services/taskApi';
-import type { Task } from '@/types/task';
+// FYI page - Shows emails classified as FYI
+import React, { useMemo, useState } from 'react';
+import { useGetEmailsQuery } from '@/services/emailApi';
+import { EmailItem } from '@/components/Email/EmailItem';
+import { EmailDetailView } from '@/components/Email/EmailDetailView';
 
 const FYI: React.FC = () => {
-  const [updateTask] = useUpdateTaskMutation();
-  const [deleteTask] = useDeleteTaskMutation();
+  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
 
   const {
-    data: taskData,
+    data: emailData,
     isLoading,
     error,
     refetch,
-  } = useGetTasksQuery({ page: 1, per_page: 1000 });
+  } = useGetEmailsQuery({ limit: 1000 });
 
-  // Filter for FYI tasks - hide completed ones
-  const fyiTasks = useMemo(() => {
-    if (!taskData?.tasks) return [];
-    return taskData.tasks.filter(task => task.category === 'fyi' && task.status !== 'done');
-  }, [taskData?.tasks]);
+  // Filter for FYI emails
+  const fyiEmails = useMemo(() => {
+    if (!emailData?.emails) return [];
+    return emailData.emails.filter(email => email.ai_category === 'fyi');
+  }, [emailData?.emails]);
 
-  const handleToggleRead = async (task: Task) => {
-    try {
-      const newStatus = task.status === 'done' ? 'todo' : 'done';
-      await updateTask({
-        id: task.id,
-        data: { status: newStatus }
-      }).unwrap();
-      refetch();
-    } catch (error) {
-      console.error('Failed to update task:', error);
-    }
-  };
-
-  const handleDelete = async (taskId: string) => {
-    if (!window.confirm('Delete this FYI item?')) {
-      return;
-    }
-    
-    try {
-      await deleteTask(taskId).unwrap();
-      refetch();
-    } catch (error) {
-      console.error('Failed to delete task:', error);
-    }
+  const handleEmailSelect = (emailId: string) => {
+    setSelectedEmails(prev => 
+      prev.includes(emailId) 
+        ? prev.filter(id => id !== emailId)
+        : [...prev, emailId]
+    );
   };
 
   if (isLoading) {
@@ -75,112 +58,62 @@ const FYI: React.FC = () => {
     );
   }
 
-  const handleDismissAll = async () => {
-    if (!window.confirm(`Dismiss all ${fyiTasks.length} FYI items?`)) {
-      return;
-    }
-    
-    try {
-      // Mark all FYI items as done
-      await Promise.all(
-        fyiTasks.map(task => 
-          updateTask({
-            id: task.id,
-            data: { status: 'done' }
-          }).unwrap()
-        )
-      );
-      refetch();
-    } catch (error) {
-      console.error('Failed to dismiss all FYI items:', error);
-      alert('Failed to dismiss all FYI items');
-    }
-  };
-
   return (
     <div className="page-container">
       <div className="page-header">
         <h1 className="page-title">ℹ️ FYI</h1>
         <div className="page-stats">
-          {fyiTasks.length} FYI item{fyiTasks.length !== 1 ? 's' : ''}
+          {fyiEmails.length} FYI item{fyiEmails.length !== 1 ? 's' : ''}
         </div>
-        {fyiTasks.length > 0 && (
-          <button
-            onClick={handleDismissAll}
-            className="synthwave-button-secondary dismiss-all-btn"
-          >
-            Dismiss All
-          </button>
-        )}
       </div>
 
       <div className="page-content">
-        {fyiTasks.length === 0 ? (
+        {fyiEmails.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state__icon">📭</div>
             <div className="empty-state__title">No FYI items yet</div>
             <div className="empty-state__description">
-              FYI summaries will appear here after you process emails.
+              FYI summaries will appear here after emails are classified.
               <br /><br />
               <strong>To get started:</strong>
               <br />1. Go to the <a href="#/emails" style={{color: '#00f9ff', textDecoration: 'underline'}}>📧 Emails</a> tab
               <br />2. Wait for emails to be classified (happens automatically)
-              <br />3. Click the <strong>"Approve"</strong> button to extract tasks
+              <br />3. Emails classified as FYI will appear here
             </div>
           </div>
         ) : (
-          <div className="flex-column gap-12">
-            {fyiTasks.map((task) => {
-              const isDone = task.status === 'done';
-              return (
-                <div
-                  key={task.id}
-                  className={`fyi-item ${isDone ? 'fyi-item--done' : ''}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isDone}
-                    onChange={() => handleToggleRead(task)}
-                    className="fyi-item__checkbox"
+          <div className="email-list-split-view">
+            {/* Email List - Left Side */}
+            <div className={`email-list-panel ${selectedEmailId ? 'email-list-panel--split' : ''}`}>
+              <div className="email-list-items-container">
+                {fyiEmails.map((email) => (
+                  <EmailItem
+                    key={email.id}
+                    email={email}
+                    isSelected={selectedEmails.includes(email.id)}
+                    onSelect={() => handleEmailSelect(email.id)}
+                    onEmailClick={(emailId) => setSelectedEmailId(emailId)}
                   />
-                  <div className="fyi-item__content">
-                    {/* Show only summary text without extra email metadata */}
-                    <div className={`fyi-item__text ${isDone ? 'fyi-item__text--done' : ''}`}>
-                      {/* Extract bullet points if present, otherwise show full description */}
-                      {task.description?.split('\n').map((line, idx) => {
-                        const trimmedLine = line.trim();
-                        if (!trimmedLine) return null;
-                        
-                        // Check if line starts with bullet point or dash
-                        const isBullet = trimmedLine.match(/^[•\-\*]\s/);
-                        const cleanedLine = isBullet 
-                          ? trimmedLine.replace(/^[•\-\*]\s/, '') 
-                          : trimmedLine;
-                        
-                        // Skip common email header patterns
-                        if (cleanedLine.match(/^(From:|To:|Subject:|Date:|Sent:)/i)) {
-                          return null;
-                        }
-                        
-                        return (
-                          <div key={idx} className="fyi-item__line">
-                            {isBullet && <span className="fyi-item__bullet">•</span>}
-                            {cleanedLine}
-                          </div>
-                        );
-                      }).filter(Boolean)}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleDelete(task.id)}
-                    className="fyi-item__delete-btn"
-                    title="Delete"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              );
-            })}
+                ))}
+              </div>
+            </div>
+
+            {/* Email Detail - Right Side */}
+            {selectedEmailId && (
+              <div className="email-list-panel" key={selectedEmailId}>
+                <EmailDetailView
+                  emailId={selectedEmailId}
+                  onClose={() => setSelectedEmailId(null)}
+                />
+              </div>
+            )}
+
+            {/* Placeholder when no email selected */}
+            {!selectedEmailId && (
+              <div className="email-list-placeholder">
+                ← Select an FYI item to view details
+              </div>
+            )}
           </div>
         )}
       </div>

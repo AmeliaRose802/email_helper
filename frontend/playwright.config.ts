@@ -28,8 +28,8 @@ export default defineConfig({
   
   // Shared settings for all projects
   use: {
-    // Base URL for navigation - Vite dev server runs on port 5173
-    baseURL: 'http://localhost:5173',
+    // Base URL for navigation - Vite dev server runs on port 3001
+    baseURL: 'http://localhost:3001',
     
     // Collect trace on failure for debugging
     trace: 'on-first-retry',
@@ -87,9 +87,9 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      // Frontend dev server (Vite on port 5173)
+      // Frontend dev server (Vite on port 3001)
       command: 'npm run dev',
-      url: 'http://localhost:5173',
+      url: 'http://localhost:3001',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000, // 2 minutes to start
       stdout: 'ignore',

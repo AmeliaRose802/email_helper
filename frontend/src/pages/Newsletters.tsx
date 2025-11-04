@@ -1,55 +1,32 @@
-// Newsletters page - Shows newsletter summaries from tasks
-import React, { useMemo } from 'react';
-import { useGetTasksQuery, useUpdateTaskMutation, useDeleteTaskMutation } from '@/services/taskApi';
-import type { Task } from '@/types/task';
+// Newsletters page - Shows emails classified as newsletters
+import React, { useMemo, useState } from 'react';
+import { useGetEmailsQuery } from '@/services/emailApi';
+import { EmailItem } from '@/components/Email/EmailItem';
+import { EmailDetailView } from '@/components/Email/EmailDetailView';
 
 const Newsletters: React.FC = () => {
-  const [updateTask] = useUpdateTaskMutation();
-  const [deleteTask] = useDeleteTaskMutation();
+  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
 
   const {
-    data: taskData,
+    data: emailData,
     isLoading,
     error,
     refetch,
-  } = useGetTasksQuery({ page: 1, per_page: 1000 });
+  } = useGetEmailsQuery({ limit: 1000 });
 
-  // Filter for newsletter tasks - hide completed ones and irrelevant ones
-  const newsletterTasks = useMemo(() => {
-    if (!taskData?.tasks) return [];
-    return taskData.tasks.filter(task => {
-      if (task.category !== 'newsletter') return false;
-      if (task.status === 'done') return false;
-      // Hide newsletters marked as irrelevant
-      if (task.description?.includes('No content relevant to your interests')) return false;
-      return true;
-    });
-  }, [taskData?.tasks]);
+  // Filter for newsletter emails
+  const newsletterEmails = useMemo(() => {
+    if (!emailData?.emails) return [];
+    return emailData.emails.filter(email => email.ai_category === 'newsletter');
+  }, [emailData?.emails]);
 
-  const handleToggleRead = async (task: Task) => {
-    try {
-      const newStatus = task.status === 'done' ? 'todo' : 'done';
-      await updateTask({
-        id: task.id,
-        data: { status: newStatus }
-      }).unwrap();
-      refetch();
-    } catch (error) {
-      console.error('Failed to update task:', error);
-    }
-  };
-
-  const handleDelete = async (taskId: string) => {
-    if (!window.confirm('Delete this newsletter summary?')) {
-      return;
-    }
-    
-    try {
-      await deleteTask(taskId).unwrap();
-      refetch();
-    } catch (error) {
-      console.error('Failed to delete task:', error);
-    }
+  const handleEmailSelect = (emailId: string) => {
+    setSelectedEmails(prev => 
+      prev.includes(emailId) 
+        ? prev.filter(id => id !== emailId)
+        : [...prev, emailId]
+    );
   };
 
   if (isLoading) {
@@ -81,118 +58,62 @@ const Newsletters: React.FC = () => {
     );
   }
 
-  const handleDismissAll = async () => {
-    if (!window.confirm(`Dismiss all ${newsletterTasks.length} newsletters?`)) {
-      return;
-    }
-    
-    try {
-      // Mark all newsletters as done
-      await Promise.all(
-        newsletterTasks.map(task => 
-          updateTask({
-            id: task.id,
-            data: { status: 'done' }
-          }).unwrap()
-        )
-      );
-      refetch();
-    } catch (error) {
-      console.error('Failed to dismiss all newsletters:', error);
-      alert('Failed to dismiss all newsletters');
-    }
-  };
-
   return (
     <div className="page-container">
       <div className="page-header">
         <h1 className="page-title">📰 Newsletters</h1>
         <div className="page-stats">
-          {newsletterTasks.length} newsletter{newsletterTasks.length !== 1 ? 's' : ''}
+          {newsletterEmails.length} newsletter{newsletterEmails.length !== 1 ? 's' : ''}
         </div>
-        {newsletterTasks.length > 0 && (
-          <button
-            onClick={handleDismissAll}
-            className="synthwave-button-secondary dismiss-all-btn"
-          >
-            Dismiss All
-          </button>
-        )}
       </div>
 
       <div className="page-content">
-        {newsletterTasks.length === 0 ? (
+        {newsletterEmails.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state__icon">📭</div>
             <div className="empty-state__title">No newsletters yet</div>
-            <div className="empty-state__description">Extract tasks from emails to see newsletter summaries here</div>
+            <div className="empty-state__description">
+              Newsletters will appear here after emails are classified.
+              <br /><br />
+              <strong>To get started:</strong>
+              <br />1. Go to the <a href="#/emails" style={{color: '#00f9ff', textDecoration: 'underline'}}>📧 Emails</a> tab
+              <br />2. Wait for emails to be classified (happens automatically)
+              <br />3. Emails classified as newsletters will appear here
+            </div>
           </div>
         ) : (
-          <div className="flex-column gap-16">
-            {newsletterTasks.map((task) => {
-              const isDone = task.status === 'done';
-              return (
-                <div
-                  key={task.id}
-                  className={`newsletter-item ${isDone ? 'newsletter-item--done' : ''}`}
-                >
-                  <div className="newsletter-item__header">
-                    <input
-                      type="checkbox"
-                      checked={isDone}
-                      onChange={() => handleToggleRead(task)}
-                      className="newsletter-item__checkbox"
-                    />
-                    <div className="newsletter-item__content">
-                      {/* Show only summary without extra noise - clean newsletter format */}
-                      <div className="newsletter-item__summary">
-                        {/* Clean up description - remove email headers and format paragraphs */}
-                        {task.description?.split('\n\n').map((paragraph, idx) => {
-                          const trimmedPara = paragraph.trim();
-                          
-                          // Skip email headers and metadata
-                          if (trimmedPara.match(/^(From:|To:|Subject:|Date:|Sent:|Email from)/i)) {
-                            return null;
-                          }
-                          
-                          // Skip empty paragraphs
-                          if (!trimmedPara) return null;
-                          
-                          return (
-                            <p key={idx} className={`newsletter-item__summary-paragraph ${isDone ? 'newsletter-item__summary--done' : ''} ${idx === 0 ? 'newsletter-item__summary-paragraph--first' : ''}`}>
-                              {trimmedPara}
-                            </p>
-                          );
-                        }).filter(Boolean)}
-                      </div>
-                      
-                      {/* Show key points if available */}
-                      {task.metadata?.key_points && Array.isArray(task.metadata.key_points) && (task.metadata.key_points as unknown as string[]).length > 0 ? (
-                        <div className="newsletter-item__highlights">
-                          <strong className="newsletter-item__highlights-title">
-                            Key Takeaways:
-                          </strong>
-                          <ul className="newsletter-item__highlights-list">
-                            {(task.metadata.key_points as unknown as string[]).map((point: string, idx: number) => (
-                              <li key={idx} className="newsletter-item__highlight">
-                                {String(point)}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                    </div>
-                    <button
-                      onClick={() => handleDelete(task.id)}
-                      className="newsletter-item__delete-btn"
-                      title="Delete"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="email-list-split-view">
+            {/* Email List - Left Side */}
+            <div className={`email-list-panel ${selectedEmailId ? 'email-list-panel--split' : ''}`}>
+              <div className="email-list-items-container">
+                {newsletterEmails.map((email) => (
+                  <EmailItem
+                    key={email.id}
+                    email={email}
+                    isSelected={selectedEmails.includes(email.id)}
+                    onSelect={() => handleEmailSelect(email.id)}
+                    onEmailClick={(emailId) => setSelectedEmailId(emailId)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Email Detail - Right Side */}
+            {selectedEmailId && (
+              <div className="email-list-panel" key={selectedEmailId}>
+                <EmailDetailView
+                  emailId={selectedEmailId}
+                  onClose={() => setSelectedEmailId(null)}
+                />
+              </div>
+            )}
+
+            {/* Placeholder when no email selected */}
+            {!selectedEmailId && (
+              <div className="email-list-placeholder">
+                ← Select a newsletter to view details
+              </div>
+            )}
           </div>
         )}
       </div>
