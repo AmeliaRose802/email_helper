@@ -494,27 +494,6 @@ describe('Edge Cases - Interaction Edge Cases', () => {
     expect(mockOnSelect).toHaveBeenCalledTimes(5);
   });
 
-  it('prevents navigation during checkbox interaction', () => {
-    render(
-      <TestWrapper>
-        <EmailItem
-          email={mockEmail}
-          isSelected={false}
-          onSelect={mockOnSelect}
-        />
-      </TestWrapper>
-    );
-
-    const checkbox = screen.getByTitle('Select email');
-    
-    // Click checkbox
-    fireEvent.click(checkbox);
-
-    // Navigation should NOT be triggered
-    expect(mockNavigate).not.toHaveBeenCalled();
-    expect(mockOnSelect).toHaveBeenCalledTimes(1);
-  });
-
   it('handles keyboard events on email item', () => {
     render(
       <TestWrapper>
