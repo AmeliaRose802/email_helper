@@ -79,8 +79,25 @@ export const EmailItem: React.FC<EmailItemProps> = ({
     }
   };
   
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on checkbox or its container
+    const target = e.target as HTMLElement;
+    
+    // Check if click is on checkbox, its parent div, or any element with checkbox class
+    if (
+      target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'checkbox' ||
+      target.classList.contains('email-item__checkbox') ||
+      target.getAttribute('data-testid') === 'email-checkbox'
+    ) {
+      return;
+    }
+    
+    handleClick();
+  };
+  
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     onSelect();
   };
   
@@ -125,16 +142,20 @@ export const EmailItem: React.FC<EmailItemProps> = ({
   return (
     <div
       className={`synthwave-email-item email-item__container ${!email.is_read ? 'unread' : ''} ${isSelected ? 'selected' : ''} ${className}`}
-      onClick={handleClick}
+      onClick={handleContainerClick}
+      data-testid="email-item"
+      data-email-id={email.id}
     >
       {/* Selection checkbox */}
       <div onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={isSelected}
-          onChange={() => onSelect()}
+          onClick={handleCheckboxClick}
+          readOnly
           title="Select email"
           className="email-item__checkbox"
+          data-testid="email-checkbox"
         />
       </div>
       
@@ -257,6 +278,7 @@ export const EmailItem: React.FC<EmailItemProps> = ({
                   disabled={isUpdating}
                   className={`email-classification-dropdown ${localCategory ? 'classified' : ''}`}
                   title={email.ai_confidence ? `Classification confidence: ${Math.round(email.ai_confidence * 100)}%` : "Change classification"}
+                  data-testid="email-category-select"
                 >
                   <option value="">-- Classify --</option>
                   {mappings.map((mapping) => (
