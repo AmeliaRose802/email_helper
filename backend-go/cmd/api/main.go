@@ -113,9 +113,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 		// Email endpoints
 		emails := api.Group("/emails")
 		{
-			emails.GET("", handlers.GetEmails) // Deprecated: Use /outlook or /database
-			emails.GET("/outlook", handlers.GetOutlookEmails)  // New: Get emails from live Outlook
-			emails.GET("/database", handlers.GetDatabaseEmails) // New: Get emails from database
+			emails.GET("", handlers.GetEmails)
 			emails.GET("/search", handlers.SearchEmails)
 			emails.GET("/stats", handlers.GetEmailStats)
 			emails.GET("/category-mappings", handlers.GetCategoryMappings)

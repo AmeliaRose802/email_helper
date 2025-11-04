@@ -26,11 +26,16 @@ export interface MockTask {
   id: string;
   title: string;
   description: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'todo' | 'in-progress' | 'review' | 'done';
   priority: 'low' | 'medium' | 'high';
+  category?: string;
   due_date?: string;
   created_at: string;
+  updated_at: string;
   email_id?: string;
+  tags?: string[];
+  progress?: number;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -87,8 +92,10 @@ export function generateMockEmails(count: number = 10): MockEmail[] {
  */
 export function generateMockTasks(count: number = 5): MockTask[] {
   const tasks: MockTask[] = [];
-  const statuses: MockTask['status'][] = ['pending', 'in_progress', 'completed', 'cancelled'];
+  const statuses: MockTask['status'][] = ['todo', 'in-progress', 'review', 'done'];
   const priorities: MockTask['priority'][] = ['low', 'medium', 'high'];
+  // Note: TaskList.tsx filters OUT newsletter and fyi categories, so use other categories
+  const categories = ['action', 'meeting', 'project', 'review'];
   
   for (let i = 1; i <= count; i++) {
     tasks.push({
@@ -97,8 +104,10 @@ export function generateMockTasks(count: number = 5): MockTask[] {
       description: `This is the description for task ${i}`,
       status: statuses[i % statuses.length],
       priority: priorities[i % priorities.length],
+      category: categories[i % categories.length],  // Add category field
       due_date: new Date(Date.now() + i * 86400000).toISOString(),
       created_at: new Date(Date.now() - i * 3600000).toISOString(),
+      updated_at: new Date(Date.now() - i * 1800000).toISOString(),
       email_id: i <= 5 ? `email-${i}` : undefined,
     });
   }
@@ -226,13 +235,14 @@ async function mockEmailAPI(page: Page, emails: MockEmail[]): Promise<void> {
  * Mock Task API responses
  */
 async function mockTaskAPI(page: Page, tasks: MockTask[]): Promise<void> {
-  // Mock /api/tasks with wildcard pattern to catch all hosts including localhost:8000
-  await page.route('**/api/tasks', async (route) => {
-    const url = new URL(route.request().url());
+  console.log('[Mock Setup] Setting up task API mocks for', tasks.length, 'tasks');
+  
+  // Mock /api/tasks - Using regex to match with or without query parameters
+  await page.route(/\/api\/tasks(\?.*)?$/, async (route) => {
+    console.log('[Mock API] Intercepted', route.request().method(), route.request().url());
     
     // GET /api/tasks - List tasks
     if (route.request().method() === 'GET') {
-      console.log('[Mock API] Intercepted GET /api/tasks from:', route.request().url());
       const response = {
         tasks,
         total_count: tasks.length,  // Match backend schema
@@ -249,13 +259,14 @@ async function mockTaskAPI(page: Page, tasks: MockTask[]): Promise<void> {
     }
     // POST /api/tasks - Create task
     else if (route.request().method() === 'POST') {
-      console.log('[Mock API] Intercepted POST /api/tasks');
       const taskData = await route.request().postDataJSON();
       const newTask: MockTask = {
         id: `task-${Date.now()}`,
         created_at: new Date().toISOString(),
-        status: 'pending',
+        updated_at: new Date().toISOString(),
+        status: 'todo',
         priority: 'medium',
+        description: '',
         ...taskData,
       };
       tasks.push(newTask);
@@ -268,7 +279,6 @@ async function mockTaskAPI(page: Page, tasks: MockTask[]): Promise<void> {
       return;
     }
     else {
-      // Let other requests pass through or fail
       console.log('[Mock API] Unhandled method for /api/tasks:', route.request().method());
       await route.fallback();
     }
@@ -346,10 +356,10 @@ async function mockTaskAPI(page: Page, tasks: MockTask[]): Promise<void> {
       body: JSON.stringify({
         total: tasks.length,
         by_status: {
-          pending: tasks.filter((t) => t.status === 'pending').length,
-          in_progress: tasks.filter((t) => t.status === 'in_progress').length,
-          completed: tasks.filter((t) => t.status === 'completed').length,
-          cancelled: tasks.filter((t) => t.status === 'cancelled').length,
+          todo: tasks.filter((t) => t.status === 'todo').length,
+          'in-progress': tasks.filter((t) => t.status === 'in-progress').length,
+          review: tasks.filter((t) => t.status === 'review').length,
+          done: tasks.filter((t) => t.status === 'done').length,
         },
         by_priority: {
           low: tasks.filter((t) => t.priority === 'low').length,

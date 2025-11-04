@@ -608,6 +608,78 @@ func GetTasksByEmailID(emailID string) ([]*models.Task, error) {
 	return tasks, nil
 }
 
+// GetTasksByCategory retrieves all tasks with a specific category
+func GetTasksByCategory(category string) ([]*models.Task, error) {
+	db, err := GetDB()
+	if err != nil {
+		return nil, err
+	}
+
+	query := `
+		SELECT id, user_id, title, description, status, priority, category, email_id,
+		       one_line_summary, due_date, created_at, updated_at, completed_at
+		FROM tasks
+		WHERE category = ? AND user_id = 1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := db.Query(query, category)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tasks []*models.Task
+	for rows.Next() {
+		task := &models.Task{}
+		var description sql.NullString
+		var categoryDB sql.NullString
+		var emailID sql.NullString
+		var oneLineSummary sql.NullString
+		var dueDate sql.NullTime
+		var completedAt sql.NullTime
+		
+		err := rows.Scan(
+			&task.ID,
+			&task.UserID,
+			&task.Title,
+			&description,
+			&task.Status,
+			&task.Priority,
+			&categoryDB,
+			&emailID,
+			&oneLineSummary,
+			&dueDate,
+			&task.CreatedAt,
+			&task.UpdatedAt,
+			&completedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		
+		// Map nullable fields
+		task.Description = description.String
+		task.Category = categoryDB.String
+		if emailID.Valid {
+			task.EmailID = &emailID.String
+		}
+		if oneLineSummary.Valid {
+			task.OneLineSummary = &oneLineSummary.String
+		}
+		if dueDate.Valid {
+			task.DueDate = &dueDate.Time
+		}
+		if completedAt.Valid {
+			task.CompletedAt = &completedAt.Time
+		}
+		
+		tasks = append(tasks, task)
+	}
+
+	return tasks, nil
+}
+
 // Helper function to repeat SQL placeholders
 func repeatPlaceholder(count int) string {
 	if count <= 0 {

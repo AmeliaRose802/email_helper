@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -10,14 +11,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetEmails retrieves paginated list of emails (DEPRECATED)
-// Deprecated: Use GetOutlookEmails or GetDatabaseEmails instead
+// GetEmails retrieves paginated list of emails
+// Intelligently chooses data source based on query parameters:
+// - If folder is explicitly specified: use Outlook (live folder data)
+// - If category is specified: use database (filtered by AI classification)
+// - Default: use Outlook for inbox browsing
 func GetEmails(c *gin.Context) {
+	folderProvided := c.Query("folder") != ""
 	folder := c.DefaultQuery("folder", "Inbox")
 	limitStr := c.DefaultQuery("limit", "50")
 	offsetStr := c.DefaultQuery("offset", "0")
 	category := c.Query("category")
-	source := c.DefaultQuery("source", "outlook")
 
 	limit, _ := strconv.Atoi(limitStr)
 	offset, _ := strconv.Atoi(offsetStr)
@@ -26,89 +30,17 @@ func GetEmails(c *gin.Context) {
 		limit = 50
 	}
 
-	// Add deprecation warning header
-	c.Header("X-Deprecation-Warning", "This endpoint is deprecated. Use /api/emails/outlook or /api/emails/database instead.")
-	c.Header("X-Sunset", "2025-05-01")
+	// Intelligently choose data source:
+	// Priority: folder parameter > category parameter > default (outlook)
+	// - If folder explicitly specified: use Outlook (live folder browsing)
+	// - Else if category specified: use database (has AI classifications)
+	// - Else: use Outlook (default inbox)
+	source := "outlook"
+	if !folderProvided && category != "" {
+		source = "database"
+	}
 
 	emails, total, err := emailService.GetEmails(folder, limit, offset, source, category)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	hasMore := offset+limit < total
-
-	// Convert []*models.Email to []models.Email
-	emailList := make([]models.Email, len(emails))
-	for i, e := range emails {
-		if e != nil {
-			emailList[i] = *e
-		}
-	}
-
-	c.JSON(http.StatusOK, models.EmailListResponse{
-		Emails:  emailList,
-		Total:   total,
-		Offset:  offset,
-		Limit:   limit,
-		HasMore: hasMore,
-	})
-}
-
-// GetOutlookEmails retrieves emails from live Outlook via COM
-func GetOutlookEmails(c *gin.Context) {
-	folder := c.DefaultQuery("folder", "Inbox")
-	limitStr := c.DefaultQuery("limit", "50")
-	offsetStr := c.DefaultQuery("offset", "0")
-
-	limit, _ := strconv.Atoi(limitStr)
-	offset, _ := strconv.Atoi(offsetStr)
-
-	if limit <= 0 || limit > 50000 {
-		limit = 50
-	}
-
-	// Always use "outlook" source
-	emails, total, err := emailService.GetEmails(folder, limit, offset, "outlook", "")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	hasMore := offset+limit < total
-
-	// Convert []*models.Email to []models.Email
-	emailList := make([]models.Email, len(emails))
-	for i, e := range emails {
-		if e != nil {
-			emailList[i] = *e
-		}
-	}
-
-	c.JSON(http.StatusOK, models.EmailListResponse{
-		Emails:  emailList,
-		Total:   total,
-		Offset:  offset,
-		Limit:   limit,
-		HasMore: hasMore,
-	})
-}
-
-// GetDatabaseEmails retrieves cached/classified emails from SQLite
-func GetDatabaseEmails(c *gin.Context) {
-	limitStr := c.DefaultQuery("limit", "50")
-	offsetStr := c.DefaultQuery("offset", "0")
-	category := c.Query("category")
-
-	limit, _ := strconv.Atoi(limitStr)
-	offset, _ := strconv.Atoi(offsetStr)
-
-	if limit <= 0 || limit > 50000 {
-		limit = 50
-	}
-
-	// Always use "database" source
-	emails, total, err := emailService.GetEmails("", limit, offset, "database", category)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -422,11 +354,33 @@ func GetConversationThread(c *gin.Context) {
 
 // BatchProcessRequest request for batch processing emails
 type BatchProcessRequest struct {
-	EmailIDs []string `json:"email_ids" binding:"required"`
-	SaveToDatabase bool `json:"save_to_database"`
+	EmailIDs       []string `json:"email_ids" binding:"required"`
+	SaveToDatabase bool     `json:"save_to_database"`
 }
 
-// BatchProcessEmails handles batch email processing
+// BatchEmailResult represents the result of processing a single email
+type BatchEmailResult struct {
+	EmailID        string   `json:"email_id"`
+	Subject        string   `json:"subject"`
+	Category       string   `json:"category"`
+	Confidence     float64  `json:"confidence"`
+	Priority       string   `json:"priority"`
+	ActionItems    []string `json:"action_items,omitempty"`
+	OneLineSummary string   `json:"one_line_summary,omitempty"`
+	Reasoning      string   `json:"reasoning,omitempty"`
+	Success        bool     `json:"success"`
+	Error          string   `json:"error,omitempty"`
+}
+
+// BatchProcessResponse response for batch email processing
+type BatchProcessResponse struct {
+	ProcessedCount  int                 `json:"processed_count"`
+	SuccessfulCount int                 `json:"successful_count"`
+	FailedCount     int                 `json:"failed_count"`
+	Results         []BatchEmailResult  `json:"results"`
+}
+
+// BatchProcessEmails handles batch email processing with AI classification and action items extraction
 func BatchProcessEmails(c *gin.Context) {
 	var req BatchProcessRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -435,55 +389,121 @@ func BatchProcessEmails(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	var processedEmails []models.Email
-	var errors []string
+	results := make([]BatchEmailResult, 0, len(req.EmailIDs))
 	successCount := 0
-	errorCount := 0
+	failedCount := 0
+
+	// Categories that should extract action items
+	actionableCategories := map[string]bool{
+		"required_personal_action": true,
+		"team_action":              true,
+	}
 
 	for _, emailID := range req.EmailIDs {
+		result := BatchEmailResult{
+			EmailID: emailID,
+			Success: false,
+		}
+
 		// Get email details
 		email, err := emailService.GetEmailByID(emailID, "outlook")
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("Email %s: failed to get email: %v", emailID, err))
-			errorCount++
+			result.Error = fmt.Sprintf("Failed to get email: %v", err)
+			results = append(results, result)
+			failedCount++
 			continue
 		}
+
+		result.Subject = email.Subject
 
 		// Classify email using AI
 		classification, err := emailService.ClassifyEmail(ctx, email.Subject, email.Sender, email.Content, "")
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("Email %s: failed to classify: %v", emailID, err))
-			errorCount++
+			result.Error = fmt.Sprintf("Failed to classify: %v", err)
+			results = append(results, result)
+			failedCount++
 			continue
+		}
+
+		// Update result with classification
+		result.Category = classification.Category
+		if classification.Confidence != nil {
+			result.Confidence = *classification.Confidence
+		}
+		result.OneLineSummary = classification.OneLineSummary
+		result.Reasoning = classification.Reasoning
+
+		// Calculate priority based on category and confidence
+		result.Priority = calculateEmailPriority(classification.Category, result.Confidence)
+
+		// Extract action items for actionable categories
+		if actionableCategories[classification.Category] {
+			actionItems, err := emailService.ExtractActionItems(ctx, email.Content, "")
+			if err == nil && len(actionItems.ActionItems) > 0 {
+				result.ActionItems = actionItems.ActionItems
+			}
 		}
 
 		// Update email with classification results
 		email.AICategory = classification.Category
-		email.AIConfidence = *classification.Confidence
+		email.AIConfidence = result.Confidence
 		email.AIReasoning = classification.Reasoning
 		email.OneLineSummary = classification.OneLineSummary
 
 		// Save to database if requested
 		if req.SaveToDatabase {
 			if err := emailService.SyncToDatabase([]*models.Email{email}); err != nil {
-				errors = append(errors, fmt.Sprintf("Email %s: failed to save to database: %v", emailID, err))
-				errorCount++
+				log.Printf("Warning: Failed to save email %s to database: %v", emailID, err)
+				// Don't fail the whole operation if DB save fails
 			}
 		}
 
-		processedEmails = append(processedEmails, *email)
+		result.Success = true
+		results = append(results, result)
 		successCount++
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":        errorCount == 0,
-		"emails":         processedEmails,
-		"total":          len(processedEmails),
-		"processed":      len(req.EmailIDs),
-		"success_count":  successCount,
-		"error_count":    errorCount,
-		"errors":         errors,
-	})
+	// Build response matching Python API format
+	response := BatchProcessResponse{
+		ProcessedCount:  len(req.EmailIDs),
+		SuccessfulCount: successCount,
+		FailedCount:     failedCount,
+		Results:         results,
+	}
+
+	// Return 200 OK even with partial failures (partial success pattern)
+	c.JSON(http.StatusOK, response)
+}
+
+// calculateEmailPriority determines priority based on category and confidence
+func calculateEmailPriority(category string, confidence float64) string {
+	// High priority categories
+	if category == "required_personal_action" && confidence > 0.8 {
+		return "high"
+	}
+	if category == "team_action" && confidence > 0.75 {
+		return "high"
+	}
+
+	// Medium priority categories
+	if category == "required_personal_action" || category == "team_action" {
+		return "medium"
+	}
+	if category == "optional_event" && confidence > 0.7 {
+		return "medium"
+	}
+
+	// Low priority categories
+	if category == "fyi" || category == "newsletter" || category == "optional_event" {
+		return "low"
+	}
+
+	// Spam and job listings are lowest priority
+	if category == "spam_to_delete" || category == "job_listing" {
+		return "low"
+	}
+
+	return "medium" // default
 }
 
 // ExtractTasksRequest request for extracting tasks from emails

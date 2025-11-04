@@ -403,6 +403,15 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 	return err
 }
 
+// GetChatCompletions exposes the underlying client's GetChatCompletions method for custom prompts
+func (c *Client) GetChatCompletions(ctx context.Context, options azopenai.ChatCompletionsOptions, opts *azopenai.GetChatCompletionsOptions) (azopenai.GetChatCompletionsResponse, error) {
+	// Ensure deployment is set if not provided in options
+	if options.DeploymentName == nil {
+		options.DeploymentName = to.Ptr(c.deployment)
+	}
+	return c.client.GetChatCompletions(ctx, options, opts)
+}
+
 // buildClassificationSystemPrompt builds the system prompt for email classification
 func (c *Client) buildClassificationSystemPrompt(userContext string) string {
 	prompt := `You are an email classification assistant. Classify emails into these categories:

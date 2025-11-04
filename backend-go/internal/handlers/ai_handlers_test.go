@@ -264,13 +264,14 @@ func TestAIHealthCheckUnavailable(t *testing.T) {
 	mockService.AssertExpectations(t)
 }
 
-func TestClassifyBatchStreamNotImplemented(t *testing.T) {
+func TestClassifyBatchStreamRequiresEmailIDs(t *testing.T) {
 	router := setupTestRouter()
 	router.POST("/ai/classify/batch/stream", ClassifyBatchStream)
 
+	// Test with no body
 	req, _ := http.NewRequest("POST", "/ai/classify/batch/stream", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusNotImplemented, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }

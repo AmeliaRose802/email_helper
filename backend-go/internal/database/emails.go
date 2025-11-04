@@ -354,7 +354,18 @@ func GetEmailStats(limit int) (map[string]interface{}, error) {
 	return stats, nil
 }
 
-// GetAccuracyStats retrieves AI classification accuracy statistics
+// CategoryStats represents accuracy statistics for a specific category
+type CategoryStats struct {
+	Precision float64 `json:"precision"`
+	Recall    float64 `json:"recall"`
+	F1Score   float64 `json:"f1_score"`
+	TruePositives  int `json:"true_positives"`
+	FalsePositives int `json:"false_positives"`
+	FalseNegatives int `json:"false_negatives"`
+	Total      int `json:"total"`
+}
+
+// GetAccuracyStats retrieves AI classification accuracy statistics including per-category metrics
 func GetAccuracyStats() (map[string]interface{}, error) {
 	db, err := GetDB()
 	if err != nil {
@@ -365,7 +376,13 @@ func GetAccuracyStats() (map[string]interface{}, error) {
 
 	// Total classified emails (only count emails with both AI and user categories that are not empty)
 	var totalClassified int
-	err = db.QueryRow("SELECT COUNT(*) FROM emails WHERE ai_category IS NOT NULL AND ai_category != '' AND category IS NOT NULL AND category != '' AND user_id = 1").Scan(&totalClassified)
+	err = db.QueryRow(`
+		SELECT COUNT(*) 
+		FROM emails 
+		WHERE ai_category IS NOT NULL AND ai_category != '' 
+		  AND category IS NOT NULL AND category != '' 
+		  AND user_id = 1
+	`).Scan(&totalClassified)
 	if err != nil {
 		return nil, err
 	}
@@ -373,13 +390,19 @@ func GetAccuracyStats() (map[string]interface{}, error) {
 
 	// User-corrected classifications
 	var corrected int
-	err = db.QueryRow("SELECT COUNT(*) FROM emails WHERE category IS NOT NULL AND category != '' AND category != ai_category AND user_id = 1").Scan(&corrected)
+	err = db.QueryRow(`
+		SELECT COUNT(*) 
+		FROM emails 
+		WHERE category IS NOT NULL AND category != '' 
+		  AND category != ai_category 
+		  AND user_id = 1
+	`).Scan(&corrected)
 	if err != nil {
 		return nil, err
 	}
 	stats["user_corrected"] = corrected
 
-	// Calculate accuracy
+	// Calculate overall accuracy
 	if totalClassified > 0 {
 		accuracy := float64(totalClassified-corrected) / float64(totalClassified) * 100
 		stats["accuracy_percentage"] = accuracy
@@ -389,7 +412,12 @@ func GetAccuracyStats() (map[string]interface{}, error) {
 
 	// Average confidence
 	var avgConfidence sql.NullFloat64
-	err = db.QueryRow("SELECT AVG(ai_confidence) FROM emails WHERE ai_confidence IS NOT NULL AND user_id = 1").Scan(&avgConfidence)
+	err = db.QueryRow(`
+		SELECT AVG(ai_confidence) 
+		FROM emails 
+		WHERE ai_confidence IS NOT NULL 
+		  AND user_id = 1
+	`).Scan(&avgConfidence)
 	if err != nil {
 		return nil, err
 	}
@@ -398,6 +426,114 @@ func GetAccuracyStats() (map[string]interface{}, error) {
 	} else {
 		stats["average_confidence"] = 0.0
 	}
+
+	// Calculate per-category statistics (precision, recall, F1)
+	categoryStats := make(map[string]CategoryStats)
+	
+	// Get all unique categories from user corrections
+	rows, err := db.Query(`
+		SELECT DISTINCT category 
+		FROM emails 
+		WHERE category IS NOT NULL AND category != '' 
+		  AND user_id = 1
+		ORDER BY category
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var categories []string
+	for rows.Next() {
+		var category string
+		if err := rows.Scan(&category); err != nil {
+			return nil, err
+		}
+		categories = append(categories, category)
+	}
+
+	// For each category, calculate TP, FP, FN, precision, recall, F1
+	for _, category := range categories {
+		var truePositives, falsePositives, falseNegatives, total int
+
+		// True Positives: AI predicted category and user confirmed (or didn't change)
+		err = db.QueryRow(`
+			SELECT COUNT(*) 
+			FROM emails 
+			WHERE ai_category = ? 
+			  AND category = ? 
+			  AND user_id = 1
+		`, category, category).Scan(&truePositives)
+		if err != nil {
+			return nil, err
+		}
+
+		// False Positives: AI predicted category but user corrected to different
+		err = db.QueryRow(`
+			SELECT COUNT(*) 
+			FROM emails 
+			WHERE ai_category = ? 
+			  AND category != ? 
+			  AND category IS NOT NULL 
+			  AND category != '' 
+			  AND user_id = 1
+		`, category, category).Scan(&falsePositives)
+		if err != nil {
+			return nil, err
+		}
+
+		// False Negatives: AI predicted different category but user corrected to this category
+		err = db.QueryRow(`
+			SELECT COUNT(*) 
+			FROM emails 
+			WHERE ai_category != ? 
+			  AND category = ? 
+			  AND ai_category IS NOT NULL 
+			  AND ai_category != '' 
+			  AND user_id = 1
+		`, category, category).Scan(&falseNegatives)
+		if err != nil {
+			return nil, err
+		}
+
+		// Total emails in this category (based on user category)
+		err = db.QueryRow(`
+			SELECT COUNT(*) 
+			FROM emails 
+			WHERE category = ? 
+			  AND user_id = 1
+		`, category).Scan(&total)
+		if err != nil {
+			return nil, err
+		}
+
+		// Calculate metrics
+		var precision, recall, f1 float64
+
+		if (truePositives + falsePositives) > 0 {
+			precision = float64(truePositives) / float64(truePositives+falsePositives)
+		}
+
+		if (truePositives + falseNegatives) > 0 {
+			recall = float64(truePositives) / float64(truePositives+falseNegatives)
+		}
+
+		if (precision + recall) > 0 {
+			f1 = 2 * (precision * recall) / (precision + recall)
+		}
+
+		categoryStats[category] = CategoryStats{
+			Precision:      precision,
+			Recall:         recall,
+			F1Score:        f1,
+			TruePositives:  truePositives,
+			FalsePositives: falsePositives,
+			FalseNegatives: falseNegatives,
+			Total:          total,
+		}
+	}
+
+	stats["category_stats"] = categoryStats
 
 	return stats, nil
 }

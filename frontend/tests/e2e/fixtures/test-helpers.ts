@@ -51,12 +51,25 @@ export async function waitForElements(
   
   const locator = page.locator(selector);
   
-  await expect(locator).toHaveCount(minCount, { timeout }).catch(() => {
+  // Wait for first element to appear
+  try {
+    await locator.first().waitFor({ state: 'attached', timeout });
+  } catch (error) {
+    const actualCount = await locator.count();
     throw new Error(
-      `Expected at least ${minCount} elements matching "${selector}", but found none.\n` +
+      `Expected at least ${minCount} elements matching "${selector}", but found ${actualCount}.\n` +
       `Page URL: ${page.url()}`
     );
-  });
+  }
+  
+  // Check we have at least minCount
+  const actualCount = await locator.count();
+  if (actualCount < minCount) {
+    throw new Error(
+      `Expected at least ${minCount} elements matching "${selector}", but found ${actualCount}.\n` +
+      `Page URL: ${page.url()}`
+    );
+  }
   
   return locator.all();
 }
@@ -96,14 +109,16 @@ export async function waitForTestId(
   
   const locator = page.getByTestId(testId);
   
-  await locator.waitFor({ state, timeout }).catch(() => {
+  try {
+    await locator.first().waitFor({ state, timeout });
+  } catch (error) {
     throw new Error(
       `Element with data-testid="${testId}" not found.\n` +
       `Page URL: ${page.url()}`
     );
-  });
+  }
   
-  return locator;
+  return locator.first();
 }
 
 /**

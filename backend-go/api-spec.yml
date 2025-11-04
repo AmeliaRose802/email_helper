@@ -193,78 +193,33 @@ paths:
 
   /api/emails:
     get:
-      summary: Get paginated list of emails (DEPRECATED)
-      deprecated: true
+      summary: Get paginated list of emails
       description: |
-        **Deprecated:** This endpoint is deprecated. Use `/api/emails/outlook` or `/api/emails/database` instead.
+        Retrieves emails intelligently based on query parameters. The backend automatically selects
+        the appropriate data source:
         
-        Sunset date: 2025-05-01
+        - **With category parameter**: Returns classified emails from database (SQLite cache)
+        - **With folder parameter**: Returns live emails from Outlook via COM interface
+        - **Default (no parameters)**: Returns emails from Outlook Inbox
         
-        This endpoint uses the `source` query parameter to switch between Outlook and database sources,
-        which causes confusion. Use the dedicated endpoints for clearer intent.
+        This unified endpoint provides a clean abstraction over the backend data sources,
+        allowing the frontend to request emails by their semantic meaning rather than
+        implementation details.
+        
+        **Data Sources:**
+        - Live Outlook (via COM): Fresh data, current folder locations
+        - SQLite database: Cached data with AI classifications and summaries
+        
+        **Use cases:**
+        - Browse current inbox: `/api/emails` or `/api/emails?folder=Inbox`
+        - View sent emails: `/api/emails?folder=Sent`
+        - Filter by AI category: `/api/emails?category=fyi`
+        - View action items: `/api/emails?category=action_required`
       tags: [Emails]
       parameters:
         - name: folder
           in: query
-          schema:
-            type: string
-            default: Inbox
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 50000
-            default: 50
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            minimum: 0
-            default: 0
-        - name: category
-          in: query
-          schema:
-            type: string
-        - name: source
-          in: query
-          schema:
-            type: string
-            enum: [outlook, database]
-            default: outlook
-      responses:
-        '200':
-          description: List of emails
-          headers:
-            X-Deprecation-Warning:
-              description: Deprecation warning message
-              schema:
-                type: string
-            X-Sunset:
-              description: Sunset date for this endpoint
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EmailListResponse'
-
-  /api/emails/outlook:
-    get:
-      summary: Get emails from live Outlook via COM
-      description: |
-        Retrieves emails directly from Outlook using COM interface. Returns fresh data with current 
-        Outlook categories and folder locations. Use this endpoint when browsing the current inbox
-        or getting the latest email data.
-        
-        **Data Source:** Live Outlook (via COM interface)
-        **Caching:** Results are enriched with database data but not cached
-        **Use cases:** Browse inbox, get latest emails, check current categories
-      tags: [Emails]
-      parameters:
-        - name: folder
-          in: query
-          description: Outlook folder name to query
+          description: Outlook folder name (uses Outlook data source)
           schema:
             type: string
             default: Inbox
@@ -286,65 +241,22 @@ paths:
             minimum: 0
             default: 0
           example: 0
-      responses:
-        '200':
-          description: List of emails from Outlook
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EmailListResponse'
-        '500':
-          description: Failed to retrieve emails from Outlook
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /api/emails/database:
-    get:
-      summary: Get cached/classified emails from database
-      description: |
-        Retrieves emails from the SQLite database that have been previously synced and classified by AI.
-        Returns emails with AI classifications, summaries, and action items. Use this endpoint when
-        searching through classified data or viewing emails by AI category.
-        
-        **Data Source:** SQLite database (cached data)
-        **Caching:** Fully cached, may not reflect latest Outlook state
-        **Use cases:** View classified emails, filter by AI category, search analyzed emails
-      tags: [Emails]
-      parameters:
-        - name: limit
-          in: query
-          description: Maximum number of emails to return
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 50000
-            default: 50
-          example: 50
-        - name: offset
-          in: query
-          description: Number of emails to skip for pagination
-          schema:
-            type: integer
-            minimum: 0
-            default: 0
-          example: 0
         - name: category
           in: query
-          description: Filter by AI classification category (fyi, action_required, newsletter, etc.)
+          description: AI classification category (uses database data source)
           schema:
             type: string
+            enum: [fyi, action_required, newsletter, calendar_event, auto_response, receipts_confirmations, other]
           example: fyi
       responses:
         '200':
-          description: List of emails from database
+          description: List of emails
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EmailListResponse'
         '500':
-          description: Failed to retrieve emails from database
+          description: Failed to retrieve emails
           content:
             application/json:
               schema:
