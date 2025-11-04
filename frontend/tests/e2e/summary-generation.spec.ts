@@ -22,7 +22,7 @@ test.describe('Summary Generation', () => {
   test.beforeEach(async ({ page, mockEmails, mockEmailAPI, mockAIAPI }) => {
     await mockEmailAPI(page, mockEmails);
     await mockAIAPI(page);
-    await page.goto('/emails');
+    await page.goto('/#emails');
     await waitForLoadingComplete(page);
   });
 

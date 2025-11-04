@@ -147,7 +147,7 @@ test.describe('Enhanced Assertions: API Payload Validation', () => {
     mockTaskAPI
   }) => {
     await mockTaskAPI(page, []);
-    await page.goto('/tasks');
+    await page.goto('/#tasks');
     await page.waitForLoadState('networkidle');
 
     const createButton = await waitForElement(page, 'button:has-text("Create"), button:has-text("New Task")');
@@ -189,7 +189,7 @@ test.describe('Enhanced Assertions: State Persistence', () => {
     mockEmailAPI
   }) => {
     await mockEmailAPI(page, []);
-    await page.goto('/emails');
+    await page.goto('/#emails');
 
     // Apply filter
     const filterButton = await waitForElement(page, 'button:has-text("Filter"), select[name="category"]');
@@ -224,7 +224,7 @@ test.describe('Enhanced Assertions: State Persistence', () => {
     mockEmailAPI
   }) => {
     await mockEmailAPI(page, []);
-    await page.goto('/emails?page=2&limit=50');
+    await page.goto('/#emails?page=2&limit=50');
     await page.waitForLoadState('networkidle');
 
     // Validate URL parameters
@@ -285,7 +285,7 @@ test.describe('Enhanced Assertions: Error Handling', () => {
     mockTaskAPI
   }) => {
     await mockTaskAPI(page, []);
-    await page.goto('/tasks');
+    await page.goto('/#tasks');
 
     const createButton = await waitForElement(page, 'button:has-text("Create")');
     await clickElement(createButton);
@@ -335,7 +335,7 @@ test.describe('Enhanced Assertions: Task Data Validation', () => {
     ];
 
     await mockTaskAPI(page, testTasks);
-    await page.goto('/tasks');
+    await page.goto('/#tasks');
     await page.waitForLoadState('networkidle');
 
     // Validate task count
@@ -363,7 +363,7 @@ test.describe('Enhanced Assertions: Accessibility Validation', () => {
     mockEmailAPI
   }) => {
     await mockEmailAPI(page, []);
-    await page.goto('/emails');
+    await page.goto('/#emails');
 
     const classifyButton = await waitForElement(
       page,
@@ -383,7 +383,7 @@ test.describe('Enhanced Assertions: Accessibility Validation', () => {
     mockTaskAPI
   }) => {
     await mockTaskAPI(page, []);
-    await page.goto('/tasks');
+    await page.goto('/#tasks');
 
     const createButton = await waitForElement(page, 'button:has-text("Create")');
     await clickElement(createButton);
@@ -400,7 +400,7 @@ test.describe('Enhanced Assertions: Accessibility Validation', () => {
   test('should validate image alt text', async ({
     page
   }) => {
-    await page.goto('/');
+    await page.goto('/#');
     
     const logo = page.locator('img[src*="logo"], .logo img').first();
     if (await logo.count() > 0) {

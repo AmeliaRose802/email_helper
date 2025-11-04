@@ -22,7 +22,7 @@ test.describe('Email Processing Workflow', () => {
   test.beforeEach(async ({ page, mockEmails, mockEmailAPI, mockAIAPI }) => {
     await mockEmailAPI(page, mockEmails);
     await mockAIAPI(page);
-    await page.goto('/');
+    await page.goto('/#');
     await waitForLoadingComplete(page);
   });
 

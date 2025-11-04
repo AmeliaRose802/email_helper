@@ -212,7 +212,14 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
             ].filter(Boolean).join(' ');
 
             return (
-              <div key={task.id} className={taskItemClasses}>
+              <div 
+                key={task.id} 
+                className={taskItemClasses}
+                data-testid="task-card"
+                data-task-id={task.id}
+                data-task-status={task.status}
+                data-task-priority={task.priority}
+              >
                 {/* Checkbox */}
                 <input
                   type="checkbox"
@@ -227,7 +234,7 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
                   <div className="simple-task-title-row">
                     <span className="simple-task-icon">{getCategoryIcon(task.category)}</span>
                     <span className="simple-task-icon">{getPriorityEmoji(task.priority)}</span>
-                    <span className={`simple-task-title ${isDone ? 'completed' : ''}`}>
+                    <span className={`simple-task-title ${isDone ? 'completed' : ''}`} data-testid="task-title">
                       {task.title}
                     </span>
                     {task.due_date && (
@@ -286,6 +293,7 @@ export const SimpleTaskList: React.FC<SimpleTaskListProps> = ({ tasks, onRefresh
                   onClick={() => handleDelete(task.id)}
                   className="simple-task-delete-btn"
                   title="Delete task"
+                  data-testid="task-delete-button"
                 >
                   🗑️
                 </button>

@@ -21,7 +21,7 @@ import {
 test.describe('Email Editing Workflow', () => {
   test.beforeEach(async ({ page, mockEmails, mockEmailAPI }) => {
     await mockEmailAPI(page, mockEmails);
-    await page.goto('/emails');
+    await page.goto('/#emails');
     await waitForLoadingComplete(page);
   });
 

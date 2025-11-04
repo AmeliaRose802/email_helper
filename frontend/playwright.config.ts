@@ -75,7 +75,18 @@ export default defineConfig({
   ],
 
   // Web server configuration - Start both backend and frontend automatically
-  webServer: [
+  // Backend can be disabled for mock-only tests by setting SKIP_BACKEND=1
+  webServer: process.env.SKIP_BACKEND ? [
+    {
+      // Frontend dev server only (for mock tests)
+      command: 'npm run dev',
+      url: 'http://localhost:3001',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000,
+      stdout: 'ignore',
+      stderr: 'pipe',
+    },
+  ] : [
     {
       // Backend server (Go API on port 8000)
       command: 'pwsh.exe -NoProfile -Command "cd c:/Users/ameliapayne/email_helper/backend-go; go run cmd/api/main.go"',

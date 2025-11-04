@@ -110,11 +110,12 @@ export function generateMockTasks(count: number = 5): MockTask[] {
  * Mock Email API responses
  */
 async function mockEmailAPI(page: Page, emails: MockEmail[]): Promise<void> {
-  await page.route('**/api/emails*', async (route) => {
+  // Mock /api/emails list endpoint
+  await page.route(/\/api\/emails($|\?)/, async (route) => {
     const url = new URL(route.request().url());
     
     // GET /api/emails - List emails with pagination
-    if (route.request().method() === 'GET' && url.pathname === '/api/emails') {
+    if (route.request().method() === 'GET') {
       const page = parseInt(url.searchParams.get('page') || '1');
       const perPage = parseInt(url.searchParams.get('per_page') || '20');
       const start = (page - 1) * perPage;
@@ -131,12 +132,30 @@ async function mockEmailAPI(page: Page, emails: MockEmail[]): Promise<void> {
           total_pages: Math.ceil(emails.length / perPage),
         }),
       });
+      return;
     }
+    // POST /api/emails/batch - Batch operations
+    else if (route.request().method() === 'POST' && url.pathname.includes('/batch')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, updated: 0 }),
+      });
+      return;
+    }
+    else {
+      await route.fallback();
+    }
+  });
+  
+  // Mock individual email routes /api/emails/:id
+  await page.route(/\/api\/emails\/email-[\w-]+/, async (route) => {
+    const url = new URL(route.request().url());
+    const id = url.pathname.split('/').pop();
+    const email = emails.find((e) => e.id === id);
+    
     // GET /api/emails/:id - Get single email
-    else if (route.request().method() === 'GET' && url.pathname.match(/\/api\/emails\/email-\d+$/)) {
-      const id = url.pathname.split('/').pop();
-      const email = emails.find((e) => e.id === id);
-      
+    if (route.request().method() === 'GET') {
       if (email) {
         await route.fulfill({
           status: 200,
@@ -146,12 +165,10 @@ async function mockEmailAPI(page: Page, emails: MockEmail[]): Promise<void> {
       } else {
         await route.fulfill({ status: 404, body: 'Email not found' });
       }
+      return;
     }
     // PATCH /api/emails/:id - Update email
     else if (route.request().method() === 'PATCH') {
-      const id = url.pathname.split('/').pop();
-      const email = emails.find((e) => e.id === id);
-      
       if (email) {
         const updates = await route.request().postDataJSON();
         Object.assign(email, updates);
@@ -164,22 +181,15 @@ async function mockEmailAPI(page: Page, emails: MockEmail[]): Promise<void> {
       } else {
         await route.fulfill({ status: 404, body: 'Email not found' });
       }
-    }
-    // POST /api/emails/batch - Batch operations
-    else if (route.request().method() === 'POST' && url.pathname.includes('/batch')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, updated: 0 }),
-      });
+      return;
     }
     else {
-      await route.continue();
+      await route.fallback();
     }
   });
   
   // Mock email stats
-  await page.route('**/api/emails/stats*', async (route) => {
+  await page.route(/\/api\/emails\/stats/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -195,31 +205,51 @@ async function mockEmailAPI(page: Page, emails: MockEmail[]): Promise<void> {
       }),
     });
   });
+  
+  // Mock category mappings
+  await page.route(/\/api\/emails\/category-mappings/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        required_personal_action: { label: 'Action Required', color: '#ff6b6b' },
+        optional_fyi: { label: 'FYI', color: '#4dabf7' },
+        team_discussion: { label: 'Team Discussion', color: '#51cf66' },
+        task_delegation: { label: 'Task Delegation', color: '#ffd43b' },
+        newsletter: { label: 'Newsletter', color: '#9775fa' },
+      }),
+    });
+  });
 }
 
 /**
  * Mock Task API responses
  */
 async function mockTaskAPI(page: Page, tasks: MockTask[]): Promise<void> {
-  await page.route('**/api/tasks*', async (route) => {
+  // Mock /api/tasks with wildcard pattern to catch all hosts including localhost:8000
+  await page.route('**/api/tasks', async (route) => {
     const url = new URL(route.request().url());
     
     // GET /api/tasks - List tasks
-    if (route.request().method() === 'GET' && url.pathname === '/api/tasks') {
+    if (route.request().method() === 'GET') {
+      console.log('[Mock API] Intercepted GET /api/tasks from:', route.request().url());
+      const response = {
+        tasks,
+        total_count: tasks.length,  // Match backend schema
+        page: 1,
+        per_page: 50,
+        has_more: false,  // Required field
+      };
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          tasks,
-          total: tasks.length,
-          page: 1,
-          per_page: 50,
-          total_pages: 1,
-        }),
+        body: JSON.stringify(response),
       });
+      return;  // Exit after handling
     }
     // POST /api/tasks - Create task
-    else if (route.request().method() === 'POST' && url.pathname === '/api/tasks') {
+    else if (route.request().method() === 'POST') {
+      console.log('[Mock API] Intercepted POST /api/tasks');
       const taskData = await route.request().postDataJSON();
       const newTask: MockTask = {
         id: `task-${Date.now()}`,
@@ -235,12 +265,31 @@ async function mockTaskAPI(page: Page, tasks: MockTask[]): Promise<void> {
         contentType: 'application/json',
         body: JSON.stringify(newTask),
       });
+      return;
     }
+    else {
+      // Let other requests pass through or fail
+      console.log('[Mock API] Unhandled method for /api/tasks:', route.request().method());
+      await route.fallback();
+    }
+  });
+  
+  // Mock task detail routes /api/tasks/:id
+  await page.route('**/api/tasks/*', async (route) => {
+    const url = new URL(route.request().url());
+    const id = url.pathname.split('/').pop();
+    
+    // Skip stats endpoint (handled separately below)
+    if (id === 'stats') {
+      await route.continue();
+      return;
+    }
+    
+    const task = tasks.find((t) => t.id === id);
+    
     // PATCH /api/tasks/:id - Update task
-    else if (route.request().method() === 'PATCH') {
-      const id = url.pathname.split('/').pop();
-      const task = tasks.find((t) => t.id === id);
-      
+    if (route.request().method() === 'PATCH') {
+      console.log('[Mock API] Intercepted PATCH /api/tasks/' + id);
       if (task) {
         const updates = await route.request().postDataJSON();
         Object.assign(task, updates);
@@ -253,10 +302,11 @@ async function mockTaskAPI(page: Page, tasks: MockTask[]): Promise<void> {
       } else {
         await route.fulfill({ status: 404, body: 'Task not found' });
       }
+      return;
     }
     // DELETE /api/tasks/:id - Delete task
     else if (route.request().method() === 'DELETE') {
-      const id = url.pathname.split('/').pop();
+      console.log('[Mock API] Intercepted DELETE /api/tasks/' + id);
       const index = tasks.findIndex((t) => t.id === id);
       
       if (index !== -1) {
@@ -265,14 +315,31 @@ async function mockTaskAPI(page: Page, tasks: MockTask[]): Promise<void> {
       } else {
         await route.fulfill({ status: 404, body: 'Task not found' });
       }
+      return;
+    }
+    // GET /api/tasks/:id - Get single task
+    else if (route.request().method() === 'GET') {
+      console.log('[Mock API] Intercepted GET /api/tasks/' + id);
+      if (task) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(task),
+        });
+      } else {
+        await route.fulfill({ status: 404, body: 'Task not found' });
+      }
+      return;
     }
     else {
+      console.log('[Mock API] Unhandled method for /api/tasks/:id:', route.request().method());
       await route.continue();
     }
   });
   
   // Mock task stats
-  await page.route('**/api/tasks/stats*', async (route) => {
+  await page.route('**/api/tasks/stats', async (route) => {
+    console.log('[Mock API] Intercepted /api/tasks/stats');
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -299,7 +366,7 @@ async function mockTaskAPI(page: Page, tasks: MockTask[]): Promise<void> {
  */
 async function mockAIAPI(page: Page): Promise<void> {
   // Mock classification
-  await page.route('**/api/ai/classify*', async (route) => {
+  await page.route(/\/api\/ai\/classify/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -313,7 +380,7 @@ async function mockAIAPI(page: Page): Promise<void> {
   });
   
   // Mock action item extraction
-  await page.route('**/api/ai/extract-actions*', async (route) => {
+  await page.route(/\/api\/ai\/extract-actions/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -335,7 +402,7 @@ async function mockAIAPI(page: Page): Promise<void> {
   });
   
   // Mock summary generation
-  await page.route('**/api/ai/summarize*', async (route) => {
+  await page.route(/\/api\/ai\/summarize/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -347,7 +414,7 @@ async function mockAIAPI(page: Page): Promise<void> {
   });
   
   // Mock batch processing
-  await page.route('**/api/processing/process-batch*', async (route) => {
+  await page.route(/\/api\/processing\/process-batch/, async (route) => {
     const data = await route.request().postDataJSON();
     const emailIds = data.email_ids || [];
     

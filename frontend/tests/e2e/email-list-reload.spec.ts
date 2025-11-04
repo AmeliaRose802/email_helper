@@ -13,7 +13,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Email List Page Reload', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to email list page
-    await page.goto('http://localhost:5173/#/emails');
+    await page.goto('/#/emails');
     
     // Wait for the page to load
     await page.waitForLoadState('networkidle');
@@ -141,7 +141,7 @@ test.describe('Email List Error Handling', () => {
     await page.route('**/api/**', route => route.abort());
     
     // Navigate to email list
-    await page.goto('http://localhost:5173/#/emails');
+    await page.goto('/#/emails');
     
     // Wait for error state to appear
     await page.waitForSelector('.email-list-error-overlay', { timeout: 10000 });

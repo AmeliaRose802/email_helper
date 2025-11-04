@@ -124,6 +124,67 @@ go test ./... -cover
 3. If you discover bugs during testing, file them with: `bd create "Bug: <description>" -t bug -p 1`
 4. Verify the exit code is 0 (all tests passed)
 
+### CRITICAL: Running Playwright Tests Safely
+
+**NEVER run Playwright tests in default mode - they will block indefinitely and require Ctrl+C which AI agents cannot send!**
+
+**❌ WRONG - Will block forever:**
+```powershell
+npx playwright test                           # Blocks waiting for input
+npm run test:e2e                             # Same as above
+cd frontend; npx playwright test             # Still blocks
+```
+
+**✅ CORRECT - Safe non-blocking test execution:**
+```powershell
+# Run specific test file (fastest, most targeted)
+cd c:\Users\ameliapayne\email_helper\frontend
+npx playwright test task-management.spec.ts --reporter=list 2>&1
+
+# Run specific test by name (grep pattern)
+npx playwright test task-management.spec.ts -g "should display list of tasks" --reporter=list 2>&1
+
+# Run all E2E tests with explicit reporter
+npx playwright test --reporter=list 2>&1
+
+# Disable retries for faster feedback during debugging
+npx playwright test task-management.spec.ts --reporter=list --retries=0 2>&1
+
+# Run in headed mode to see what's happening (still non-blocking with --reporter)
+npx playwright test task-management.spec.ts --headed --reporter=list 2>&1
+```
+
+**Key flags for safe execution:**
+- `--reporter=list` - Text output, no interactive UI (REQUIRED!)
+- `2>&1` - Capture stderr and stdout together
+- `--retries=0` - Disable retries during debugging
+- Specific test file or `-g "pattern"` - Run subset of tests
+- Always use absolute path: `cd c:\Users\ameliapayne\email_helper\frontend` first
+
+**Why this matters:**
+- Default Playwright reporter opens interactive HTML UI that waits for user input
+- AI agents cannot send Ctrl+C to exit blocked processes
+- `--reporter=list` forces text-only output that exits cleanly
+- Without this flag, terminal will hang indefinitely
+
+**Debugging failed tests:**
+```powershell
+# Run single test to see detailed error
+npx playwright test path/to/test.spec.ts -g "test name" --reporter=list 2>&1
+
+# Check test structure without running
+npx playwright test --list 2>&1
+
+# Run with debug logging
+DEBUG=pw:api npx playwright test test.spec.ts --reporter=list 2>&1
+```
+
+**When tests fail:**
+1. File Beads issue immediately: `bd create "Playwright test failure: <test_name>" -t bug -p 1`
+2. Link to parent work: `bd dep add <new-id> <parent-id> --type discovered-from`
+3. Include error message in issue description
+4. Run single failing test with `--reporter=list` to get full error details
+
 ## Dependencies & Integration
 
 ### External Services

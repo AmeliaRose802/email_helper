@@ -24,7 +24,7 @@ test.describe('Task Management', () => {
   test.beforeEach(async ({ page, mockTasks, mockTaskAPI, mockEmails, mockEmailAPI }) => {
     await mockTaskAPI(page, mockTasks);
     await mockEmailAPI(page, mockEmails);
-    await page.goto('/tasks');
+    await page.goto('/#/tasks');  // Use hash router format
     await waitForLoadingComplete(page);
   });
 

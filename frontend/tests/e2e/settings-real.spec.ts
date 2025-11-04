@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Real Settings E2E', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:8080/#/settings');
+    await page.goto('/#/settings');
     await page.waitForSelector('h1, h2', { timeout: 15000 });
   });
 

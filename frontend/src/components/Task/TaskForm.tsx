@@ -168,6 +168,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ task, emailId, onClose, isOp
               onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
               disabled={isLoading}
               className={errors.title ? 'error' : ''}
+              data-testid="task-title-input"
             />
             {errors.title && <span className="error-text">{errors.title}</span>}
           </div>
@@ -180,6 +181,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ task, emailId, onClose, isOp
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               disabled={isLoading}
               rows={3}
+              data-testid="task-description-input"
             />
           </div>
 
@@ -194,6 +196,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ task, emailId, onClose, isOp
                   priority: e.target.value as 'high' | 'medium' | 'low' 
                 }))}
                 disabled={isLoading}
+                data-testid="task-priority-select"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -293,6 +296,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ task, emailId, onClose, isOp
               onClick={onClose}
               disabled={isLoading}
               className="btn-secondary"
+              data-testid="task-cancel-button"
             >
               Cancel
             </button>
@@ -300,6 +304,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ task, emailId, onClose, isOp
               type="submit"
               disabled={isLoading}
               className="btn-primary"
+              data-testid="task-submit-button"
             >
               {isLoading ? 'Saving...' : (isEditing ? 'Update Task' : 'Create Task')}
             </button>

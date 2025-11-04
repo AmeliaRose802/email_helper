@@ -71,6 +71,7 @@ const TaskList: React.FC = () => {
           <button 
             className="create-task-btn primary"
             onClick={() => setShowCreateForm(true)}
+            data-testid="create-task-button"
           >
             + New Task
           </button>

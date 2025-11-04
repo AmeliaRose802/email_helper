@@ -684,7 +684,7 @@ const EmailList: React.FC = () => {
   }
 
   return (
-    <div className="email-list-container">
+    <div className="email-list-container" data-testid="email-list-container">
       {/* Header */}
       <div className="email-list-header">
         <h1 className="email-list-title">Inbox</h1>

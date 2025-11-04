@@ -114,7 +114,7 @@ test.describe('Critical User Flow 1: Email Retrieval and Classification', () => 
     // Mock empty email list
     await mockEmailAPI(page, []);
     
-    await page.goto('/emails');
+    await page.goto('/#emails');
     await page.waitForLoadState('networkidle');
     
     // Verify empty state message
@@ -183,7 +183,7 @@ test.describe('Critical User Flow 2: Task Creation and Management', () => {
       }
       
       // Navigate to tasks page
-      await page.goto('/tasks');
+      await page.goto('/#tasks');
       await page.waitForLoadState('networkidle');
       
       // Verify task appears in list
@@ -236,7 +236,7 @@ test.describe('Critical User Flow 2: Task Creation and Management', () => {
       }
     });
     
-    await page.goto('/emails');
+    await page.goto('/#emails');
     await page.waitForLoadState('networkidle');
     
     const firstEmail = page.locator('[data-testid="email-item"], .email-item').first();
@@ -274,7 +274,7 @@ test.describe('Critical User Flow 3: Bulk Processing and Category Review', () =>
     await mockEmailAPI(page, mockEmails);
     await mockAIAPI(page);
     
-    await page.goto('/emails');
+    await page.goto('/#emails');
     await page.waitForLoadState('networkidle');
     
     // Select multiple emails
@@ -367,7 +367,7 @@ test.describe('Critical User Flow 3: Bulk Processing and Category Review', () =>
       });
     });
     
-    await page.goto('/emails');
+    await page.goto('/#emails');
     await page.waitForLoadState('networkidle');
     
     const selectAllCheckbox = page.locator('input[type="checkbox"][aria-label*="select all" i]').first();
@@ -427,7 +427,7 @@ test.describe('Critical User Flow 4: Settings Configuration', () => {
     });
     
     // Navigate to settings
-    await page.goto('/settings');
+    await page.goto('/#settings');
     await page.waitForLoadState('networkidle');
     
     // Wait for settings to load
@@ -495,7 +495,7 @@ test.describe('Critical User Flow 4: Settings Configuration', () => {
       }
     });
     
-    await page.goto('/settings');
+    await page.goto('/#settings');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     
@@ -547,7 +547,7 @@ test.describe('Critical User Flow 5: Error Recovery and Retry', () => {
       }
     });
     
-    await page.goto('/emails');
+    await page.goto('/#emails');
     
     // Wait for retry attempt
     await page.waitForTimeout(5000);
@@ -593,7 +593,7 @@ test.describe('Critical User Flow 5: Error Recovery and Retry', () => {
       }
     });
     
-    await page.goto('/emails');
+    await page.goto('/#emails');
     await page.waitForTimeout(2000);
     
     // Verify error is displayed
@@ -624,7 +624,7 @@ test.describe('Critical User Flow 5: Error Recovery and Retry', () => {
     });
     
     // Try to navigate to non-existent email
-    await page.goto('/emails/invalid-id');
+    await page.goto('/#emails/invalid-id');
     await page.waitForTimeout(2000);
     
     // Verify 404 error handling
@@ -675,7 +675,7 @@ test.describe('Critical User Flow 5: Error Recovery and Retry', () => {
       }
     });
     
-    await page.goto('/emails');
+    await page.goto('/#emails');
     await page.waitForLoadState('networkidle');
     
     // Select and classify email
