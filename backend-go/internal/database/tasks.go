@@ -129,8 +129,16 @@ func GetTasks(page, limit int, status, priority, search string) ([]*models.Task,
 
 	offset := (page - 1) * limit
 
-	// Build where clause
-	whereClause := "WHERE user_id = 1"
+	// Build where clause - exclude test data by default
+	whereClause := `WHERE user_id = 1 
+		AND (category IS NULL OR category != 'test')
+		AND title NOT LIKE '%Test Task%'
+		AND title NOT LIKE '%Bulk Update%'
+		AND title NOT LIKE '%Random Task%'
+		AND title NOT LIKE '%Specific Task%'
+		AND title NOT LIKE '%Pagination Test%'
+		AND title NOT LIKE '%Email-linked Task%'
+		AND title NOT LIKE '%Minimal Task%'`
 	args := []interface{}{}
 
 	if status != "" {
