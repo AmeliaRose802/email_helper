@@ -94,6 +94,8 @@ const Settings: React.FC = () => {
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
       console.error('Failed to save settings:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`❌ Failed to save settings: ${errorMsg}\n\nPlease check console for details.`);
       setSaveStatus('error');
       setTimeout(() => setSaveStatus('idle'), 2000);
     }
@@ -109,6 +111,8 @@ const Settings: React.FC = () => {
         setTimeout(() => setSaveStatus('idle'), 2000);
       } catch (error) {
         console.error('Failed to reset settings:', error);
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        alert(`❌ Failed to reset settings: ${errorMsg}\n\nPlease check console for details.`);
         setSaveStatus('error');
         setTimeout(() => setSaveStatus('idle'), 2000);
       }

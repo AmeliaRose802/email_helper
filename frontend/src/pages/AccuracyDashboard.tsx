@@ -24,10 +24,10 @@ const AccuracyDashboard: React.FC = () => {
       try {
         const response = await fetch('http://localhost:8000/api/emails/accuracy-stats');
         if (!response.ok) {
-          throw new Error('Failed to fetch accuracy stats');
+          throw new Error(`Failed to fetch accuracy stats: ${response.status} ${response.statusText}`);
         }
         
-        const data = await response.json() as { categories: Array<{
+        const data = await response.json() as { categories?: Array<{
           category: string;
           total: number;
           correct: number;
@@ -36,6 +36,13 @@ const AccuracyDashboard: React.FC = () => {
           recall: number;
           f1_score: number;
         }> };
+        
+        // Validate response has expected structure
+        if (!data.categories || !Array.isArray(data.categories)) {
+          console.warn('API response missing categories array, using mock data');
+          loadMockData();
+          return;
+        }
         
         // Transform backend data to match our interface
         const transformedStats: AccuracyStat[] = data.categories.map((cat) => ({

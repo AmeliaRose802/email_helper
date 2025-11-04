@@ -280,6 +280,13 @@ const EmailList: React.FC = () => {
         }
       } catch (error) {
         console.error(`Failed to classify conversation ${repEmail.id}:`, error);
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        
+        // Show user-friendly error on first classification failure
+        if (i === 0 && !isPrefetch) {
+          alert(`❌ Classification failed: ${errorMsg}\n\nPlease check your internet connection and Azure OpenAI API configuration.`);
+        }
+        
         // Store as error status for all emails in conversation
         setClassifiedEmails(prev => {
           const next = new Map(prev);
@@ -545,18 +552,25 @@ const EmailList: React.FC = () => {
       
       if (successCount > 0 && failCount === 0) {
         console.log(`✅ Successfully moved ${successCount} email(s) to Outlook folders`);
+        alert(`✅ Success! Moved ${successCount} email(s) to Outlook folders.`);
       } else if (successCount > 0 && failCount > 0) {
         console.log(`⚠️ Moved ${successCount}/${totalProcessed} emails. ${failCount} emails couldn't be moved (may have been deleted or moved already).`);
+        alert(`⚠️ Partially successful\n\nMoved ${successCount}/${totalProcessed} emails.\n${failCount} emails couldn't be moved (may have been deleted or moved already).`);
       } else {
         console.error('❌ Failed to move emails to Outlook folders.');
         if (result.errors && result.errors.length > 0) {
           console.error('Errors:', result.errors.slice(0, 5).join(', '));
+          alert(`❌ Failed to move emails to Outlook folders.\n\nErrors: ${result.errors.slice(0, 3).join(', ')}\n\nCheck console for details.`);
+        } else {
+          alert('❌ Failed to move emails to Outlook folders. Check console for details.');
         }
       }
       
       refetch(); // Refresh the email list
     } catch (error) {
       console.error('Bulk apply to Outlook failed:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`❌ Outlook sync failed: ${errorMsg}\n\nPlease check console for details.`);
     } finally {
       setIsApplyingToOutlook(false);
     }
@@ -752,11 +766,18 @@ const EmailList: React.FC = () => {
                 // Show success notification (non-blocking)
                 console.log(`✅ Background processing complete!\n\n📁 Moved ${applyResult.successful} emails to Outlook folders\n💾 Synced ${syncResult.synced_count} emails to database\n📋 Extracted tasks from ${extractResult.email_count} emails`);
 
-                refetch();
+                // Safely refetch emails - guard against query not being started
+                try {
+                  await refetch();
+                } catch (refetchError) {
+                  console.warn('Could not refetch emails after processing:', refetchError);
+                }
               } catch (error) {
                 console.error('Error processing emails:', error);
-                // Log error but don't block UI
-                console.error('❌ Some operations failed:', error);
+                
+                // Show user-friendly error message in addition to console logging
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+                alert(`❌ Email processing failed: ${errorMessage}\n\nPlease check the console for details or contact support.`);
               }
             })();
           }}
