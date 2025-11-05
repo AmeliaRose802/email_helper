@@ -26,7 +26,7 @@ func ClassifyEmail(c *gin.Context) {
 func ClassifyEmailSingular(c *gin.Context) {
 	var req models.AIClassificationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -35,7 +35,7 @@ func ClassifyEmailSingular(c *gin.Context) {
 
 	result, err := emailService.ClassifyEmail(ctx, req.Subject, req.Sender, req.Content, req.Context)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		AIServiceError(c, "Failed to classify email: "+err.Error())
 		return
 	}
 
@@ -46,7 +46,7 @@ func ClassifyEmailSingular(c *gin.Context) {
 func ExtractActionItems(c *gin.Context) {
 	var req models.ActionItemRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -55,7 +55,7 @@ func ExtractActionItems(c *gin.Context) {
 
 	result, err := emailService.ExtractActionItems(ctx, req.EmailContent, req.Context)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		AIServiceError(c, "Failed to extract action items: "+err.Error())
 		return
 	}
 
@@ -75,7 +75,7 @@ func SummarizeEmail(c *gin.Context) {
 func SummarizeEmailSingular(c *gin.Context) {
 	var req models.SummaryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -89,7 +89,7 @@ func SummarizeEmailSingular(c *gin.Context) {
 
 	result, err := emailService.SummarizeEmail(ctx, req.EmailContent, summaryType)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		AIServiceError(c, "Failed to summarize email: "+err.Error())
 		return
 	}
 
@@ -112,7 +112,7 @@ func AIHealthCheck(c *gin.Context) {
 	defer cancel()
 
 	if err := emailService.CheckAIHealth(ctx); err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "AI service unavailable"})
+		ServiceUnavailable(c, "AI", "AI service unavailable: "+err.Error())
 		return
 	}
 
@@ -150,12 +150,12 @@ func ClassifyBatchStream(c *gin.Context) {
 func ClassifyBatchStreamNew(c *gin.Context) {
 	var req ClassifyBatchStreamRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	if len(req.EmailIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "email_ids cannot be empty"})
+		ValidationError(c, "Invalid request", "email_ids cannot be empty")
 		return
 	}
 
@@ -284,12 +284,12 @@ type BatchClassificationResponse struct {
 func ClassifyEmailsBatch(c *gin.Context) {
 	var req BatchClassificationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	if len(req.EmailIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "email_ids cannot be empty"})
+		ValidationError(c, "Invalid request", "email_ids cannot be empty")
 		return
 	}
 
@@ -364,12 +364,12 @@ type BatchSummaryResponse struct {
 func SummarizeEmailsBatch(c *gin.Context) {
 	var req BatchSummaryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	if len(req.EmailIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "email_ids cannot be empty"})
+		ValidationError(c, "Invalid request", "email_ids cannot be empty")
 		return
 	}
 

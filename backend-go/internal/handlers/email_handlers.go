@@ -146,7 +146,7 @@ func GetCategoryMappings(c *gin.Context) {
 func GetAccuracyStats(c *gin.Context) {
 	stats, err := emailService.GetAccuracyStats()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to retrieve accuracy statistics: "+err.Error())
 		return
 	}
 
@@ -157,7 +157,7 @@ func GetAccuracyStats(c *gin.Context) {
 func PrefetchEmails(c *gin.Context) {
 	var emailIDs []string
 	if err := c.ShouldBindJSON(&emailIDs); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -247,12 +247,12 @@ func UpdateEmailClassification(c *gin.Context) {
 	
 	var req models.UpdateClassificationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	if err := emailService.UpdateClassification(id, req.Category, req.ApplyToOutlook); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to update classification: "+err.Error())
 		return
 	}
 
@@ -267,13 +267,13 @@ func UpdateEmailClassification(c *gin.Context) {
 func ApplyClassifications(c *gin.Context) {
 	var req models.BulkApplyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	successful, failed, errors, err := emailService.BulkApplyToOutlook(req.EmailIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		OutlookError(c, "Failed to apply classifications: "+err.Error())
 		return
 	}
 
@@ -295,13 +295,13 @@ func BulkApplyToOutlook(c *gin.Context) {
 	
 	var req models.BulkApplyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	successful, failed, errors, err := emailService.BulkApplyToOutlook(req.EmailIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		OutlookError(c, "Failed to apply classifications: "+err.Error())
 		return
 	}
 
@@ -318,7 +318,7 @@ func BulkApplyToOutlook(c *gin.Context) {
 func SyncToDatabase(c *gin.Context) {
 	var req models.SyncEmailRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -329,7 +329,7 @@ func SyncToDatabase(c *gin.Context) {
 	}
 
 	if err := emailService.SyncToDatabase(emails); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to sync emails to database: "+err.Error())
 		return
 	}
 
@@ -344,7 +344,7 @@ func SyncToDatabase(c *gin.Context) {
 func GetFolders(c *gin.Context) {
 	folders, err := emailService.GetFolders()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		OutlookError(c, "Failed to retrieve folders: "+err.Error())
 		return
 	}
 
@@ -361,7 +361,7 @@ func GetConversationThread(c *gin.Context) {
 
 	emails, err := emailService.GetConversation(id, source)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to retrieve conversation thread: "+err.Error())
 		return
 	}
 
@@ -395,7 +395,7 @@ func BatchProcessEmails(c *gin.Context) {
 	
 	var req BatchProcessRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -534,7 +534,7 @@ type ExtractTasksRequest struct {
 func ExtractTasks(c *gin.Context) {
 	var req ExtractTasksRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -612,18 +612,18 @@ func ExtractTasks(c *gin.Context) {
 func AnalyzeHolistically(c *gin.Context) {
 	var req models.HolisticAnalysisRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid request body: %v", err)})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	if len(req.EmailIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "email_ids cannot be empty"})
+		ValidationError(c, "Invalid request", "email_ids cannot be empty")
 		return
 	}
 
 	// Get email service
 	if emailService == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Email service not initialized"})
+		InternalError(c, "Email service not initialized")
 		return
 	}
 
@@ -631,7 +631,7 @@ func AnalyzeHolistically(c *gin.Context) {
 	result, err := emailService.AnalyzeHolistically(c.Request.Context(), req.EmailIDs)
 	if err != nil {
 		log.Printf("Holistic analysis failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("AI analysis failed: %v", err)})
+		AIServiceError(c, "AI analysis failed: "+err.Error())
 		return
 	}
 

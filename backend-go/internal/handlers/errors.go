@@ -77,3 +77,7 @@ func OutlookError(c *gin.Context, message string) {
 func AIServiceError(c *gin.Context, message string) {
 	respondWithError(c, http.StatusInternalServerError, models.ErrorCodeAIServiceError, message)
 }
+
+func NotImplemented(c *gin.Context, message string) {
+	respondWithError(c, http.StatusNotImplemented, "NOT_IMPLEMENTED", message)
+}

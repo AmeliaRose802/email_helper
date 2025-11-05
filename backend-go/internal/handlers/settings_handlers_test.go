@@ -210,9 +210,11 @@ func TestUpdateSettingsMalformedJSON(t *testing.T) {
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
-		// Just verify error field exists and contains something useful
-		errorMsg, ok := response["error"].(string)
+		// Verify error field exists with nested structure
+		errorField, ok := response["error"].(map[string]interface{})
 		assert.True(t, ok, "Response should contain error field")
+		errorMsg, ok := errorField["message"].(string)
+		assert.True(t, ok, "Error field should contain message")
 		assert.NotEmpty(t, errorMsg, "Error message should not be empty")
 	})
 
@@ -590,9 +592,12 @@ func TestErrorResponseFormat(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
 		assert.Contains(t, response, "error")
-		assert.NotEmpty(t, response["error"], "Error message should not be empty")
+		errorField, ok := response["error"].(map[string]interface{})
+		assert.True(t, ok, "Error field should be an object")
+		errorMsg, ok := errorField["message"].(string)
+		assert.True(t, ok, "Error should have message field")
+		assert.NotEmpty(t, errorMsg, "Error message should not be empty")
 		// Verify error message is helpful
-		errorMsg := response["error"].(string)
 		assert.True(t, len(errorMsg) > 10, "Error message should be descriptive")
 	})
 

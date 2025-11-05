@@ -39,7 +39,7 @@ func GetTasks(c *gin.Context) {
 
 	tasks, total, err := taskService.GetTasks(page, limit, status, priority, search)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to retrieve tasks: "+err.Error())
 		return
 	}
 
@@ -66,13 +66,13 @@ func GetTasks(c *gin.Context) {
 func CreateTask(c *gin.Context) {
 	var req models.TaskCreate
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	task, err := taskService.CreateTask(&req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to create task: "+err.Error())
 		return
 	}
 
@@ -84,13 +84,13 @@ func GetTask(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		ValidationError(c, "Invalid task ID", "Task ID must be a valid integer")
 		return
 	}
 
 	task, err := taskService.GetTask(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		NotFound(c, models.ErrorCodeTaskNotFound, "Task not found: "+idStr)
 		return
 	}
 
@@ -102,19 +102,19 @@ func UpdateTask(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		ValidationError(c, "Invalid task ID", "Task ID must be a valid integer")
 		return
 	}
 
 	var req models.TaskUpdate
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	task, err := taskService.UpdateTask(id, &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to update task: "+err.Error())
 		return
 	}
 
@@ -126,12 +126,12 @@ func DeleteTask(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		ValidationError(c, "Invalid task ID", "Task ID must be a valid integer")
 		return
 	}
 
 	if err := taskService.DeleteTask(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to delete task: "+err.Error())
 		return
 	}
 
@@ -145,7 +145,7 @@ func DeleteTask(c *gin.Context) {
 func GetTaskStats(c *gin.Context) {
 	stats, err := taskService.GetStats()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to retrieve task statistics: "+err.Error())
 		return
 	}
 
@@ -157,7 +157,7 @@ func UpdateTaskStatus(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		ValidationError(c, "Invalid task ID", "Task ID must be a valid integer")
 		return
 	}
 
@@ -165,7 +165,7 @@ func UpdateTaskStatus(c *gin.Context) {
 		Status string `json:"status" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -175,7 +175,7 @@ func UpdateTaskStatus(c *gin.Context) {
 
 	task, err := taskService.UpdateTask(id, &update)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to update task status: "+err.Error())
 		return
 	}
 
@@ -187,7 +187,7 @@ func LinkEmailToTask(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		ValidationError(c, "Invalid task ID", "Task ID must be a valid integer")
 		return
 	}
 
@@ -195,7 +195,7 @@ func LinkEmailToTask(c *gin.Context) {
 		EmailID string `json:"email_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
@@ -205,7 +205,7 @@ func LinkEmailToTask(c *gin.Context) {
 
 	task, err := taskService.UpdateTask(id, &update)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to link email to task: "+err.Error())
 		return
 	}
 
@@ -216,12 +216,12 @@ func LinkEmailToTask(c *gin.Context) {
 func UpdateTasks(c *gin.Context) {
 	var req models.BulkTaskUpdate
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	if err := taskService.BulkUpdate(req.TaskIDs, &req.Updates); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to update tasks: "+err.Error())
 		return
 	}
 
@@ -243,12 +243,12 @@ func BulkUpdateTasks(c *gin.Context) {
 	
 	var req models.BulkTaskUpdate
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	if err := taskService.BulkUpdate(req.TaskIDs, &req.Updates); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to update tasks: "+err.Error())
 		return
 	}
 
@@ -265,12 +265,12 @@ func BulkUpdateTasks(c *gin.Context) {
 func DeleteTasks(c *gin.Context) {
 	var req models.BulkTaskDelete
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	if err := taskService.BulkDelete(req.TaskIDs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to delete tasks: "+err.Error())
 		return
 	}
 
@@ -292,12 +292,12 @@ func BulkDeleteTasks(c *gin.Context) {
 	
 	var req models.BulkTaskDelete
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, "Invalid request body: "+err.Error())
 		return
 	}
 
 	if err := taskService.BulkDelete(req.TaskIDs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to delete tasks: "+err.Error())
 		return
 	}
 
@@ -325,7 +325,7 @@ func deduplicateTasksByCategory(c *gin.Context, category string) {
 	// Get all tasks for this category
 	tasks, err := database.GetTasksByCategory(category)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to retrieve tasks: %v", err)})
+		DatabaseError(c, "Failed to retrieve tasks: "+err.Error())
 		return
 	}
 
@@ -342,20 +342,20 @@ func deduplicateTasksByCategory(c *gin.Context, category string) {
 	// Get AI client from context
 	aiClient, exists := c.Get("aiClient")
 	if !exists {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "AI client not available"})
+		InternalError(c, "AI client not available")
 		return
 	}
 
 	client, ok := aiClient.(*azureopenai.Client)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid AI client type"})
+		InternalError(c, "Invalid AI client type")
 		return
 	}
 
 	// Use AI to identify duplicate groups
 	duplicateGroups, err := identifyDuplicateTasks(c.Request.Context(), client, tasks, category)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to identify duplicates: %v", err)})
+		AIServiceError(c, "Failed to identify duplicates: "+err.Error())
 		return
 	}
 
