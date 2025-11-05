@@ -12,6 +12,7 @@ import (
 	"email-helper-backend/config"
 	"email-helper-backend/internal/database"
 	"email-helper-backend/internal/handlers"
+	"email-helper-backend/internal/middleware"
 	"email-helper-backend/internal/services"
 	
 	"github.com/gin-contrib/cors"
@@ -26,6 +27,9 @@ var (
 func main() {
 	// Load configuration
 	cfg := config.Load()
+
+	// Set version information for middleware
+	middleware.SetVersion(Version, "unknown", BuildTime)
 
 	// Initialize database
 	if err := database.InitDB(cfg.DatabasePath); err != nil {
@@ -54,12 +58,18 @@ func main() {
 	// Create router
 	router := gin.Default()
 
+	// Add standard API headers middleware
+	router.Use(middleware.StandardHeaders())
+	
+	// Add response timer middleware
+	router.Use(middleware.ResponseTimer())
+
 	// CORS middleware
 	router.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
+		ExposeHeaders:    []string{"Content-Length", "X-API-Version", "X-Response-Time-Ms", "X-Pagination-Total", "X-Pagination-Page", "X-Pagination-Has-More", "X-Deprecation-Warning"},
 		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}))
