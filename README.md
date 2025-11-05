@@ -190,6 +190,12 @@ your_username
 - [`SECURITY_SETUP.md`](SECURITY_SETUP.md) - Detailed security configuration guide
 - [`scripts/README.md`](scripts/README.md) - Technical implementation details
 
+### API Documentation
+- **[API Patterns Guide](docs/technical/API_PATTERNS.md)** - Common usage patterns and best practices
+- **[Error Codes Reference](docs/technical/ERROR_CODES.md)** - Complete error code documentation
+- **[OpenAPI Specification](backend-go/api-spec.yml)** - Full API specification with examples
+- **[Postman Collection](email_helper.postman_collection.json)** - Ready-to-use API collection
+
 ### Additional Documentation
 - **[Complete Documentation Index](docs/README.md)** - Start here for all documentation
 - **[Quick Start Guide](QUICK_START.md)** - Get up and running quickly
@@ -198,6 +204,175 @@ your_username
 - **[Technical Documentation](docs/technical/)** - Architecture and design details
 - **[Test Documentation](test/TEST_ORGANIZATION.md)** - Testing guide and organization
 - **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+
+## 🔌 API Quick Start
+
+Email Helper provides a RESTful API for programmatic access to email classification, task management, and AI processing.
+
+### Starting the API Server
+
+**Go Backend (Recommended):**
+```bash
+cd backend-go
+./build.ps1 -Run
+
+# Or use the startup script
+./start-go-backend.ps1
+```
+
+**Python Backend (Legacy):**
+```bash
+python run_backend.py
+```
+
+API will be available at: `http://localhost:8000`
+
+### Verify API is Running
+
+```bash
+curl http://localhost:8000/health
+```
+
+**Expected response:**
+```json
+{
+  "status": "healthy",
+  "service": "email-helper-api",
+  "version": "1.0.0",
+  "database": "healthy"
+}
+```
+
+### Common API Operations
+
+#### Classify a Single Email
+
+```bash
+curl -X POST "http://localhost:8000/api/ai/classification" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject": "Team meeting tomorrow",
+    "sender": "manager@company.com",
+    "content": "Please join us for the team meeting tomorrow at 2 PM",
+    "context": ""
+  }'
+```
+
+**Response:**
+```json
+{
+  "category": "optional_event",
+  "confidence": 0.92,
+  "reasoning": "Meeting invitation with specific time",
+  "one_line_summary": "Team meeting tomorrow at 2 PM"
+}
+```
+
+#### Get Inbox Emails
+
+```bash
+# Get emails from Outlook Inbox (live data)
+curl "http://localhost:8000/api/emails?folder=Inbox&limit=20"
+
+# Get classified FYI emails (from database)
+curl "http://localhost:8000/api/emails?category=fyi&limit=50"
+```
+
+#### Batch Classify Emails
+
+```bash
+curl -X POST "http://localhost:8000/api/ai/classifications" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email_ids": ["email-1", "email-2", "email-3"],
+    "context": ""
+  }'
+```
+
+#### Get Tasks
+
+```bash
+# Get all pending tasks
+curl "http://localhost:8000/api/tasks?status=pending&limit=20"
+
+# Get high priority tasks
+curl "http://localhost:8000/api/tasks?priority=high"
+
+# Search tasks
+curl "http://localhost:8000/api/tasks?search=budget"
+```
+
+### Using Postman
+
+Import the provided Postman collection for a complete API testing environment:
+
+1. Open Postman
+2. Click **Import**
+3. Select `email_helper.postman_collection.json`
+4. Collection includes all endpoints with example requests and test assertions
+
+### API Design Principles
+
+The Email Helper API follows consistent REST patterns:
+
+- **Singular endpoints** for single-item operations: `/api/ai/classification`, `/api/ai/summary`
+- **Plural endpoints** for batch operations: `/api/ai/classifications`, `/api/ai/summaries`
+- **Consistent error format** with application error codes
+- **Pagination** with `limit` and `offset` parameters
+- **Streaming support** for long-running operations via Server-Sent Events
+
+### Key Features
+
+- **Intelligent Data Source Selection**: `/api/emails` automatically routes to Outlook (live) or database (classified) based on query parameters
+- **Batch Operations**: Process multiple items in one request with partial failure handling
+- **Real-time Progress**: SSE streaming for batch operations with progress updates
+- **Comprehensive Error Handling**: Detailed error codes with retry guidance
+
+### API Documentation Resources
+
+- **[API Patterns Guide](docs/technical/API_PATTERNS.md)** - Detailed usage patterns, examples, and best practices
+- **[Error Codes Reference](docs/technical/ERROR_CODES.md)** - Complete error code documentation with resolution steps
+- **[OpenAPI Specification](backend-go/api-spec.yml)** - Full API specification with request/response examples
+
+### Example Workflows
+
+**Process Inbox on Startup:**
+```javascript
+// 1. Get unclassified emails
+const inbox = await fetch('http://localhost:8000/api/emails?folder=Inbox&limit=100');
+
+// 2. Batch classify
+const emailIds = inbox.emails.map(e => e.id);
+await fetch('http://localhost:8000/api/ai/classifications', {
+  method: 'POST',
+  body: JSON.stringify({ email_ids: emailIds })
+});
+
+// 3. Apply to Outlook folders
+await fetch('http://localhost:8000/api/emails/classifications/apply', {
+  method: 'POST',
+  body: JSON.stringify({ email_ids: emailIds, apply_to_outlook: true })
+});
+```
+
+**Real-time Email Classification:**
+```javascript
+async function classifyEmailAsUserReads(email) {
+  const result = await fetch('http://localhost:8000/api/ai/classification', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      subject: email.subject,
+      sender: email.sender,
+      content: email.body,
+      context: ''
+    })
+  });
+  return await result.json();
+}
+```
+
+See [API Patterns Guide](docs/technical/API_PATTERNS.md) for more examples and detailed workflows.
 
 ## 🐛 Troubleshooting
 

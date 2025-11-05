@@ -1,0 +1,822 @@
+{
+	"info": {
+		"_postman_id": "email-helper-api-v1",
+		"name": "Email Helper API",
+		"description": "Comprehensive API collection for Email Helper - AI-powered email classification and task management.\n\n**Features:**\n- Email classification and summarization\n- Task management\n- Batch operations with progress streaming\n- User settings management\n\n**Setup:**\n1. Ensure Go backend is running on localhost:8000\n2. Import this collection into Postman\n3. Use the included environment variables\n4. Test with /health endpoint first\n\n**Documentation:** See docs/technical/ for detailed API patterns and error codes.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Service is healthy\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql('healthy');",
+									"    pm.expect(jsonData.database).to.eql('healthy');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Check if the API service and database are operational."
+					},
+					"response": [
+						{
+							"name": "Healthy Service",
+							"originalRequest": {
+								"method": "GET",
+								"url": "{{baseUrl}}/health"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [{"key": "Content-Type", "value": "application/json"}],
+							"body": "{\n  \"status\": \"healthy\",\n  \"service\": \"email-helper-api\",\n  \"version\": \"1.0.0\",\n  \"database\": \"healthy\"\n}"
+						}
+					]
+				},
+				{
+					"name": "API Root",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/",
+							"host": ["{{baseUrl}}"],
+							"path": [""]
+						},
+						"description": "Get API information and available endpoints."
+					},
+					"response": []
+				},
+				{
+					"name": "AI Service Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ai/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ai", "health"]
+						},
+						"description": "Check if Azure OpenAI service is configured and reachable."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "AI - Classification",
+			"item": [
+				{
+					"name": "Classify Single Email",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has classification\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('category');",
+									"    pm.expect(jsonData).to.have.property('confidence');",
+									"    pm.expect(jsonData.confidence).to.be.within(0, 1);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"subject\": \"Team meeting tomorrow\",\n  \"sender\": \"manager@company.com\",\n  \"content\": \"Please join us for the team meeting tomorrow at 2 PM to discuss Q4 objectives.\",\n  \"context\": \"\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/ai/classification",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ai", "classification"]
+						},
+						"description": "Classify a single email using AI. Returns category, confidence score, reasoning, and one-line summary."
+					},
+					"response": [
+						{
+							"name": "Action Required Email",
+							"originalRequest": {
+								"method": "POST",
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"subject\": \"Please review the Q4 budget proposal\",\n  \"sender\": \"cfo@company.com\",\n  \"content\": \"Hi team, I need your feedback on the attached Q4 budget proposal by Friday. Please review and send comments.\",\n  \"context\": \"\"\n}"
+								},
+								"url": "{{baseUrl}}/api/ai/classification"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "{\n  \"category\": \"required_personal_action\",\n  \"confidence\": 0.92,\n  \"reasoning\": \"Email explicitly requests feedback on budget proposal with specific deadline\",\n  \"one_line_summary\": \"Review Q4 budget proposal by Friday\",\n  \"alternative_categories\": [\"team_action\"],\n  \"processing_time\": 1.8\n}"
+						}
+					]
+				},
+				{
+					"name": "Batch Classify (Non-Streaming)",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email_ids\": [\n    \"AAMkADc4...\",\n    \"AAMkADc5...\",\n    \"AAMkADc6...\"\n  ],\n  \"context\": \"\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/ai/classifications",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ai", "classifications"]
+						},
+						"description": "Classify multiple emails in batch. Returns all results at once."
+					},
+					"response": []
+				},
+				{
+					"name": "Batch Classify (Streaming)",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email_ids\": [\n    \"AAMkADc4...\",\n    \"AAMkADc5...\",\n    \"AAMkADc6...\"\n  ],\n  \"context\": \"\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/ai/classifications/stream",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ai", "classifications", "stream"]
+						},
+						"description": "Classify multiple emails with Server-Sent Events streaming for real-time progress updates."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "AI - Summarization",
+			"item": [
+				{
+					"name": "Generate Single Summary",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email_content\": \"Long email content here...\",\n  \"summary_type\": \"brief\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/ai/summary",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ai", "summary"]
+						},
+						"description": "Generate a summary for a single email. Summary types: brief, detailed."
+					},
+					"response": []
+				},
+				{
+					"name": "Batch Summarize",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email_ids\": [\"email-1\", \"email-2\", \"email-3\"],\n  \"summary_type\": \"detailed\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/ai/summaries",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ai", "summaries"]
+						},
+						"description": "Summarize multiple emails in batch."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "AI - Action Items",
+			"item": [
+				{
+					"name": "Extract Action Items",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email_content\": \"Please review the budget by Friday and send your comments. Also, update the project documentation.\",\n  \"context\": \"\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/ai/action-items",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ai", "action-items"]
+						},
+						"description": "Extract action items from email content."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "AI - Templates",
+			"item": [
+				{
+					"name": "Get Available Templates",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ai/templates",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ai", "templates"]
+						},
+						"description": "List all available prompt templates."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Emails",
+			"item": [
+				{
+					"name": "Get Emails (Inbox)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has emails array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('emails');",
+									"    pm.expect(jsonData.emails).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/emails?folder=Inbox&limit=20&offset=0",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "emails"],
+							"query": [
+								{"key": "folder", "value": "Inbox", "description": "Outlook folder name"},
+								{"key": "limit", "value": "20", "description": "Max results"},
+								{"key": "offset", "value": "0", "description": "Pagination offset"}
+							]
+						},
+						"description": "Get emails from Outlook Inbox. Returns live data from Outlook via COM."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Emails (By Category)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/emails?category=fyi&limit=50",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "emails"],
+							"query": [
+								{"key": "category", "value": "fyi", "description": "AI classification category"},
+								{"key": "limit", "value": "50"}
+							]
+						},
+						"description": "Get classified emails from database by category."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Specific Email",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/emails/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "emails", ":id"],
+							"variable": [
+								{"key": "id", "value": "AAMkADc4...", "description": "Email ID"}
+							]
+						},
+						"description": "Get specific email by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Emails",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/emails/search?q=budget&page=1&per_page=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "emails", "search"],
+							"query": [
+								{"key": "q", "value": "budget", "description": "Search term"},
+								{"key": "page", "value": "1"},
+								{"key": "per_page", "value": "20"}
+							]
+						},
+						"description": "Search emails by keyword."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Email Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/emails/stats?limit=100",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "emails", "stats"],
+							"query": [{"key": "limit", "value": "100"}]
+						},
+						"description": "Get email statistics including counts by folder and sender."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Email Read Status",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/emails/:id/read?read=true",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "emails", ":id", "read"],
+							"query": [{"key": "read", "value": "true"}],
+							"variable": [{"key": "id", "value": "AAMkADc4..."}]
+						},
+						"description": "Mark email as read or unread."
+					},
+					"response": []
+				},
+				{
+					"name": "Move Email to Folder",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/emails/:id/move?destination_folder=Archive",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "emails", ":id", "move"],
+							"query": [{"key": "destination_folder", "value": "Archive"}],
+							"variable": [{"key": "id", "value": "AAMkADc4..."}]
+						},
+						"description": "Move email to specified Outlook folder."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Email Classification",
+					"request": {
+						"method": "PUT",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"category\": \"fyi\",\n  \"apply_to_outlook\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/emails/:id/classification",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "emails", ":id", "classification"],
+							"variable": [{"key": "id", "value": "AAMkADc4..."}]
+						},
+						"description": "Update email's AI classification category."
+					},
+					"response": []
+				},
+				{
+					"name": "Apply Classifications to Outlook",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email_ids\": [\"email-1\", \"email-2\", \"email-3\"],\n  \"apply_to_outlook\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/emails/classifications/apply",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "emails", "classifications", "apply"]
+						},
+						"description": "Apply AI classifications to multiple emails in Outlook (move to folders)."
+					},
+					"response": []
+				},
+				{
+					"name": "Extract Tasks from Emails",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email_ids\": [\"email-1\", \"email-2\"],\n  \"apply_to_outlook\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/emails/extract-tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "emails", "extract-tasks"]
+						},
+						"description": "Extract action items as tasks from emails."
+					},
+					"response": []
+				},
+				{
+					"name": "Holistic Email Analysis",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email_ids\": [\n    \"email-1\",\n    \"email-2\",\n    \"email-3\"\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/emails/analyze-holistically",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "emails", "analyze-holistically"]
+						},
+						"description": "Perform cross-email analysis to identify truly relevant actions, superseded items, duplicates, and expired content."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Folders",
+			"item": [
+				{
+					"name": "Get Folders List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/folders",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "folders"]
+						},
+						"description": "Get list of available Outlook folders."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Tasks",
+			"item": [
+				{
+					"name": "Get Tasks",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has tasks array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('tasks');",
+									"    pm.expect(jsonData.tasks).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks?page=1&limit=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "limit", "value": "20"},
+								{"key": "status", "value": "pending", "disabled": true},
+								{"key": "priority", "value": "high", "disabled": true},
+								{"key": "search", "value": "budget", "disabled": true}
+							]
+						},
+						"description": "Get paginated list of tasks with optional filtering."
+					},
+					"response": []
+				},
+				{
+					"name": "Get High Priority Pending Tasks",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks?status=pending&priority=high&limit=50",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks"],
+							"query": [
+								{"key": "status", "value": "pending"},
+								{"key": "priority", "value": "high"},
+								{"key": "limit", "value": "50"}
+							]
+						},
+						"description": "Filter tasks by status and priority."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Tasks",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks?search=budget&page=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks"],
+							"query": [
+								{"key": "search", "value": "budget"},
+								{"key": "page", "value": "1"}
+							]
+						},
+						"description": "Search tasks by keyword in title and description."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Specific Task",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks", ":id"],
+							"variable": [{"key": "id", "value": "1"}]
+						},
+						"description": "Get specific task by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Task",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Review Q4 budget proposal\",\n  \"description\": \"CFO needs feedback by Friday\",\n  \"status\": \"pending\",\n  \"priority\": \"high\",\n  \"category\": \"action_required\",\n  \"due_date\": \"2025-11-08T17:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks"]
+						},
+						"description": "Create a new task."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Task",
+					"request": {
+						"method": "PUT",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"completed\",\n  \"completed_at\": \"2025-11-04T16:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks", ":id"],
+							"variable": [{"key": "id", "value": "1"}]
+						},
+						"description": "Update a task."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Task",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks", ":id"],
+							"variable": [{"key": "id", "value": "1"}]
+						},
+						"description": "Delete a task."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Task Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks/stats",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks", "stats"]
+						},
+						"description": "Get task statistics including counts by status, priority, and category."
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Update Tasks",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"task_ids\": [1, 2, 3],\n  \"updates\": {\n    \"status\": \"completed\",\n    \"completed_at\": \"2025-11-04T16:00:00Z\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks/updates",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks", "updates"]
+						},
+						"description": "Update multiple tasks with the same field values."
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Delete Tasks",
+					"request": {
+						"method": "DELETE",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"task_ids\": [1, 2, 3]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks"]
+						},
+						"description": "Delete multiple tasks."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Settings",
+			"item": [
+				{
+					"name": "Get User Settings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/settings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "settings"]
+						},
+						"description": "Get current user settings."
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Settings",
+					"request": {
+						"method": "PUT",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"user@example.com\",\n  \"job_context\": \"Software Engineer\",\n  \"azure_openai_endpoint\": \"https://your-resource.openai.azure.com/\",\n  \"azure_openai_deployment\": \"gpt-4\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/settings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "settings"]
+						},
+						"description": "Update user settings including Azure OpenAI configuration."
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Settings to Defaults",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/settings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "settings"]
+						},
+						"description": "Reset all settings to default values."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Processing",
+			"item": [
+				{
+					"name": "Start Processing Pipeline",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email_ids\": [\"email-1\", \"email-2\", \"email-3\"],\n  \"priority\": \"medium\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/processing/start",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "processing", "start"]
+						},
+						"description": "Start a processing pipeline for multiple emails."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Pipeline Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/processing/:id/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "processing", ":id", "status"],
+							"variable": [{"key": "id", "value": "pipeline-id"}]
+						},
+						"description": "Get status of a processing pipeline."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Pre-request script for all requests",
+					"// Add any authentication headers here if needed"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test script",
+					"if (pm.response.code >= 400) {",
+					"    console.error('Request failed:', pm.response.json());",
+					"}"
+				]
+			}
+		}
+	]
+}

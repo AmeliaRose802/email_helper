@@ -29,6 +29,14 @@ paths:
     get:
       summary: Health check
       tags: [Health]
+      description: |
+        Check if the API service is operational. Returns health status of the API server and database connection.
+        Use this endpoint to verify the service is running before making other API calls.
+        
+        **Example curl:**
+        ```bash
+        curl -X GET "http://localhost:8000/health"
+        ```
       responses:
         '200':
           description: Service is healthy
@@ -49,6 +57,28 @@ paths:
                   database:
                     type: string
                     example: healthy
+              examples:
+                success:
+                  summary: Healthy service
+                  value:
+                    status: "healthy"
+                    service: "email-helper-api"
+                    version: "1.0.0"
+                    database: "healthy"
+        '503':
+          description: Service unavailable (database connection failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                database_error:
+                  summary: Database connection failed
+                  value:
+                    error:
+                      code: "DATABASE_UNAVAILABLE"
+                      message: "Failed to connect to database"
+                      details: "Connection refused"
 
   /:
     get:
@@ -77,6 +107,22 @@ paths:
       description: |
         Atomic operation for classifying a single email. Uses singular naming for single-item operations.
         Replaces the deprecated `/api/ai/classify` endpoint.
+        
+        **Use case:** Classify individual emails in real-time as user reads them.
+        
+        **Example curl:**
+        ```bash
+        curl -X POST "http://localhost:8000/api/ai/classification" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "subject": "Team meeting tomorrow",
+            "sender": "manager@company.com",
+            "content": "Please join us for the team meeting tomorrow at 2 PM",
+            "context": ""
+          }'
+        ```
+        
+        **Performance:** Typically 1-3 seconds depending on email length and AI service latency.
       tags: [AI]
       requestBody:
         required: true
@@ -101,6 +147,28 @@ paths:
                 context:
                   type: string
                   example: ""
+            examples:
+              action_required:
+                summary: Action required email
+                value:
+                  subject: "Please review the Q4 budget proposal"
+                  sender: "cfo@company.com"
+                  content: "Hi team, I need your feedback on the attached Q4 budget proposal by Friday. Please review and send comments."
+                  context: ""
+              fyi:
+                summary: FYI email
+                value:
+                  subject: "Weekly team update"
+                  sender: "manager@company.com"
+                  content: "Here's what the team accomplished this week: 1) Launched new feature, 2) Fixed critical bugs, 3) Improved performance by 20%"
+                  context: ""
+              newsletter:
+                summary: Newsletter
+                value:
+                  subject: "Tech Weekly - AI Trends 2025"
+                  sender: "newsletter@techweekly.com"
+                  content: "In this week's issue: Latest AI breakthroughs, Cloud computing updates, and more..."
+                  context: ""
       responses:
         '200':
           description: Classification result
@@ -108,10 +176,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EmailClassificationResponse'
+              examples:
+                action_required:
+                  summary: Action required classification
+                  value:
+                    category: "required_personal_action"
+                    confidence: 0.92
+                    reasoning: "Email explicitly requests feedback on budget proposal with specific deadline"
+                    one_line_summary: "Review Q4 budget proposal by Friday"
+                    alternative_categories: ["team_action"]
+                    processing_time: 1.8
+                fyi:
+                  summary: FYI classification
+                  value:
+                    category: "fyi"
+                    confidence: 0.95
+                    reasoning: "Informational update with no action items or responses needed"
+                    one_line_summary: "Team accomplished feature launch, bug fixes, and performance improvements"
+                    alternative_categories: []
+                    processing_time: 1.2
         '400':
-          description: Invalid request
+          description: Invalid request - missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_subject:
+                  summary: Missing subject field
+                  value:
+                    error:
+                      code: "VALIDATION_ERROR"
+                      message: "Missing required field: subject"
+                      details: "Request body must include subject, sender, and content"
+                empty_content:
+                  summary: Empty email content
+                  value:
+                    error:
+                      code: "VALIDATION_ERROR"
+                      message: "Email content cannot be empty"
         '500':
           description: AI processing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                ai_service_error:
+                  summary: AI service unavailable
+                  value:
+                    error:
+                      code: "AI_SERVICE_ERROR"
+                      message: "Failed to classify email"
+                      details: "Azure OpenAI service returned 503 - Service Unavailable"
+                timeout:
+                  summary: Request timeout
+                  value:
+                    error:
+                      code: "REQUEST_TIMEOUT"
+                      message: "AI classification timed out after 30 seconds"
 
   /api/ai/classifications:
     post:
@@ -515,6 +638,21 @@ paths:
         - View sent emails: `/api/emails?folder=Sent`
         - Filter by AI category: `/api/emails?category=fyi`
         - View action items: `/api/emails?category=action_required`
+        
+        **Example curl:**
+        ```bash
+        # Get inbox emails
+        curl -X GET "http://localhost:8000/api/emails?folder=Inbox&limit=20"
+        
+        # Get classified FYI emails
+        curl -X GET "http://localhost:8000/api/emails?category=fyi&limit=50"
+        
+        # Paginate through emails
+        curl -X GET "http://localhost:8000/api/emails?limit=20&offset=20"
+        ```
+        
+        **Pagination:** Use `limit` and `offset` parameters. Default limit is 50, maximum is 50000.
+        The response includes `has_more` boolean to indicate if more results are available.
       tags: [Emails]
       parameters:
         - name: folder
@@ -555,12 +693,85 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EmailListResponse'
+              examples:
+                inbox_emails:
+                  summary: Inbox emails from Outlook
+                  value:
+                    emails:
+                      - id: "AAMkADc4..."
+                        subject: "Q4 Planning Meeting"
+                        sender: "manager@company.com"
+                        date: "2025-11-04T14:30:00Z"
+                        is_read: false
+                        has_attachments: true
+                        body: "Let's discuss Q4 objectives..."
+                      - id: "AAMkADc5..."
+                        subject: "Weekly Newsletter"
+                        sender: "newsletter@techweekly.com"
+                        date: "2025-11-04T08:00:00Z"
+                        is_read: true
+                        has_attachments: false
+                        body: "This week in tech..."
+                    total: 127
+                    offset: 0
+                    limit: 50
+                    has_more: true
+                classified_fyi:
+                  summary: Classified FYI emails from database
+                  value:
+                    emails:
+                      - id: "AAMkADc6..."
+                        subject: "Team Update"
+                        sender: "lead@company.com"
+                        date: "2025-11-04T10:00:00Z"
+                        ai_category: "fyi"
+                        ai_confidence: 0.95
+                        one_line_summary: "Team completed feature launch and bug fixes"
+                    total: 45
+                    offset: 0
+                    limit: 50
+                    has_more: false
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_category:
+                  summary: Invalid category value
+                  value:
+                    error:
+                      code: "INVALID_PARAMETER"
+                      message: "Invalid category value"
+                      details: "Category must be one of: fyi, action_required, newsletter, calendar_event, auto_response, receipts_confirmations, other"
+                invalid_limit:
+                  summary: Limit exceeds maximum
+                  value:
+                    error:
+                      code: "INVALID_PARAMETER"
+                      message: "Limit exceeds maximum of 50000"
         '500':
           description: Failed to retrieve emails
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+              examples:
+                outlook_error:
+                  summary: Outlook COM interface error
+                  value:
+                    error:
+                      code: "OUTLOOK_ERROR"
+                      message: "Failed to retrieve emails from Outlook"
+                      details: "Outlook is not running or COM interface unavailable"
+                database_error:
+                  summary: Database query failed
+                  value:
+                    error:
+                      code: "DATABASE_ERROR"
+                      message: "Failed to query database"
+                      details: "SQLite error: database is locked"
 
   /api/emails/{id}:
     get:
@@ -1004,6 +1215,27 @@ paths:
   /api/tasks:
     get:
       summary: Get paginated list of tasks
+      description: |
+        Retrieves tasks with optional filtering and pagination. Tasks are extracted action items
+        from classified emails.
+        
+        **Example curl:**
+        ```bash
+        # Get all tasks (first page)
+        curl -X GET "http://localhost:8000/api/tasks?page=1&limit=20"
+        
+        # Filter by status
+        curl -X GET "http://localhost:8000/api/tasks?status=pending&limit=50"
+        
+        # Filter by priority
+        curl -X GET "http://localhost:8000/api/tasks?priority=high"
+        
+        # Search tasks
+        curl -X GET "http://localhost:8000/api/tasks?search=budget"
+        ```
+        
+        **Filtering:** Combine multiple filters (status, priority, search) to narrow results.
+        All filters use AND logic.
       tags: [Tasks]
       parameters:
         - name: page
@@ -1021,16 +1253,24 @@ paths:
             default: 20
         - name: status
           in: query
+          description: Filter by task status
           schema:
             type: string
+            enum: [pending, in_progress, completed, cancelled]
+          example: pending
         - name: priority
           in: query
+          description: Filter by task priority
           schema:
             type: string
+            enum: [low, medium, high, urgent]
+          example: high
         - name: search
           in: query
+          description: Search task titles and descriptions
           schema:
             type: string
+          example: budget
       responses:
         '200':
           description: List of tasks
@@ -1038,8 +1278,80 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskListResponse'
+              examples:
+                all_tasks:
+                  summary: Paginated task list
+                  value:
+                    tasks:
+                      - id: 1
+                        title: "Review Q4 budget proposal"
+                        description: "CFO needs feedback by Friday"
+                        status: "pending"
+                        priority: "high"
+                        category: "action_required"
+                        email_id: "AAMkADc4..."
+                        due_date: "2025-11-08T17:00:00Z"
+                        created_at: "2025-11-04T14:30:00Z"
+                      - id: 2
+                        title: "Update project documentation"
+                        status: "in_progress"
+                        priority: "medium"
+                        category: "team_action"
+                    total_count: 42
+                    page: 1
+                    page_size: 20
+                    has_next: true
+                filtered_tasks:
+                  summary: High priority pending tasks
+                  value:
+                    tasks:
+                      - id: 1
+                        title: "Review Q4 budget proposal"
+                        status: "pending"
+                        priority: "high"
+                    total_count: 3
+                    page: 1
+                    page_size: 20
+                    has_next: false
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_status:
+                  summary: Invalid status filter
+                  value:
+                    error:
+                      code: "INVALID_PARAMETER"
+                      message: "Invalid status value"
+                      details: "Status must be one of: pending, in_progress, completed, cancelled"
+        '500':
+          description: Database query failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     post:
       summary: Create new task
+      description: |
+        Create a new task manually. Tasks can also be automatically extracted from emails
+        via the `/api/emails/extract-tasks` endpoint.
+        
+        **Example curl:**
+        ```bash
+        curl -X POST "http://localhost:8000/api/tasks" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "title": "Review Q4 budget proposal",
+            "description": "CFO needs feedback by Friday",
+            "status": "pending",
+            "priority": "high",
+            "category": "action_required",
+            "due_date": "2025-11-08T17:00:00Z"
+          }'
+        ```
       tags: [Tasks]
       requestBody:
         required: true
@@ -1047,6 +1359,21 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/TaskCreate'
+            examples:
+              minimal:
+                summary: Minimal task (only title required)
+                value:
+                  title: "Call client about project timeline"
+              complete:
+                summary: Complete task with all fields
+                value:
+                  title: "Review Q4 budget proposal"
+                  description: "CFO needs feedback by Friday"
+                  status: "pending"
+                  priority: "high"
+                  category: "action_required"
+                  email_id: "AAMkADc4..."
+                  due_date: "2025-11-08T17:00:00Z"
       responses:
         '201':
           description: Task created
@@ -1054,6 +1381,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Task'
+              examples:
+                created_task:
+                  summary: Newly created task
+                  value:
+                    id: 15
+                    title: "Review Q4 budget proposal"
+                    description: "CFO needs feedback by Friday"
+                    status: "pending"
+                    priority: "high"
+                    category: "action_required"
+                    email_id: "AAMkADc4..."
+                    due_date: "2025-11-08T17:00:00Z"
+                    created_at: "2025-11-04T15:22:10Z"
+                    updated_at: "2025-11-04T15:22:10Z"
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_title:
+                  summary: Missing required title
+                  value:
+                    error:
+                      code: "VALIDATION_ERROR"
+                      message: "Missing required field: title"
+                invalid_status:
+                  summary: Invalid status value
+                  value:
+                    error:
+                      code: "VALIDATION_ERROR"
+                      message: "Invalid status value"
+                      details: "Status must be one of: pending, in_progress, completed, cancelled"
     delete:
       summary: Delete multiple tasks
       description: |
@@ -1378,6 +1739,36 @@ paths:
 
 components:
   schemas:
+    Error:
+      type: object
+      description: Standard error response format used across all API endpoints
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code (e.g., VALIDATION_ERROR, DATABASE_ERROR)
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              description: Human-readable error message
+              example: "Missing required field: subject"
+            details:
+              type: string
+              description: Additional context about the error (optional)
+              example: "Request body must include subject, sender, and content"
+      example:
+        error:
+          code: "VALIDATION_ERROR"
+          message: "Missing required field: subject"
+          details: "Request body must include subject, sender, and content"
+
     Email:
       type: object
       properties:
