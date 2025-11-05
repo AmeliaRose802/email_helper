@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -28,7 +27,7 @@ type Client struct {
 
 // NewClient creates a new Azure OpenAI client using DefaultAzureCredential (az login)
 // This matches the Python backend's authentication approach
-func NewClient(endpoint, apiKey, deployment string) (*Client, error) {
+func NewClient(endpoint, apiKey, deployment, promptsDir string) (*Client, error) {
 	if endpoint == "" {
 		return nil, fmt.Errorf("Azure OpenAI endpoint is required")
 	}
@@ -66,20 +65,15 @@ func NewClient(endpoint, apiKey, deployment string) (*Client, error) {
 		}
 	}
 
-	// Load prompty templates from the prompts directory
-	promptsDir := filepath.Join(".", "prompts")
-	prompts, err := prompty.LoadPromptDirectory(promptsDir)
+	// Load prompty templates from the configured prompts directory
+	var prompts map[string]*prompty.PromptyTemplate
+	prompts, err = prompty.LoadPromptDirectory(promptsDir)
 	if err != nil {
-		// Try from parent directory (when running from backend-go/)
-		promptsDir = filepath.Join("..", "prompts")
-		prompts, err = prompty.LoadPromptDirectory(promptsDir)
-		if err != nil {
-			log.Printf("Warning: failed to load prompty files: %v (continuing with hardcoded prompts)", err)
-			prompts = make(map[string]*prompty.PromptyTemplate)
-		}
+		log.Printf("Warning: failed to load prompty files from %s: %v (continuing with hardcoded prompts)", promptsDir, err)
+		prompts = make(map[string]*prompty.PromptyTemplate)
+	} else {
+		log.Printf("✅ Loaded %d prompty templates from %s", len(prompts), promptsDir)
 	}
-
-	log.Printf("Loaded %d prompty templates from %s", len(prompts), promptsDir)
 
 	return &Client{
 		client:     client,
@@ -105,7 +99,7 @@ func (c *Client) ClassifyEmail(ctx context.Context, subject, sender, content, us
 			"username":         "User",              // TODO: Make configurable
 			"subject":          subject,
 			"sender":           sender,
-			"date":             time.Now().Format(time.RFC1123),
+			"received_time":    time.Now().Format(time.RFC1123),
 			"content":          content,
 		}
 
@@ -208,7 +202,7 @@ func (c *Client) ExtractActionItems(ctx context.Context, emailContent, userConte
 			"username": "User", // TODO: Make configurable
 			"subject":  subject,
 			"sender":   sender,
-			"date":     time.Now().Format(time.RFC1123),
+			"received_time": time.Now().Format(time.RFC1123),
 			"content":  body,
 		}
 
@@ -311,7 +305,7 @@ func (c *Client) Summarize(ctx context.Context, emailContent string, summaryType
 			"username": "User", // TODO: Make configurable
 			"subject":  subject,
 			"sender":   sender,
-			"date":     time.Now().Format(time.RFC1123),
+			"received_time": time.Now().Format(time.RFC1123),
 			"content":  body,
 		}
 

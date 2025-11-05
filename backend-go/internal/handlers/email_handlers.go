@@ -263,8 +263,8 @@ func UpdateEmailClassification(c *gin.Context) {
 	})
 }
 
-// BulkApplyToOutlook applies classifications to multiple emails
-func BulkApplyToOutlook(c *gin.Context) {
+// ApplyClassifications applies classifications to multiple emails (new plural naming)
+func ApplyClassifications(c *gin.Context) {
 	var req models.BulkApplyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -277,7 +277,35 @@ func BulkApplyToOutlook(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models.BulkApplyResponse{
+	c.JSON(http.StatusOK, models.BatchOperationResponse{
+		Success:    failed == 0,
+		Processed:  len(req.EmailIDs),
+		Successful: successful,
+		Failed:     failed,
+		Errors:     errors,
+	})
+}
+
+// BulkApplyToOutlook applies classifications to multiple emails
+// Deprecated: Use POST /api/emails/classifications/apply instead
+func BulkApplyToOutlook(c *gin.Context) {
+	// Add deprecation header
+	c.Header("X-Deprecated", "true")
+	c.Header("X-Deprecated-Message", "Use POST /api/emails/classifications/apply instead")
+	
+	var req models.BulkApplyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	successful, failed, errors, err := emailService.BulkApplyToOutlook(req.EmailIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.BatchOperationResponse{
 		Success:    failed == 0,
 		Processed:  len(req.EmailIDs),
 		Successful: successful,
@@ -358,30 +386,13 @@ type BatchProcessRequest struct {
 	SaveToDatabase bool     `json:"save_to_database"`
 }
 
-// BatchEmailResult represents the result of processing a single email
-type BatchEmailResult struct {
-	EmailID        string   `json:"email_id"`
-	Subject        string   `json:"subject"`
-	Category       string   `json:"category"`
-	Confidence     float64  `json:"confidence"`
-	Priority       string   `json:"priority"`
-	ActionItems    []string `json:"action_items,omitempty"`
-	OneLineSummary string   `json:"one_line_summary,omitempty"`
-	Reasoning      string   `json:"reasoning,omitempty"`
-	Success        bool     `json:"success"`
-	Error          string   `json:"error,omitempty"`
-}
-
-// BatchProcessResponse response for batch email processing
-type BatchProcessResponse struct {
-	ProcessedCount  int                 `json:"processed_count"`
-	SuccessfulCount int                 `json:"successful_count"`
-	FailedCount     int                 `json:"failed_count"`
-	Results         []BatchEmailResult  `json:"results"`
-}
-
 // BatchProcessEmails handles batch email processing with AI classification and action items extraction
+// Deprecated: Use POST /api/ai/classifications instead
 func BatchProcessEmails(c *gin.Context) {
+	// Add deprecation header
+	c.Header("X-Deprecated", "true")
+	c.Header("X-Deprecated-Message", "Use POST /api/ai/classifications instead")
+	
 	var req BatchProcessRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -389,7 +400,7 @@ func BatchProcessEmails(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	results := make([]BatchEmailResult, 0, len(req.EmailIDs))
+	results := make([]models.BatchItemResult, 0, len(req.EmailIDs))
 	successCount := 0
 	failedCount := 0
 
@@ -400,53 +411,59 @@ func BatchProcessEmails(c *gin.Context) {
 	}
 
 	for _, emailID := range req.EmailIDs {
-		result := BatchEmailResult{
-			EmailID: emailID,
+		itemResult := models.BatchItemResult{
+			ItemID:  emailID,
 			Success: false,
+			Data:    make(map[string]interface{}),
 		}
 
 		// Get email details
 		email, err := emailService.GetEmailByID(emailID, "outlook")
 		if err != nil {
-			result.Error = fmt.Sprintf("Failed to get email: %v", err)
-			results = append(results, result)
+			itemResult.Error = fmt.Sprintf("Failed to get email: %v", err)
+			results = append(results, itemResult)
 			failedCount++
 			continue
 		}
 
-		result.Subject = email.Subject
+		itemResult.Data["subject"] = email.Subject
 
 		// Classify email using AI
 		classification, err := emailService.ClassifyEmail(ctx, email.Subject, email.Sender, email.Content, "")
 		if err != nil {
-			result.Error = fmt.Sprintf("Failed to classify: %v", err)
-			results = append(results, result)
+			itemResult.Error = fmt.Sprintf("Failed to classify: %v", err)
+			results = append(results, itemResult)
 			failedCount++
 			continue
 		}
 
 		// Update result with classification
-		result.Category = classification.Category
+		itemResult.Data["category"] = classification.Category
 		if classification.Confidence != nil {
-			result.Confidence = *classification.Confidence
+			itemResult.Data["confidence"] = *classification.Confidence
 		}
-		result.OneLineSummary = classification.OneLineSummary
-		result.Reasoning = classification.Reasoning
+		itemResult.Data["one_line_summary"] = classification.OneLineSummary
+		itemResult.Data["reasoning"] = classification.Reasoning
 
 		// Calculate priority based on category and confidence
-		result.Priority = calculateEmailPriority(classification.Category, result.Confidence)
+		confidence := 0.0
+		if classification.Confidence != nil {
+			confidence = *classification.Confidence
+		}
+		priority := calculateEmailPriority(classification.Category, confidence)
+		itemResult.Data["priority"] = priority
 
 		// Extract action items for actionable categories
 		if actionableCategories[classification.Category] {
 			actionItems, err := emailService.ExtractActionItems(ctx, email.Content, "")
 			if err == nil && len(actionItems.ActionItems) > 0 {
-				result.ActionItems = actionItems.ActionItems
+				itemResult.Data["action_items"] = actionItems.ActionItems
 			}
 		}
 
 		// Update email with classification results
 		email.AICategory = classification.Category
-		email.AIConfidence = result.Confidence
+		email.AIConfidence = confidence
 		email.AIReasoning = classification.Reasoning
 		email.OneLineSummary = classification.OneLineSummary
 
@@ -458,17 +475,18 @@ func BatchProcessEmails(c *gin.Context) {
 			}
 		}
 
-		result.Success = true
-		results = append(results, result)
+		itemResult.Success = true
+		results = append(results, itemResult)
 		successCount++
 	}
 
-	// Build response matching Python API format
-	response := BatchProcessResponse{
-		ProcessedCount:  len(req.EmailIDs),
-		SuccessfulCount: successCount,
-		FailedCount:     failedCount,
-		Results:         results,
+	// Build standardized response
+	response := models.BatchOperationResponse{
+		Success:    failedCount == 0,
+		Processed:  len(req.EmailIDs),
+		Successful: successCount,
+		Failed:     failedCount,
+		Results:    results,
 	}
 
 	// Return 200 OK even with partial failures (partial success pattern)
@@ -589,7 +607,34 @@ func ExtractTasks(c *gin.Context) {
 	})
 }
 
-// AnalyzeHolistically performs holistic email analysis (stub for now)
+// AnalyzeHolistically performs holistic email analysis across multiple emails
+// Identifies truly relevant actions, superseded items, duplicates, and expired deadlines
 func AnalyzeHolistically(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "Not implemented yet"})
+	var req models.HolisticAnalysisRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid request body: %v", err)})
+		return
+	}
+
+	if len(req.EmailIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email_ids cannot be empty"})
+		return
+	}
+
+	// Get email service
+	if emailService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Email service not initialized"})
+		return
+	}
+
+	// Call email service to perform holistic analysis
+	result, err := emailService.AnalyzeHolistically(c.Request.Context(), req.EmailIDs)
+	if err != nil {
+		log.Printf("Holistic analysis failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("AI analysis failed: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
+

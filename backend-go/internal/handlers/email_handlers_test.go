@@ -135,6 +135,14 @@ func (m *MockEmailService) CheckAIHealth(ctx context.Context) error {
 	return args.Error(0)
 }
 
+func (m *MockEmailService) AnalyzeHolistically(ctx context.Context, emailIDs []string) (*models.HolisticAnalysisResponse, error) {
+	args := m.Called(ctx, emailIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.HolisticAnalysisResponse), args.Error(1)
+}
+
 func (m *MockEmailService) Close() error {
 	args := m.Called()
 	return args.Error(0)
@@ -672,15 +680,75 @@ func TestExtractTasksRequiresBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func TestAnalyzeHolisticallyNotImplemented(t *testing.T) {
+func TestAnalyzeHolistically(t *testing.T) {
+	mockService := new(MockEmailService)
+	originalService := emailService
+	emailService = mockService
+	defer func() { emailService = originalService }()
+
 	router := setupTestRouter()
 	router.POST("/emails/analyze", AnalyzeHolistically)
 
-	req, _ := http.NewRequest("POST", "/emails/analyze", nil)
+	// Setup mock expectation
+	expectedResponse := &models.HolisticAnalysisResponse{
+		TrulyRelevantActions: []models.TrulyRelevantAction{
+			{
+				ActionType:       "required_personal_action",
+				Priority:         "high",
+				Topic:            "Project Deadline",
+				CanonicalEmailID: "email-1",
+				RelatedEmailIDs:  []string{},
+				Deadline:         "2025-11-10",
+				WhyRelevant:      "Requires immediate attention",
+				BlockingOthers:   false,
+			},
+		},
+		SupersededActions: []models.SupersededAction{},
+		DuplicateGroups:   []models.DuplicateGroup{},
+		ExpiredItems:      []models.ExpiredItem{},
+		EmailsAnalyzed:    2,
+		ProcessingTime:    0.5,
+	}
+
+	mockService.On("AnalyzeHolistically", mock.Anything, []string{"email-1", "email-2"}).
+		Return(expectedResponse, nil)
+
+	// Create request
+	reqBody := models.HolisticAnalysisRequest{
+		EmailIDs: []string{"email-1", "email-2"},
+	}
+	jsonBytes, _ := json.Marshal(reqBody)
+	req, _ := http.NewRequest("POST", "/emails/analyze", bytes.NewBuffer(jsonBytes))
+	req.Header.Set("Content-Type", "application/json")
+
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusNotImplemented, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response models.HolisticAnalysisResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, response.EmailsAnalyzed)
+	assert.Equal(t, 1, len(response.TrulyRelevantActions))
+}
+
+func TestAnalyzeHolisticallyBadRequest(t *testing.T) {
+	router := setupTestRouter()
+	router.POST("/emails/analyze", AnalyzeHolistically)
+
+	// Test with no email IDs
+	reqBody := models.HolisticAnalysisRequest{
+		EmailIDs: []string{},
+	}
+	jsonBytes, _ := json.Marshal(reqBody)
+	req, _ := http.NewRequest("POST", "/emails/analyze", bytes.NewBuffer(jsonBytes))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 // Test intelligent data source selection
@@ -772,4 +840,71 @@ func TestGetEmailsWithFolderUsesOutlook(t *testing.T) {
 
 	mockService.AssertExpectations(t)
 }
+
+func TestApplyClassifications(t *testing.T) {
+	mockService := new(MockEmailService)
+	originalService := emailService
+	emailService = mockService
+	defer func() { emailService = originalService }()
+
+	router := setupTestRouter()
+	router.POST("/emails/classifications/apply", ApplyClassifications)
+
+	emailIDs := []string{"email-1", "email-2", "email-3"}
+	mockService.On("BulkApplyToOutlook", emailIDs).Return(3, 0, []string{}, nil)
+
+	bulkApplyReq := models.BulkApplyRequest{EmailIDs: emailIDs}
+	jsonData, _ := json.Marshal(bulkApplyReq)
+
+	req, _ := http.NewRequest("POST", "/emails/classifications/apply", bytes.NewBuffer(jsonData))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response models.BatchOperationResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.True(t, response.Success)
+	assert.Equal(t, 3, response.Successful)
+	assert.Equal(t, 0, response.Failed)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestBulkApplyToOutlook_Deprecated(t *testing.T) {
+	mockService := new(MockEmailService)
+	originalService := emailService
+	emailService = mockService
+	defer func() { emailService = originalService }()
+
+	router := setupTestRouter()
+	router.POST("/emails/bulk/apply", BulkApplyToOutlook)
+
+	emailIDs := []string{"email-1", "email-2"}
+	mockService.On("BulkApplyToOutlook", emailIDs).Return(2, 0, []string{}, nil)
+
+	bulkApplyReq := models.BulkApplyRequest{EmailIDs: emailIDs}
+	jsonData, _ := json.Marshal(bulkApplyReq)
+
+	req, _ := http.NewRequest("POST", "/emails/bulk/apply", bytes.NewBuffer(jsonData))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Check deprecation headers
+	assert.Equal(t, "true", w.Header().Get("X-Deprecated"))
+	assert.Equal(t, "Use POST /api/emails/classifications/apply instead", w.Header().Get("X-Deprecated-Message"))
+
+	var response models.BatchOperationResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.True(t, response.Success)
+
+	mockService.AssertExpectations(t)
+}
+
 

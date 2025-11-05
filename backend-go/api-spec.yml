@@ -71,9 +71,12 @@ paths:
                   health:
                     type: string
 
-  /api/ai/classify:
+  /api/ai/classification:
     post:
-      summary: Classify email content
+      summary: Classify single email content (new consistent naming)
+      description: |
+        Atomic operation for classifying a single email. Uses singular naming for single-item operations.
+        Replaces the deprecated `/api/ai/classify` endpoint.
       tags: [AI]
       requestBody:
         required: true
@@ -105,8 +108,305 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EmailClassificationResponse'
+        '400':
+          description: Invalid request
         '500':
           description: AI processing failed
+
+  /api/ai/classifications:
+    post:
+      summary: Batch classify multiple emails (non-streaming)
+      description: |
+        Batch operation for classifying multiple emails. Returns all results at once in a structured response.
+        Uses plural naming for batch operations.
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_ids
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+                  example: ["email-1", "email-2", "email-3"]
+                context:
+                  type: string
+                  example: ""
+      responses:
+        '200':
+          description: Batch classification results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchClassificationResponse'
+        '400':
+          description: Invalid request (empty email_ids)
+
+  /api/ai/classifications/stream:
+    post:
+      summary: Batch classify multiple emails with Server-Sent Events (SSE) streaming
+      description: |
+        Batch operation with real-time progress updates via Server-Sent Events.
+        Use this for UI progress indicators during long-running classification jobs.
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_ids
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+                  example: ["email-1", "email-2", "email-3"]
+                context:
+                  type: string
+      responses:
+        '200':
+          description: SSE stream of classification events
+          content:
+            text/event-stream:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: integer
+                  total:
+                    type: integer
+                  status:
+                    type: string
+                    enum: [processing, completed, error]
+                  email_id:
+                    type: string
+                  category:
+                    type: string
+                  message:
+                    type: string
+                  error:
+                    type: string
+                  progress:
+                    type: number
+                    format: float
+                    minimum: 0
+                    maximum: 100
+        '400':
+          description: Invalid request
+
+  /api/ai/summary:
+    post:
+      summary: Generate single email summary (new consistent naming)
+      description: |
+        Atomic operation for summarizing a single email. Uses singular naming for single-item operations.
+        Replaces the deprecated `/api/ai/summarize` endpoint.
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_content
+              properties:
+                email_content:
+                  type: string
+                summary_type:
+                  type: string
+                  enum: [brief, detailed]
+                  default: brief
+      responses:
+        '200':
+          description: Summary generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: AI processing failed
+
+  /api/ai/summaries:
+    post:
+      summary: Batch summarize multiple emails
+      description: |
+        Batch operation for summarizing multiple emails. Returns all summaries at once.
+        Uses plural naming for batch operations.
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_ids
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+                  example: ["email-1", "email-2", "email-3"]
+                summary_type:
+                  type: string
+                  enum: [brief, detailed, key_points]
+                  default: brief
+      responses:
+        '200':
+          description: Batch summary results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchSummaryResponse'
+        '400':
+          description: Invalid request (empty email_ids)
+
+  /api/ai/classify:
+    post:
+      summary: Classify email content (DEPRECATED)
+      deprecated: true
+      description: |
+        **DEPRECATED**: This endpoint is deprecated and will be removed on 2025-05-01.
+        Use `POST /api/ai/classification` instead for consistent singular naming.
+        
+        This endpoint now returns deprecation headers:
+        - `X-Deprecation-Warning`: Migration notice
+        - `X-Sunset`: Removal date
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subject
+                - sender
+                - content
+              properties:
+                subject:
+                  type: string
+                  example: "Team meeting tomorrow"
+                sender:
+                  type: string
+                  example: "manager@company.com"
+                content:
+                  type: string
+                  example: "Please join us for the team meeting tomorrow at 2 PM"
+                context:
+                  type: string
+                  example: ""
+      responses:
+        '200':
+          description: Classification result
+          headers:
+            X-Deprecation-Warning:
+              schema:
+                type: string
+              description: "This endpoint is deprecated. Use POST /api/ai/classification instead"
+            X-Sunset:
+              schema:
+                type: string
+              description: "2025-05-01"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailClassificationResponse'
+        '500':
+          description: AI processing failed
+
+  /api/ai/summarize:
+    post:
+      summary: Generate email summary (DEPRECATED)
+      deprecated: true
+      description: |
+        **DEPRECATED**: This endpoint is deprecated and will be removed on 2025-05-01.
+        Use `POST /api/ai/summary` instead for consistent singular naming.
+        
+        This endpoint now returns deprecation headers:
+        - `X-Deprecation-Warning`: Migration notice
+        - `X-Sunset`: Removal date
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_content
+              properties:
+                email_content:
+                  type: string
+                summary_type:
+                  type: string
+                  enum: [brief, detailed]
+                  default: brief
+      responses:
+        '200':
+          description: Summary generated
+          headers:
+            X-Deprecation-Warning:
+              schema:
+                type: string
+              description: "This endpoint is deprecated. Use POST /api/ai/summary instead"
+            X-Sunset:
+              schema:
+                type: string
+              description: "2025-05-01"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryResponse'
+
+  /api/ai/classify-batch-stream:
+    post:
+      summary: Batch classify with SSE streaming (DEPRECATED)
+      deprecated: true
+      description: |
+        **DEPRECATED**: This endpoint is deprecated and will be removed on 2025-05-01.
+        Use `POST /api/ai/classifications/stream` instead for consistent naming.
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_ids
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+                context:
+                  type: string
+      responses:
+        '200':
+          description: SSE stream of classification events
+          headers:
+            X-Deprecation-Warning:
+              schema:
+                type: string
+              description: "This endpoint is deprecated. Use POST /api/ai/classifications/stream instead"
+            X-Sunset:
+              schema:
+                type: string
+              description: "2025-05-01"
+          content:
+            text/event-stream:
+              schema:
+                type: object
           
   /api/ai/action-items:
     post:
@@ -457,9 +757,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/EmailOperationResponse'
 
+  /api/emails/classifications/apply:
+    post:
+      summary: Apply classifications to multiple emails
+      description: |
+        New plural-named endpoint for applying classifications to multiple emails in Outlook.
+        Replaces /api/emails/bulk-apply-to-outlook with consistent REST naming.
+      tags: [Emails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_ids
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+                apply_to_outlook:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: Classification apply results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchOperationResponse'
+
   /api/emails/bulk-apply-to-outlook:
     post:
       summary: Bulk apply classifications to Outlook
+      deprecated: true
+      description: |
+        **DEPRECATED**: Use POST /api/emails/classifications/apply instead.
+        This endpoint is maintained for backward compatibility.
       tags: [Emails]
       requestBody:
         required: true
@@ -480,10 +815,71 @@ paths:
       responses:
         '200':
           description: Bulk apply results
+          headers:
+            X-Deprecated:
+              description: Indicates this endpoint is deprecated
+              schema:
+                type: boolean
+            X-Deprecated-Message:
+              description: Deprecation message with replacement endpoint
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BulkApplyResponse'
+                $ref: '#/components/schemas/BatchOperationResponse'
+
+  /api/emails/batch-process:
+    post:
+      summary: Batch process emails with AI classification and action item extraction
+      deprecated: true
+      description: |
+        **DEPRECATED**: Use POST /api/ai/classifications instead.
+        This endpoint is maintained for backward compatibility.
+        
+        Processes multiple emails in batch, performing:
+        - AI classification and categorization
+        - Confidence scoring
+        - Action item extraction (for actionable categories)
+        - Priority calculation
+        - Optional database persistence
+      tags: [Emails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email_ids
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: List of email IDs to process
+                save_to_database:
+                  type: boolean
+                  default: false
+                  description: Whether to save processed results to database
+      responses:
+        '200':
+          description: Batch processing results (returns 200 even with partial failures)
+          headers:
+            X-Deprecated:
+              description: Indicates this endpoint is deprecated
+              schema:
+                type: boolean
+            X-Deprecated-Message:
+              description: Deprecation message with replacement endpoint
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchOperationResponse'
+        '400':
+          description: Invalid request (missing email_ids)
 
   /api/emails/extract-tasks:
     post:
@@ -528,6 +924,36 @@ paths:
       responses:
         '200':
           description: Sync completed
+
+  /api/emails/analyze-holistically:
+    post:
+      summary: Holistic email analysis across multiple emails
+      description: |
+        Performs AI-powered holistic analysis across multiple emails to identify:
+        - Truly relevant actions that require attention
+        - Superseded actions (resolved by newer emails)
+        - Duplicate email groups
+        - Expired items (past deadlines/events)
+        
+        This endpoint provides intelligent cross-email analysis for inbox management.
+      tags: [Emails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HolisticAnalysisRequest'
+      responses:
+        '200':
+          description: Holistic analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HolisticAnalysisResponse'
+        '400':
+          description: Invalid request (empty email_ids)
+        '500':
+          description: AI analysis failed
 
   /api/folders:
     get:
@@ -628,6 +1054,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Task'
+    delete:
+      summary: Delete multiple tasks
+      description: |
+        New plural-named endpoint for deleting multiple tasks.
+        Uses DELETE verb with request body (following REST best practices for bulk operations).
+        Replaces POST /api/tasks/bulk-delete.
+      tags: [Tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - task_ids
+              properties:
+                task_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: List of task IDs to delete
+      responses:
+        '200':
+          description: Delete results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchOperationResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Delete failed
 
   /api/tasks/{id}:
     get:
@@ -707,6 +1165,132 @@ paths:
                     type: object
                   tasks_by_category:
                     type: object
+
+  /api/tasks/updates:
+    post:
+      summary: Update multiple tasks
+      description: |
+        New plural-named endpoint for updating multiple tasks with the same field values.
+        Replaces /api/tasks/bulk-update with consistent REST naming.
+      tags: [Tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - task_ids
+                - updates
+              properties:
+                task_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: List of task IDs to update
+                updates:
+                  $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Update results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchOperationResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Update failed
+
+  /api/tasks/bulk-update:
+    post:
+      summary: Bulk update multiple tasks
+      deprecated: true
+      description: |
+        **DEPRECATED**: Use POST /api/tasks/updates instead.
+        This endpoint is maintained for backward compatibility.
+      tags: [Tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - task_ids
+                - updates
+              properties:
+                task_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: List of task IDs to update
+                updates:
+                  $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Bulk update results
+          headers:
+            X-Deprecated:
+              description: Indicates this endpoint is deprecated
+              schema:
+                type: boolean
+            X-Deprecated-Message:
+              description: Deprecation message with replacement endpoint
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchOperationResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Update failed
+
+  /api/tasks/bulk-delete:
+    post:
+      summary: Bulk delete multiple tasks
+      deprecated: true
+      description: |
+        **DEPRECATED**: Use DELETE /api/tasks (with body: {task_ids}) instead.
+        This endpoint is maintained for backward compatibility.
+        The new endpoint uses the proper DELETE HTTP verb for deletion operations.
+      tags: [Tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - task_ids
+              properties:
+                task_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: List of task IDs to delete
+      responses:
+        '200':
+          description: Bulk delete results
+          headers:
+            X-Deprecated:
+              description: Indicates this endpoint is deprecated
+              schema:
+                type: boolean
+            X-Deprecated-Message:
+              description: Deprecation message with replacement endpoint
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchOperationResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Delete failed
 
   /api/settings:
     get:
@@ -948,21 +1532,128 @@ components:
         processing_time:
           type: number
 
-    BulkApplyResponse:
+    BatchClassificationResponse:
       type: object
+      description: Response from batch classification endpoint
+      properties:
+        total:
+          type: integer
+          description: Total number of emails in the batch
+        successful:
+          type: integer
+          description: Number of successfully classified emails
+        failed:
+          type: integer
+          description: Number of failed classifications
+        results:
+          type: array
+          description: Classification result for each email
+          items:
+            $ref: '#/components/schemas/BatchClassificationResult'
+
+    BatchClassificationResult:
+      type: object
+      description: Single email classification result in batch operation
+      properties:
+        email_id:
+          type: string
+          description: Email identifier
+        success:
+          type: boolean
+          description: Whether classification succeeded
+        classification:
+          $ref: '#/components/schemas/EmailClassificationResponse'
+          description: Classification details (present if success is true)
+        error:
+          type: string
+          description: Error message (present if success is false)
+
+    BatchSummaryResponse:
+      type: object
+      description: Response from batch summarization endpoint
+      properties:
+        total:
+          type: integer
+          description: Total number of emails in the batch
+        successful:
+          type: integer
+          description: Number of successfully summarized emails
+        failed:
+          type: integer
+          description: Number of failed summarizations
+        results:
+          type: array
+          description: Summary result for each email
+          items:
+            $ref: '#/components/schemas/BatchSummaryResult'
+
+    BatchSummaryResult:
+      type: object
+      description: Single email summary result in batch operation
+      properties:
+        email_id:
+          type: string
+          description: Email identifier
+        success:
+          type: boolean
+          description: Whether summarization succeeded
+        summary:
+          $ref: '#/components/schemas/SummaryResponse'
+          description: Summary details (present if success is true)
+        error:
+          type: string
+          description: Error message (present if success is false)
+
+    BatchOperationResponse:
+      type: object
+      description: Standardized response for all batch operations (emails and tasks)
       properties:
         success:
           type: boolean
+          description: Whether the overall operation completed without critical errors
         processed:
           type: integer
+          description: Total number of items that were processed
         successful:
           type: integer
+          description: Count of items that completed successfully
         failed:
           type: integer
+          description: Count of items that failed to process
+        results:
+          type: array
+          description: Detailed results for each processed item (optional)
+          items:
+            $ref: '#/components/schemas/BatchItemResult'
         errors:
           type: array
+          description: Error messages from the operation (optional)
           items:
             type: string
+        message:
+          type: string
+          description: Human-readable summary of the operation (optional)
+
+    BatchItemResult:
+      type: object
+      description: Result of processing a single item in a batch operation
+      properties:
+        item_id:
+          type: string
+          description: Identifier of the item that was processed
+        success:
+          type: boolean
+          description: Whether this specific item was processed successfully
+        error:
+          type: string
+          description: Error message if processing failed (optional)
+        data:
+          type: object
+          description: |
+            Operation-specific result data (optional).
+            For emails: category, confidence, reasoning, action_items, priority.
+            For tasks: updated fields, status changes.
+          additionalProperties: true
 
     Task:
       type: object
@@ -1073,3 +1764,99 @@ components:
           type: string
         ado_pat:
           type: string
+
+    HolisticAnalysisRequest:
+      type: object
+      required:
+        - email_ids
+      properties:
+        email_ids:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          description: Array of email IDs to analyze
+
+    TrulyRelevantAction:
+      type: object
+      properties:
+        action_type:
+          type: string
+          enum: [required_personal_action, team_action, optional_action]
+        priority:
+          type: string
+          enum: [high, medium, low]
+        topic:
+          type: string
+        canonical_email_id:
+          type: string
+        related_email_ids:
+          type: array
+          items:
+            type: string
+        deadline:
+          type: string
+          description: ISO date or description
+        why_relevant:
+          type: string
+        blocking_others:
+          type: boolean
+
+    SupersededAction:
+      type: object
+      properties:
+        original_email_id:
+          type: string
+        superseded_by_email_id:
+          type: string
+        reason:
+          type: string
+
+    DuplicateGroup:
+      type: object
+      properties:
+        topic:
+          type: string
+        email_ids:
+          type: array
+          items:
+            type: string
+        keep_email_id:
+          type: string
+        archive_email_ids:
+          type: array
+          items:
+            type: string
+
+    ExpiredItem:
+      type: object
+      properties:
+        email_id:
+          type: string
+        reason:
+          type: string
+
+    HolisticAnalysisResponse:
+      type: object
+      properties:
+        truly_relevant_actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrulyRelevantAction'
+        superseded_actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupersededAction'
+        duplicate_groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/DuplicateGroup'
+        expired_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpiredItem'
+        emails_analyzed:
+          type: integer
+        processing_time:
+          type: number
+          format: float

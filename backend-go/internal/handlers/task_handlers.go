@@ -212,8 +212,8 @@ func LinkEmailToTask(c *gin.Context) {
 	c.JSON(http.StatusOK, task)
 }
 
-// BulkUpdateTasks updates multiple tasks
-func BulkUpdateTasks(c *gin.Context) {
+// UpdateTasks updates multiple tasks (new plural naming)
+func UpdateTasks(c *gin.Context) {
 	var req models.BulkTaskUpdate
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -225,15 +225,44 @@ func BulkUpdateTasks(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Tasks updated",
-		"count":   len(req.TaskIDs),
+	c.JSON(http.StatusOK, models.BatchOperationResponse{
+		Success:    true,
+		Processed:  len(req.TaskIDs),
+		Successful: len(req.TaskIDs),
+		Failed:     0,
+		Message:    "Tasks updated",
 	})
 }
 
-// BulkDeleteTasks deletes multiple tasks
-func BulkDeleteTasks(c *gin.Context) {
+// BulkUpdateTasks updates multiple tasks
+// Deprecated: Use POST /api/tasks/updates instead
+func BulkUpdateTasks(c *gin.Context) {
+	// Add deprecation header
+	c.Header("X-Deprecated", "true")
+	c.Header("X-Deprecated-Message", "Use POST /api/tasks/updates instead")
+	
+	var req models.BulkTaskUpdate
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := taskService.BulkUpdate(req.TaskIDs, &req.Updates); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.BatchOperationResponse{
+		Success:    true,
+		Processed:  len(req.TaskIDs),
+		Successful: len(req.TaskIDs),
+		Failed:     0,
+		Message:    "Tasks updated",
+	})
+}
+
+// DeleteTasks deletes multiple tasks (new plural naming)
+func DeleteTasks(c *gin.Context) {
 	var req models.BulkTaskDelete
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -245,10 +274,39 @@ func BulkDeleteTasks(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Tasks deleted",
-		"count":   len(req.TaskIDs),
+	c.JSON(http.StatusOK, models.BatchOperationResponse{
+		Success:    true,
+		Processed:  len(req.TaskIDs),
+		Successful: len(req.TaskIDs),
+		Failed:     0,
+		Message:    "Tasks deleted",
+	})
+}
+
+// BulkDeleteTasks deletes multiple tasks
+// Deprecated: Use DELETE /api/tasks (with body: {task_ids}) instead
+func BulkDeleteTasks(c *gin.Context) {
+	// Add deprecation header
+	c.Header("X-Deprecated", "true")
+	c.Header("X-Deprecated-Message", "Use DELETE /api/tasks (with body: {task_ids}) instead")
+	
+	var req models.BulkTaskDelete
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := taskService.BulkDelete(req.TaskIDs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.BatchOperationResponse{
+		Success:    true,
+		Processed:  len(req.TaskIDs),
+		Successful: len(req.TaskIDs),
+		Failed:     0,
+		Message:    "Tasks deleted",
 	})
 }
 

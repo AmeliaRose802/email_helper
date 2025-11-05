@@ -378,3 +378,146 @@ func TestBulkDeleteTasks(t *testing.T) {
 
 	mockService.AssertExpectations(t)
 }
+
+func TestUpdateTasks(t *testing.T) {
+	mockService := new(MockTaskService)
+	originalService := taskService
+	taskService = mockService
+	defer func() { taskService = originalService }()
+
+	router := setupTestRouter()
+	router.POST("/tasks/updates", UpdateTasks)
+
+	newStatus := "completed"
+	bulkUpdate := models.BulkTaskUpdate{
+		TaskIDs: []int{1, 2, 3},
+		Updates: models.TaskUpdate{
+			Status: &newStatus,
+		},
+	}
+
+	mockService.On("BulkUpdate", bulkUpdate.TaskIDs, mock.AnythingOfType("*models.TaskUpdate")).Return(nil)
+
+	jsonData, _ := json.Marshal(bulkUpdate)
+	req, _ := http.NewRequest("POST", "/tasks/updates", bytes.NewBuffer(jsonData))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response models.BatchOperationResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.True(t, response.Success)
+	assert.Equal(t, 3, response.Successful)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestDeleteTasks(t *testing.T) {
+	mockService := new(MockTaskService)
+	originalService := taskService
+	taskService = mockService
+	defer func() { taskService = originalService }()
+
+	router := setupTestRouter()
+	router.DELETE("/tasks", DeleteTasks)
+
+	bulkDelete := models.BulkTaskDelete{
+		TaskIDs: []int{1, 2, 3},
+	}
+
+	mockService.On("BulkDelete", bulkDelete.TaskIDs).Return(nil)
+
+	jsonData, _ := json.Marshal(bulkDelete)
+	req, _ := http.NewRequest("DELETE", "/tasks", bytes.NewBuffer(jsonData))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response models.BatchOperationResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.True(t, response.Success)
+	assert.Equal(t, 3, response.Successful)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestBulkUpdateTasks_Deprecated(t *testing.T) {
+	mockService := new(MockTaskService)
+	originalService := taskService
+	taskService = mockService
+	defer func() { taskService = originalService }()
+
+	router := setupTestRouter()
+	router.POST("/tasks/bulk/update", BulkUpdateTasks)
+
+	newStatus := "completed"
+	bulkUpdate := models.BulkTaskUpdate{
+		TaskIDs: []int{1, 2},
+		Updates: models.TaskUpdate{
+			Status: &newStatus,
+		},
+	}
+
+	mockService.On("BulkUpdate", bulkUpdate.TaskIDs, mock.AnythingOfType("*models.TaskUpdate")).Return(nil)
+
+	jsonData, _ := json.Marshal(bulkUpdate)
+	req, _ := http.NewRequest("POST", "/tasks/bulk/update", bytes.NewBuffer(jsonData))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Check deprecation headers
+	assert.Equal(t, "true", w.Header().Get("X-Deprecated"))
+	assert.Equal(t, "Use POST /api/tasks/updates instead", w.Header().Get("X-Deprecated-Message"))
+
+	var response models.BatchOperationResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.True(t, response.Success)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestBulkDeleteTasks_Deprecated(t *testing.T) {
+	mockService := new(MockTaskService)
+	originalService := taskService
+	taskService = mockService
+	defer func() { taskService = originalService }()
+
+	router := setupTestRouter()
+	router.POST("/tasks/bulk/delete", BulkDeleteTasks)
+
+	bulkDelete := models.BulkTaskDelete{
+		TaskIDs: []int{1, 2},
+	}
+
+	mockService.On("BulkDelete", bulkDelete.TaskIDs).Return(nil)
+
+	jsonData, _ := json.Marshal(bulkDelete)
+	req, _ := http.NewRequest("POST", "/tasks/bulk/delete", bytes.NewBuffer(jsonData))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Check deprecation headers
+	assert.Equal(t, "true", w.Header().Get("X-Deprecated"))
+	assert.Equal(t, "Use DELETE /api/tasks (with body: {task_ids}) instead", w.Header().Get("X-Deprecated-Message"))
+
+	var response models.BatchOperationResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.True(t, response.Success)
+
+	mockService.AssertExpectations(t)
+}
+
