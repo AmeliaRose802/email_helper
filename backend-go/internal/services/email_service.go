@@ -2,14 +2,22 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"email-helper-backend/config"
 	"email-helper-backend/internal/database"
 	"email-helper-backend/internal/models"
 	"email-helper-backend/pkg/azureopenai"
 	"email-helper-backend/pkg/outlook"
+	"email-helper-backend/pkg/prompty"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 )
 
 // OutlookProvider interface for email operations
@@ -63,6 +71,7 @@ func NewEmailService(cfg *config.Config) (*EmailService, error) {
 			cfg.AzureOpenAIEndpoint,
 			cfg.AzureOpenAIAPIKey, // Empty string = use az login
 			cfg.AzureOpenAIDeployment,
+			cfg.PromptsDirectory,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create AI client: %w", err)
@@ -356,4 +365,163 @@ func (s *EmailService) CheckAIHealth(ctx context.Context) error {
 		return fmt.Errorf("AI client not configured")
 	}
 	return s.aiClient.CheckHealth(ctx)
+}
+
+// AnalyzeHolistically performs holistic email analysis across multiple emails
+// Identifies truly relevant actions, superseded items, duplicates, and expired deadlines
+func (s *EmailService) AnalyzeHolistically(ctx context.Context, emailIDs []string) (*models.HolisticAnalysisResponse, error) {
+	if s.aiClient == nil {
+		return nil, fmt.Errorf("AI client not configured")
+	}
+
+	// Fetch emails by ID (try database first, then Outlook)
+	emails := make([]*models.Email, 0, len(emailIDs))
+	for _, emailID := range emailIDs {
+		// Try database first, fallback to Outlook
+		email, err := s.GetEmailByID(emailID, "database")
+		if err != nil {
+			// Try Outlook if database fetch failed
+			email, err = s.GetEmailByID(emailID, "outlook")
+			if err != nil {
+				log.Printf("Failed to fetch email %s: %v", emailID, err)
+				continue // Skip emails that can't be fetched
+			}
+		}
+		emails = append(emails, email)
+	}
+
+	if len(emails) == 0 {
+		return nil, fmt.Errorf("no valid emails found for analysis")
+	}
+
+	// Build inbox summary for AI analysis
+	inboxSummary := buildInboxSummary(emails)
+
+	// Call AI with holistic analyzer prompty
+	return analyzeHolisticallyWithAI(ctx, s.aiClient, inboxSummary, len(emails))
+}
+
+// buildInboxSummary creates a formatted summary of emails for AI analysis
+func buildInboxSummary(emails []*models.Email) string {
+	var summary strings.Builder
+	
+	for i, email := range emails {
+		summary.WriteString(fmt.Sprintf("Email %d:\n", i+1))
+		summary.WriteString(fmt.Sprintf("  ID: %s\n", email.ID))
+		summary.WriteString(fmt.Sprintf("  Subject: %s\n", email.Subject))
+		summary.WriteString(fmt.Sprintf("  Sender: %s\n", email.Sender))
+		summary.WriteString(fmt.Sprintf("  Date: %s\n", email.ReceivedTime))
+		
+		// Include a snippet of content (first 200 chars)
+		content := email.Content
+		if len(content) > 200 {
+			content = content[:200] + "..."
+		}
+		summary.WriteString(fmt.Sprintf("  Content: %s\n", content))
+		
+		// Include classification if available
+		if email.AICategory != "" {
+			summary.WriteString(fmt.Sprintf("  Category: %s\n", email.AICategory))
+		}
+		if email.OneLineSummary != "" {
+			summary.WriteString(fmt.Sprintf("  Summary: %s\n", email.OneLineSummary))
+		}
+		
+		summary.WriteString("\n")
+	}
+	
+	return summary.String()
+}
+
+// analyzeHolisticallyWithAI calls Azure OpenAI with the holistic analyzer prompt
+func analyzeHolisticallyWithAI(ctx context.Context, aiClient AIClient, inboxSummary string, emailCount int) (*models.HolisticAnalysisResponse, error) {
+	startTime := time.Now()
+	
+	// Load holistic_inbox_analyzer prompty template
+	promptsDir := filepath.Join(".", "prompts")
+	prompts, err := prompty.LoadPromptDirectory(promptsDir)
+	if err != nil {
+		// Try from parent directory
+		promptsDir = filepath.Join("..", "prompts")
+		prompts, err = prompty.LoadPromptDirectory(promptsDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load prompty files: %w", err)
+		}
+	}
+
+	tmpl, ok := prompts["holistic_inbox_analyzer"]
+	if !ok {
+		return nil, fmt.Errorf("holistic_inbox_analyzer.prompty template not found")
+	}
+
+	// Prepare template variables
+	vars := map[string]string{
+		"context":          "", // Optional user context
+		"job_role_context": "Software Engineer", // TODO: Make configurable from settings
+		"username":         "User", // TODO: Make configurable from settings
+		"inbox_summary":    inboxSummary,
+		"current_date":     time.Now().Format("2006-01-02"),
+	}
+
+	// Render prompts
+	systemPrompt, err := tmpl.RenderPrompt("system", vars)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render system prompt: %w", err)
+	}
+
+	userPrompt, err := tmpl.RenderPrompt("user", vars)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render user prompt: %w", err)
+	}
+
+	// Prepare chat completions request
+	messages := []azopenai.ChatRequestMessageClassification{
+		&azopenai.ChatRequestSystemMessage{Content: to.Ptr(systemPrompt)},
+		&azopenai.ChatRequestUserMessage{Content: azopenai.NewChatRequestUserMessageContent(userPrompt)},
+	}
+
+	options := azopenai.ChatCompletionsOptions{
+		Messages:    messages,
+		MaxTokens:   to.Ptr(tmpl.Model.Parameters.MaxTokens),
+		Temperature: to.Ptr(tmpl.Model.Parameters.Temperature),
+	}
+
+	// Call AI client's GetChatCompletions method (exposed by azureopenai.Client)
+	type AIClientWithCompletions interface {
+		GetChatCompletions(ctx context.Context, options azopenai.ChatCompletionsOptions, opts *azopenai.GetChatCompletionsOptions) (azopenai.GetChatCompletionsResponse, error)
+	}
+
+	aiClientWithCompletions, ok := aiClient.(AIClientWithCompletions)
+	if !ok {
+		return nil, fmt.Errorf("AI client does not support GetChatCompletions")
+	}
+
+	resp, err := aiClientWithCompletions.GetChatCompletions(ctx, options, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get AI completions: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from AI")
+	}
+
+	responseText := *resp.Choices[0].Message.Content
+	
+	// Clean up response - remove markdown code blocks if present
+	responseText = strings.TrimPrefix(responseText, "```json")
+	responseText = strings.TrimPrefix(responseText, "```")
+	responseText = strings.TrimSuffix(responseText, "```")
+	responseText = strings.TrimSpace(responseText)
+
+	// Parse JSON response into our model
+	var analysisResult models.HolisticAnalysisResponse
+	if err := json.Unmarshal([]byte(responseText), &analysisResult); err != nil {
+		return nil, fmt.Errorf("failed to parse AI response: %w (response: %s)", err, responseText)
+	}
+
+	// Add metadata
+	analysisResult.ProcessingTime = time.Since(startTime).Seconds()
+	analysisResult.EmailsAnalyzed = emailCount
+
+	return &analysisResult, nil
 }

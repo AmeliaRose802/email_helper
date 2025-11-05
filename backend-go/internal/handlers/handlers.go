@@ -27,6 +27,7 @@ type EmailServiceInterface interface {
 	ExtractActionItems(ctx context.Context, emailContent, userContext string) (*models.ActionItemResponse, error)
 	SummarizeEmail(ctx context.Context, emailContent, summaryType string) (*models.SummaryResponse, error)
 	CheckAIHealth(ctx context.Context) error
+	AnalyzeHolistically(ctx context.Context, emailIDs []string) (*models.HolisticAnalysisResponse, error)
 	Close() error
 }
 

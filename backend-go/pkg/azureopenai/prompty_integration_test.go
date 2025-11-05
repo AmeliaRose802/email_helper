@@ -61,8 +61,8 @@ func TestClassificationPromptRendering(t *testing.T) {
 		"username":         "TestUser",
 		"subject":          "Test Email",
 		"sender":           "test@example.com",
-		"date":             "2025-10-31",
-		"body":             "This is a test email body",
+		"received_time":    "2025-10-31",
+		"content":          "This is a test email content",
 	}
 
 	systemPrompt, err := tmpl.RenderPrompt("system", vars)

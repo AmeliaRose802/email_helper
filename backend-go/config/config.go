@@ -25,6 +25,9 @@ type Config struct {
 	AzureOpenAIDeployment  string
 	AzureOpenAIAPIVersion  string
 
+	// Prompts
+	PromptsDirectory string
+
 	// Email Provider
 	UseComBackend   bool
 	EmailProvider   string
@@ -62,6 +65,9 @@ func Load() *Config {
 		AzureOpenAIAPIKey:     getEnv("AZURE_OPENAI_API_KEY", ""), // Empty string = use az login
 		AzureOpenAIDeployment: getEnv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o"),
 		AzureOpenAIAPIVersion: getEnv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
+
+		// Prompts
+		PromptsDirectory: getEnv("PROMPTS_DIRECTORY", getDefaultPromptsPath()),
 
 		// Email Provider
 		UseComBackend:    getEnvAsBool("USE_COM_BACKEND", true),
@@ -136,4 +142,25 @@ func getDefaultDatabasePath() string {
 	}
 
 	return dbPath
+}
+
+func getDefaultPromptsPath() string {
+	// Get the directory where the executable is located
+	execPath, err := os.Executable()
+	if err != nil {
+		execPath, _ = os.Getwd()
+	}
+	execDir := filepath.Dir(execPath)
+
+	// Navigate to prompts relative to project root
+	// From backend-go/bin or backend-go/, go up to email_helper/prompts
+	promptsPath := filepath.Join(execDir, "..", "prompts")
+	
+	// Check if prompts directory exists
+	if _, err := os.Stat(promptsPath); os.IsNotExist(err) {
+		// Try one level up (for when running from backend-go/)
+		promptsPath = filepath.Join(execDir, "..", "..", "prompts")
+	}
+
+	return promptsPath
 }

@@ -21,7 +21,7 @@ model:
 inputs:
   subject:
     type: string
-  body:
+  content:
     type: string
 ---
 
@@ -31,7 +31,7 @@ Process the email carefully.
 
 user:
 Subject: {{.subject}}
-Body: {{.body}}
+Content: {{.content}}
 `
 
 	tmpl, err := ParsePromptyContent([]byte(content))
@@ -487,10 +487,10 @@ Test
 user:
 Subject: {{.subject}}
 From: {{.sender}}
-Date: {{.date}}
+Date: {{.received_time}}
 
-Body:
-{{.body}}
+Content:
+{{.content}}
 
 Please analyze this email.
 `
@@ -581,7 +581,7 @@ Use the context: {{.context}}
 user:
 Subject: {{.subject}}
 From: {{.sender}}
-Body: {{.body}}
+Content: {{.content}}
 `
 		tmpl, err := ParsePromptyContent([]byte(content))
 		require.NoError(t, err)

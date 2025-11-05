@@ -13,8 +13,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ClassifyEmail handles email classification
+// ClassifyEmail handles email classification (deprecated: use ClassifyEmailSingular instead)
 func ClassifyEmail(c *gin.Context) {
+	// Add deprecation header
+	c.Header("X-Deprecation-Warning", "This endpoint is deprecated. Use POST /api/ai/classification instead")
+	c.Header("X-Sunset", "2025-05-01")
+	
+	ClassifyEmailSingular(c)
+}
+
+// ClassifyEmailSingular handles single email classification (new consistent naming)
+func ClassifyEmailSingular(c *gin.Context) {
 	var req models.AIClassificationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -53,8 +62,17 @@ func ExtractActionItems(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// SummarizeEmail handles email summarization
+// SummarizeEmail handles email summarization (deprecated: use SummarizeEmailSingular instead)
 func SummarizeEmail(c *gin.Context) {
+	// Add deprecation header
+	c.Header("X-Deprecation-Warning", "This endpoint is deprecated. Use POST /api/ai/summary instead")
+	c.Header("X-Sunset", "2025-05-01")
+	
+	SummarizeEmailSingular(c)
+}
+
+// SummarizeEmailSingular handles single email summarization (new consistent naming)
+func SummarizeEmailSingular(c *gin.Context) {
 	var req models.SummaryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -119,8 +137,17 @@ type ClassifyBatchStreamEvent struct {
 	Progress float64 `json:"progress,omitempty"` // 0-100
 }
 
-// ClassifyBatchStream handles batch classification with Server-Sent Events (SSE) streaming
+// ClassifyBatchStream handles batch classification with Server-Sent Events (SSE) streaming (deprecated)
 func ClassifyBatchStream(c *gin.Context) {
+	// Add deprecation header
+	c.Header("X-Deprecation-Warning", "This endpoint is deprecated. Use POST /api/ai/classifications/stream instead")
+	c.Header("X-Sunset", "2025-05-01")
+	
+	ClassifyBatchStreamNew(c)
+}
+
+// ClassifyBatchStreamNew handles batch classification with Server-Sent Events (SSE) streaming
+func ClassifyBatchStreamNew(c *gin.Context) {
 	var req ClassifyBatchStreamRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -229,5 +256,170 @@ func ClassifyBatchStream(c *gin.Context) {
 		Message:  fmt.Sprintf("Batch classification complete: %d successful, %d failed", successCount, errorCount),
 		Progress: 100,
 	})
+}
+
+// BatchClassificationRequest request for batch classification (non-streaming)
+type BatchClassificationRequest struct {
+	EmailIDs []string `json:"email_ids" binding:"required"`
+	Context  string   `json:"context"`
+}
+
+// BatchClassificationResult represents a single classification result in batch
+type BatchClassificationResult struct {
+	EmailID        string                            `json:"email_id"`
+	Success        bool                              `json:"success"`
+	Classification *models.AIClassificationResponse  `json:"classification,omitempty"`
+	Error          string                            `json:"error,omitempty"`
+}
+
+// BatchClassificationResponse response for batch classification
+type BatchClassificationResponse struct {
+	Total        int                          `json:"total"`
+	Successful   int                          `json:"successful"`
+	Failed       int                          `json:"failed"`
+	Results      []BatchClassificationResult  `json:"results"`
+}
+
+// ClassifyEmailsBatch handles batch classification (non-streaming) - returns all results at once
+func ClassifyEmailsBatch(c *gin.Context) {
+	var req BatchClassificationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(req.EmailIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email_ids cannot be empty"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	results := make([]BatchClassificationResult, 0, len(req.EmailIDs))
+	successCount := 0
+	failedCount := 0
+
+	for _, emailID := range req.EmailIDs {
+		result := BatchClassificationResult{
+			EmailID: emailID,
+			Success: false,
+		}
+
+		// Get email details
+		email, err := emailService.GetEmailByID(emailID, "outlook")
+		if err != nil {
+			result.Error = fmt.Sprintf("Failed to get email: %v", err)
+			results = append(results, result)
+			failedCount++
+			continue
+		}
+
+		// Classify email using AI
+		classification, err := emailService.ClassifyEmail(ctx, email.Subject, email.Sender, email.Content, req.Context)
+		if err != nil {
+			result.Error = fmt.Sprintf("Failed to classify: %v", err)
+			results = append(results, result)
+			failedCount++
+			continue
+		}
+
+		result.Success = true
+		result.Classification = classification
+		results = append(results, result)
+		successCount++
+	}
+
+	response := BatchClassificationResponse{
+		Total:      len(req.EmailIDs),
+		Successful: successCount,
+		Failed:     failedCount,
+		Results:    results,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// BatchSummaryRequest request for batch summarization
+type BatchSummaryRequest struct {
+	EmailIDs    []string `json:"email_ids" binding:"required"`
+	SummaryType string   `json:"summary_type"` // brief, detailed, or key_points
+}
+
+// BatchSummaryResult represents a single summary result in batch
+type BatchSummaryResult struct {
+	EmailID string                   `json:"email_id"`
+	Success bool                     `json:"success"`
+	Summary *models.SummaryResponse  `json:"summary,omitempty"`
+	Error   string                   `json:"error,omitempty"`
+}
+
+// BatchSummaryResponse response for batch summarization
+type BatchSummaryResponse struct {
+	Total      int                  `json:"total"`
+	Successful int                  `json:"successful"`
+	Failed     int                  `json:"failed"`
+	Results    []BatchSummaryResult `json:"results"`
+}
+
+// SummarizeEmailsBatch handles batch email summarization - returns all results at once
+func SummarizeEmailsBatch(c *gin.Context) {
+	var req BatchSummaryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(req.EmailIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email_ids cannot be empty"})
+		return
+	}
+
+	summaryType := req.SummaryType
+	if summaryType == "" {
+		summaryType = "brief"
+	}
+
+	ctx := c.Request.Context()
+	results := make([]BatchSummaryResult, 0, len(req.EmailIDs))
+	successCount := 0
+	failedCount := 0
+
+	for _, emailID := range req.EmailIDs {
+		result := BatchSummaryResult{
+			EmailID: emailID,
+			Success: false,
+		}
+
+		// Get email details
+		email, err := emailService.GetEmailByID(emailID, "outlook")
+		if err != nil {
+			result.Error = fmt.Sprintf("Failed to get email: %v", err)
+			results = append(results, result)
+			failedCount++
+			continue
+		}
+
+		// Summarize email using AI
+		summary, err := emailService.SummarizeEmail(ctx, email.Content, summaryType)
+		if err != nil {
+			result.Error = fmt.Sprintf("Failed to summarize: %v", err)
+			results = append(results, result)
+			failedCount++
+			continue
+		}
+
+		result.Success = true
+		result.Summary = summary
+		results = append(results, result)
+		successCount++
+	}
+
+	response := BatchSummaryResponse{
+		Total:      len(req.EmailIDs),
+		Successful: successCount,
+		Failed:     failedCount,
+		Results:    results,
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 

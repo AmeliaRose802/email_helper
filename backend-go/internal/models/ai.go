@@ -56,3 +56,51 @@ type AvailableTemplatesResponse struct {
 	Templates    []string          `json:"templates"`
 	Descriptions map[string]string `json:"descriptions"`
 }
+
+// HolisticAnalysisRequest for holistic inbox analysis
+type HolisticAnalysisRequest struct {
+	EmailIDs []string `json:"email_ids" binding:"required"`
+}
+
+// TrulyRelevantAction represents an action that requires attention
+type TrulyRelevantAction struct {
+	ActionType        string   `json:"action_type"` // required_personal_action, team_action, optional_action
+	Priority          string   `json:"priority"`    // high, medium, low
+	Topic             string   `json:"topic"`
+	CanonicalEmailID  string   `json:"canonical_email_id"`
+	RelatedEmailIDs   []string `json:"related_email_ids"`
+	Deadline          string   `json:"deadline"` // ISO date or description
+	WhyRelevant       string   `json:"why_relevant"`
+	BlockingOthers    bool     `json:"blocking_others"`
+}
+
+// SupersededAction represents an action made obsolete by a newer email
+type SupersededAction struct {
+	OriginalEmailID    string `json:"original_email_id"`
+	SupersededByEmailID string `json:"superseded_by_email_id"`
+	Reason             string `json:"reason"`
+}
+
+// DuplicateGroup represents a group of similar/duplicate emails
+type DuplicateGroup struct {
+	Topic            string   `json:"topic"`
+	EmailIDs         []string `json:"email_ids"`
+	KeepEmailID      string   `json:"keep_email_id"`
+	ArchiveEmailIDs  []string `json:"archive_email_ids"`
+}
+
+// ExpiredItem represents an email with a past deadline or event
+type ExpiredItem struct {
+	EmailID string `json:"email_id"`
+	Reason  string `json:"reason"`
+}
+
+// HolisticAnalysisResponse results of holistic inbox analysis
+type HolisticAnalysisResponse struct {
+	TrulyRelevantActions []TrulyRelevantAction `json:"truly_relevant_actions"`
+	SupersededActions    []SupersededAction    `json:"superseded_actions"`
+	DuplicateGroups      []DuplicateGroup      `json:"duplicate_groups"`
+	ExpiredItems         []ExpiredItem         `json:"expired_items"`
+	ProcessingTime       float64               `json:"processing_time,omitempty"`
+	EmailsAnalyzed       int                   `json:"emails_analyzed"`
+}
