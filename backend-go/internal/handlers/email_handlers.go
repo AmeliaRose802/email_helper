@@ -42,7 +42,7 @@ func GetEmails(c *gin.Context) {
 
 	emails, total, err := emailService.GetEmails(folder, limit, offset, source, category)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to retrieve emails: "+err.Error())
 		return
 	}
 
@@ -72,7 +72,7 @@ func GetEmail(c *gin.Context) {
 
 	email, err := emailService.GetEmailByID(id, source)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Email not found"})
+		NotFound(c, models.ErrorCodeEmailNotFound, "Email not found: "+id)
 		return
 	}
 
@@ -97,7 +97,7 @@ func SearchEmails(c *gin.Context) {
 
 	emails, total, err := emailService.SearchEmails(query, page, perPage)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Search failed: "+err.Error())
 		return
 	}
 
@@ -128,7 +128,7 @@ func GetEmailStats(c *gin.Context) {
 
 	stats, err := emailService.GetStats(limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		DatabaseError(c, "Failed to retrieve statistics: "+err.Error())
 		return
 	}
 
@@ -192,7 +192,7 @@ func UpdateEmailReadStatus(c *gin.Context) {
 	read := readStr == "true"
 
 	if err := emailService.MarkAsRead(id, read); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		OutlookError(c, "Failed to update read status: "+err.Error())
 		return
 	}
 
@@ -208,7 +208,7 @@ func MarkEmailAsRead(c *gin.Context) {
 	id := c.Param("id")
 
 	if err := emailService.MarkAsRead(id, true); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		OutlookError(c, "Failed to mark as read: "+err.Error())
 		return
 	}
 
@@ -225,12 +225,12 @@ func MoveEmail(c *gin.Context) {
 	destination := c.Query("destination_folder")
 
 	if destination == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "destination_folder required"})
+		ValidationError(c, "Missing required parameter", "destination_folder is required")
 		return
 	}
 
 	if err := emailService.MoveToFolder(id, destination); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		OutlookError(c, "Failed to move email: "+err.Error())
 		return
 	}
 
