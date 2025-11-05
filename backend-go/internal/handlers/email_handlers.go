@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"email-helper-backend/internal/middleware"
 	"email-helper-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -47,6 +48,10 @@ func GetEmails(c *gin.Context) {
 	}
 
 	hasMore := offset+limit < total
+
+	// Add pagination headers
+	page := (offset / limit) + 1
+	middleware.AddPaginationHeaders(c, total, page, limit, hasMore)
 
 	// Convert []*models.Email to []models.Email
 	emailList := make([]models.Email, len(emails))
@@ -103,6 +108,9 @@ func SearchEmails(c *gin.Context) {
 
 	offset := (page - 1) * perPage
 	hasMore := offset+perPage < total
+
+	// Add pagination headers
+	middleware.AddPaginationHeaders(c, total, page, perPage, hasMore)
 
 	// Convert []*models.Email to []models.Email
 	emailList := make([]models.Email, len(emails))

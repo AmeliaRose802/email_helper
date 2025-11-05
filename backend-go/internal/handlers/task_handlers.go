@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"email-helper-backend/internal/database"
+	"email-helper-backend/internal/middleware"
 	"email-helper-backend/internal/models"
 	"email-helper-backend/pkg/azureopenai"
 
@@ -44,6 +45,9 @@ func GetTasks(c *gin.Context) {
 	}
 
 	hasNext := page*limit < total
+
+	// Add pagination headers
+	middleware.AddPaginationHeaders(c, total, page, limit, hasNext)
 
 	// Convert []*models.Task to []models.Task
 	taskList := make([]models.Task, len(tasks))
